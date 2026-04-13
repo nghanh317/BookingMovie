@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background-color: #0A0A0F;
+    color: #E8E8F0;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #1A1A24;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2A2A3E;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #F5C518;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-gold text-cinema-black font-heading font-bold rounded-lg transition-all duration-200 hover:shadow-glow-gold hover:scale-105 active:scale-95;
+  }
+
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-red text-white font-heading font-bold rounded-lg transition-all duration-200 hover:shadow-glow-red hover:scale-105 active:scale-95;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 border border-cinema-border text-cinema-text font-semibold rounded-lg transition-all duration-200 hover:border-primary hover:text-primary;
+  }
+
+  .card {
+    @apply bg-cinema-card rounded-xl border border-cinema-border shadow-card transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .section-title {
+    @apply text-2xl md:text-3xl font-heading font-bold text-white relative inline-flex items-center gap-3;
+  }
+
+  .section-title::before {
+    content: '';
+    @apply block w-1 h-7 bg-gradient-gold rounded-full;
+  }
+
+  .input-field {
+    @apply w-full bg-cinema-surface border border-cinema-border text-cinema-text rounded-lg px-4 py-3 outline-none transition-all duration-200 focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-cinema-muted;
+  }
+
+  .glass {
+    @apply bg-white/5 backdrop-blur-md border border-white/10;
+  }
+}

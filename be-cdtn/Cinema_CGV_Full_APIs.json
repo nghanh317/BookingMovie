@@ -1,0 +1,316 @@
+{
+	"info": {
+		"name": "Cinema CGV Full APIs",
+		"description": "Toàn bộ danh sách các API của dự án Backend Cinema CGV dùng để test.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Khởi tạo / Auth",
+			"item": [
+				{
+					"name": "Đăng nhập (Lấy Token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if(jsonData.token) {",
+									"    pm.collectionVariables.set(\"jwt_token\", jsonData.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"passwordHash\": \"123456\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"auth",
+								"login"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Accounts (Tài khoản)",
+			"item": [
+				{
+					"name": "Lấy danh sách Account",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/accounts?pageNumber=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "accounts"],
+							"query": [
+								{"key": "pageNumber", "value": "0"},
+								{"key": "size", "value": "10"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Lấy Account theo ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/accounts/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "accounts", "1"]
+						}
+					}
+				},
+				{
+					"name": "Thêm mới Account (Đăng ký)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"testuser\",\r\n    \"passwordHash\": \"123456\",\r\n    \"email\": \"test@gmail.com\",\r\n    \"phone\": \"0123456789\",\r\n    \"fullName\": \"Nguyen Van A\",\r\n    \"role\": \"USER\"\r\n}",
+							"options": {"raw": {"language": "json"}}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "Cập nhật Account",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"testuser\",\r\n    \"email\": \"testupdated@gmail.com\",\r\n    \"phone\": \"0123456789\",\r\n    \"fullName\": \"Nguyen Van A Updated\",\r\n    \"role\": \"USER\"\r\n}",
+							"options": {"raw": {"language": "json"}}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/accounts/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "accounts", "1"]
+						}
+					}
+				},
+				{
+					"name": "Xóa Account",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/accounts/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "accounts", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Movies (Bộ Phim)",
+			"item": [
+				{
+					"name": "Danh sách Phim",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/movies?pageNumber=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "movies"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Provinces (Tỉnh/Thành phố)",
+			"item": [
+				{
+					"name": "Danh sách Tỉnh thành phố",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/provinces?pageNumber=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "provinces"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Cinemas (Rạp hát)",
+			"item": [
+				{
+					"name": "Danh sách Rạp",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/cinemas?pageNumber=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "cinemas"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Rooms (Phòng chiếu)",
+			"item": [
+				{
+					"name": "Danh sách Phòng",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/rooms?pageNumber=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "rooms"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "7. Tickets (Vé & Đặt vé)",
+			"item": [
+				{
+					"name": "Lấy danh sách Vé",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/tickets?pageNumber=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "tickets"]
+						}
+					}
+				},
+				{
+					"name": "Chi tiết Vé (ID)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/tickets/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "tickets", "1"]
+						}
+					}
+				},
+				{
+					"name": "Đặt vé trực tuyến",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"accountsId\": 1,\r\n    \"slotsId\": 1,\r\n    \"discountAmount\": 0,\r\n    \"note\": \"Booking from Postman\",\r\n    \"seats\": [\r\n        { \"seatId\": 1 },\r\n        { \"seatId\": 2 }\r\n    ],\r\n    \"products\": [\r\n        { \"productId\": 1, \"quantity\": 2 }\r\n    ]\r\n}",
+							"options": {"raw": {"language": "json"}}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/tickets",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "tickets"]
+						}
+					}
+				},
+				{
+					"name": "Cập nhật Trạng thái vé",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"paymentStatus\": \"PAID\",\r\n    \"status\": \"CONFIRMED\"\r\n}",
+							"options": {"raw": {"language": "json"}}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/tickets/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "tickets", "1"]
+						}
+					}
+				},
+				{
+					"name": "Hủy/Xóa vé",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/tickets/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "tickets", "1"]
+						}
+					}
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{jwt_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [""]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [""]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "jwt_token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
