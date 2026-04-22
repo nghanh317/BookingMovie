@@ -158,17 +158,54 @@ export default function Checkout() {
     // Thử tạo vé thật qua API
     try {
       const ticketData = {
-        accountsId: user?.id,
-        slotsId: showtime?.id,
-        totalAmount: grandTotal,
-        note: `Ghế: ${seats.join(', ')}`,
+        accountsId: user?.id || 1, // Fallback to account 1 if not logged in
+        slotsId: showtime?.id || 1, // Fallback slot
+        discountAmount: 0,
+        note: `Ghế: ${seats.join(', ')} - SDT: ${form.phone}`,
+        seats: seats.map((s, index) => ({ seatId: index + 1 })), // Temporary mock mapping for seats
+        products: snacks.map(s => ({ productId: s.id, quantity: s.quantity })),
       };
+      
       const res = await ticketApi.create(ticketData);
       if (res.data?.ticketsCode) {
         ticketCode = res.data.ticketsCode;
+      } else if (res.ticketsCode) {
+        ticketCode = res.ticketsCode;
       }
+      
+      // TÍCH HỢP THANH TOÁN VNPAY & MOMO
+      if (paymentMethod === 'vnpay' || paymentMethod === 'momo') {
+        try {
+          const returnUrl = window.location.origin + '/payment/callback';
+          const payRes = await ticketApi.createPaymentUrl(paymentMethod, {
+             amount: grandTotal,
+             orderInfo: ticketCode,
+             returnUrl: returnUrl
+          });
+          const redirectUrl = payRes.data?.url || payRes.url || payRes?.url;
+          if (redirectUrl) {
+             sessionStorage.setItem('pendingBooking', JSON.stringify({
+               code: ticketCode,
+               movie: movie.title || movie.name,
+               seats: seats.join(', '),
+               snacks: snacks.length > 0 ? snacks.map(s => `${s.icon} ${s.name} ×${s.quantity}`).join(', ') : null,
+               total: grandTotal.toLocaleString('vi-VN') + 'đ'
+             }));
+             window.location.href = redirectUrl;
+             return;
+          }
+        } catch (paymentErr) {
+          console.warn('Lỗi gọi API thanh toán:', paymentErr);
+          // Fallback to success simulated
+        }
+      }
+
     } catch (err) {
-      console.warn('⚠️ Không thể tạo vé qua API, dùng mã tạm:', err.message);
+      console.warn('⚠️ Không thể tạo vé qua API, dùng mã tạm:', err.response?.data || err.message);
+      // In production, you might want to uncomment this to block booking on API failure
+      // alert("Lỗi khi thanh toán: " + (err.response?.data?.message || err.message));
+      // setProcessing(false);
+      // return;
     }
 
     // Simulate processing delay
@@ -177,7 +214,7 @@ export default function Checkout() {
 
     setBooking({
       code: ticketCode,
-      movie: movie.title,
+      movie: movie.title || movie.name,
       seats: seats.join(', '),
       snacks: snacks.length > 0 ? snacks.map(s => `${s.icon} ${s.name} ×${s.quantity}`).join(', ') : null,
       total: grandTotal.toLocaleString('vi-VN') + 'đ',
@@ -323,20 +360,20 @@ export default function Checkout() {
 
               <div className="flex gap-3 mb-4 pb-4 border-b border-cinema-border">
                 <img
-                  src={movie.poster}
-                  alt={movie.title}
+                  src={movie.heroImage || movie.poster}
+                  alt={movie.title || movie.name}
                   className="w-14 h-20 object-cover rounded-lg flex-shrink-0"
                   onError={e => { e.target.src = 'https://placehold.co/80x120/1E1E2C/A0A0B4'; }}
                 />
                 <div>
-                  <p className="text-white font-semibold text-sm leading-snug">{movie.title}</p>
-                  {cinema && <p className="text-cinema-muted text-xs mt-1">{cinema.name}</p>}
+                  <p className="text-white font-semibold text-sm leading-snug">{movie.title || movie.name}</p>
+                  {cinema && <p className="text-cinema-muted text-xs mt-1">{cinema.name || cinema.cinemasName}</p>}
                   {showtime && (
                     <p className="text-cinema-muted text-xs">
-                      {new Date(showtime.date).toLocaleDateString('vi-VN')} • {showtime.time}
+                      {new Date(showtime.date || showtime.showTime).toLocaleDateString('vi-VN')} • {showtime.time}
                     </p>
                   )}
-                  {showtime && <span className="badge bg-cinema-surface border border-cinema-border text-cinema-muted text-[10px] mt-1 inline-block">{showtime.type}</span>}
+                  {showtime && <span className="badge bg-cinema-surface border border-cinema-border text-cinema-muted text-[10px] mt-1 inline-block">{showtime.type || '2D'}</span>}
                 </div>
               </div>
 

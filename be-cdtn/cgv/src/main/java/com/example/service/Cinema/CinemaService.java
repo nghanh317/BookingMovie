@@ -56,6 +56,9 @@ public class CinemaService implements ICinemaService{
 			form.getPhone(), 
 			form.getEmail()
 		);
+		createCinema.setLatitude(form.getLatitude());
+		createCinema.setLongitude(form.getLongitude());
+		
 		Provinces province = new Provinces();
 		province.setId(form.getProvinceId());
 		createCinema.setProvinces(province);
@@ -70,6 +73,8 @@ public class CinemaService implements ICinemaService{
 		updateCinema.setAddress(form.getAddress());
 		updateCinema.setPhone(form.getPhone());
 		updateCinema.setEmail(form.getEmail());
+		updateCinema.setLatitude(form.getLatitude());
+		updateCinema.setLongitude(form.getLongitude());
 		
 		cinemaRepository.save(updateCinema);
 	}

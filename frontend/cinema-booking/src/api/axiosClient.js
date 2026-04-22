@@ -33,13 +33,18 @@ axiosClient.interceptors.response.use(
       const { status, config } = error.response;
       const requestUrl = config?.url || '';
 
-      // Bỏ qua redirect cho các endpoint công khai (auth, movies GET, ...)
+      // Danh sách endpoint công khai - không redirect khi lỗi 401/403
       const isPublicEndpoint =
         requestUrl.includes('/api/v1/auth/') ||
-        requestUrl.includes('/api/v1/movies');
+        requestUrl.includes('/api/v1/movies') ||
+        requestUrl.includes('/api/v1/slots') ||
+        requestUrl.includes('/api/v1/rooms') ||
+        requestUrl.includes('/api/v1/cinemas') ||
+        requestUrl.includes('/api/v1/provinces');
 
-      // Chỉ logout + redirect khi user ĐANG đăng nhập và token hết hạn
-      if ((status === 401 || status === 403) && !isPublicEndpoint) {
+      // Chỉ logout + redirect khi token thực sự hết hạn (401)
+      // KHÔNG logout khi 403 (thiếu quyền) vì admin vẫn đang đăng nhập hợp lệ
+      if (status === 401 && !isPublicEndpoint) {
         try {
           const authData = JSON.parse(localStorage.getItem('cinema-auth'));
           if (authData?.state?.user?.token) {

@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import com.example.dto.AccountDTO;
@@ -52,19 +52,20 @@ public class JWTTokenService implements IJWTTokenService{
         try {
         String userName = Jwts.parser()
                 .setSigningKey(SECRET)
-                .parseClaimsJws(token.replace(TOKEN_PREFIX, ""))
+                .parseClaimsJws(token.replace(TOKEN_PREFIX, "").trim())
                 .getBody()
                 .getSubject();
         
-        AccountDTO account = accountService.getAccountByUserName(userName);
+        UserDetails userDetails = accountService.loadUserByUsername(userName);
 
         return userName != null ?
                 new UsernamePasswordAuthenticationToken(
-                		account.getUserName(), 
+                		userDetails.getUsername(), 
                 		null, 
-                		AuthorityUtils.createAuthorityList(account.getRole().toString())) :
+                		userDetails.getAuthorities()) :
                 null;
         } catch (Exception e) {
+            e.printStackTrace();
 			return null;
 		}
     }

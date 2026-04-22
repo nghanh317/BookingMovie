@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { SNACK_ITEMS } from '../../constants/mockData';
+import productApi from '../../api/productApi';
 
 const STEPS = ['Chọn suất chiếu', 'Chọn ghế', 'Bỏng & Nước', 'Thanh toán'];
 
@@ -50,10 +50,36 @@ export default function SnackSelection() {
   const navigate = useNavigate();
   const { movie, showtime, cinema, seats, totalPrice } = location.state || {};
 
-  // quantities: { [snackId]: number }
-  const [quantities, setQuantities] = useState(() =>
-    Object.fromEntries(SNACK_ITEMS.map(s => [s.id, 0]))
-  );
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // quantities: { [product.id]: number }
+  const [quantities, setQuantities] = useState({});
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const res = await productApi.getAll({ size: 100 });
+        const list = res.content || res.data?.content || res.data || [];
+        // Optional mapping icon logic based on category or name
+        const mappedList = list.map(p => ({
+          ...p,
+          icon: p.category?.toLowerCase() === 'drink' ? '🥤' : p.category?.toLowerCase() === 'combo' ? '🎉' : '🍿',
+          price: p.price || 0,
+        }));
+        setProducts(mappedList);
+        // define initial map
+        const initialQs = {};
+        mappedList.forEach(p => initialQs[p.id] = 0);
+        setQuantities(initialQs);
+      } catch (err) {
+        console.error('Lỗi lấy snack/product', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);
 
   if (!movie || !seats) {
     return (
@@ -68,7 +94,7 @@ export default function SnackSelection() {
 
   const setQty = (id, val) => setQuantities(prev => ({ ...prev, [id]: val }));
 
-  const selectedSnacks = SNACK_ITEMS
+  const selectedSnacks = products
     .filter(s => quantities[s.id] > 0)
     .map(s => ({ ...s, quantity: quantities[s.id], subtotal: s.price * quantities[s.id] }));
 
@@ -87,7 +113,7 @@ export default function SnackSelection() {
   };
 
   const CATEGORIES = [
-    { key: 'snack', label: '🍿 Bỏng Rang', color: 'from-yellow-500/10 to-orange-500/10 border-yellow-700/30' },
+    { key: 'snack', label: '🍿 Đồ ăn nhẹ', color: 'from-yellow-500/10 to-orange-500/10 border-yellow-700/30' },
     { key: 'drink', label: '🥤 Nước Uống', color: 'from-blue-500/10 to-cyan-500/10 border-blue-700/30' },
     { key: 'combo', label: '🎉 Combo Tiết Kiệm', color: 'from-primary/10 to-accent/10 border-primary/30' },
   ];
@@ -105,8 +131,21 @@ export default function SnackSelection() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left – Items */}
           <div className="lg:col-span-2 space-y-6">
-            {CATEGORIES.map(cat => {
-              const items = SNACK_ITEMS.filter(s => s.category === cat.key);
+            {loading ? (
+              <div className="text-cinema-muted text-center py-20">Đang tải danh sách đồ ăn, thức uống...</div>
+            ) : products.length === 0 ? (
+              <div className="text-cinema-muted text-center py-10 border border- सिनेमा-border rounded-xl">Không có bỏng nước nào được tìm thấy.</div>
+            ) : CATEGORIES.map(cat => {
+              const items = products.filter(s => {
+                const c = s.category?.toLowerCase() || '';
+                if (cat.key === 'snack') return !c.includes('combo') && !c.includes('drink') && !c.includes('voucher');
+                if (cat.key === 'drink') return c.includes('drink');
+                if (cat.key === 'combo') return c.includes('combo') || c.includes('voucher');
+                return true;
+              });
+
+              if (items.length === 0) return null;
+
               return (
                 <div key={cat.key}>
                   <h2 className="font-heading font-bold text-white mb-3 text-lg">{cat.label}</h2>
@@ -120,12 +159,12 @@ export default function SnackSelection() {
                       >
                         <div className="text-4xl flex-shrink-0">{item.icon}</div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-white font-semibold">{item.name}</p>
-                          <p className="text-cinema-muted text-xs mt-0.5 line-clamp-1">{item.desc}</p>
+                          <p className="text-white font-semibold">{item.productName || item.name}</p>
+                          <p className="text-cinema-muted text-xs mt-0.5 line-clamp-1">{item.description}</p>
                           <p className="text-primary font-bold mt-1">{item.price.toLocaleString('vi-VN')}đ</p>
                         </div>
                         <QuantityControl
-                          value={quantities[item.id]}
+                          value={quantities[item.id] || 0}
                           onChange={val => setQty(item.id, val)}
                         />
                       </motion.div>
@@ -144,14 +183,14 @@ export default function SnackSelection() {
               {/* Movie info */}
               <div className="flex gap-3 mb-4 pb-4 border-b border-cinema-border">
                 <img
-                  src={movie.poster}
-                  alt={movie.title}
+                  src={movie.heroImage || movie.poster}
+                  alt={movie.title || movie.name}
                   className="w-12 h-16 object-cover rounded-lg flex-shrink-0"
                   onError={e => { e.target.src = 'https://placehold.co/80x120/1E1E2C/A0A0B4'; }}
                 />
                 <div>
-                  <p className="text-white font-semibold text-sm leading-snug">{movie.title}</p>
-                  {showtime && <p className="text-cinema-muted text-xs mt-1">{showtime.time} · {showtime.type}</p>}
+                  <p className="text-white font-semibold text-sm leading-snug">{movie.title || movie.name}</p>
+                  {showtime && <p className="text-cinema-muted text-xs mt-1">{showtime.time} · {showtime.type || '2D'}</p>}
                   <p className="text-cinema-muted text-xs">Ghế: {seats.join(', ')}</p>
                 </div>
               </div>
@@ -160,14 +199,14 @@ export default function SnackSelection() {
               <div className="space-y-2 text-sm mb-4">
                 <div className="flex justify-between">
                   <span className="text-cinema-muted">Tiền vé ({seats.length} ghế)</span>
-                  <span className="text-white">{totalPrice.toLocaleString('vi-VN')}đ</span>
+                  <span className="text-white font-bold">{totalPrice.toLocaleString('vi-VN')}đ</span>
                 </div>
                 {selectedSnacks.length > 0 && (
                   <>
                     <p className="text-cinema-muted text-xs pt-1 pb-0.5 border-t border-cinema-border/50 mt-2">Bỏng & Nước:</p>
                     {selectedSnacks.map(s => (
                       <div key={s.id} className="flex justify-between text-xs">
-                        <span className="text-cinema-muted">{s.icon} {s.name} ×{s.quantity}</span>
+                        <span className="text-cinema-muted">{s.icon} {s.productName || s.name} ×{s.quantity}</span>
                         <span className="text-white">{s.subtotal.toLocaleString('vi-VN')}đ</span>
                       </div>
                     ))}

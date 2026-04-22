@@ -183,14 +183,13 @@ export default function Home() {
     const fetchMovies = async () => {
       try {
         const { data } = await movieApi.getAll({ page: 0, size: 50 });
-        // Spring Data Page trả về { content: [...], totalPages, ... }
-        const list = data.content || data.data || data;
+        // Backend trả về { data: [...] } hoặc data là array trực tiếp
+        const list = Array.isArray(data) ? data : (data?.data || data?.content || []);
         if (Array.isArray(list) && list.length > 0) {
           setMovies(list.map(mapMovieDTO));
         }
       } catch (err) {
         console.warn('⚠️ Không kết nối được backend, dùng mock data:', err.message);
-        // Giữ nguyên MOVIES mock
       } finally {
         setLoading(false);
       }

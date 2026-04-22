@@ -60,18 +60,18 @@ public class SecurityConfiguration {
 					.requestMatchers(HttpMethod.POST, "/api/v1/movies/**").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.PUT, "/api/v1/movies/**").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.DELETE, "/api/v1/movies/**").hasAuthority("ADMIN")
-//					PROVINCE, CINEMAS, ROOMS, SLOTS, SEATS, PROMOTIONS - Public GET
+//					PROVINCE, CINEMAS, ROOMS, SLOTS, SEATS, PROMOTIONS, PRODUCTS - Public GET
 					.requestMatchers(HttpMethod.GET, "/api/v1/provinces/**", "/api/v1/cinemas/**", "/api/v1/rooms/**", 
-							"/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**").permitAll()
+							"/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**", "/api/v1/products/**").permitAll()
 					
 //					TICKET & BOOKING SEAT - USER & ADMIN can create/view
 					.requestMatchers(HttpMethod.GET, "/api/v1/tickets/**", "/api/v1/bookingSeats/**").hasAnyAuthority("USER", "ADMIN")
 					.requestMatchers(HttpMethod.POST, "/api/v1/tickets/**", "/api/v1/bookingSeats/**").hasAnyAuthority("USER", "ADMIN")
 					
 //					Other methods for PROVINCE, CINEMA, etc. still require ADMIN
-					.requestMatchers(HttpMethod.POST, "/api/v1/provinces/**", "/api/v1/cinemas/**", "/api/v1/rooms/**", "/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**").hasAuthority("ADMIN")
-					.requestMatchers(HttpMethod.PUT, "/api/v1/provinces/**", "/api/v1/cinemas/**", "/api/v1/rooms/**", "/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**").hasAuthority("ADMIN")
-					.requestMatchers(HttpMethod.DELETE, "/api/v1/provinces/**", "/api/v1/cinemas/**", "/api/v1/rooms/**", "/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.POST, "/api/v1/provinces/**", "/api/v1/cinemas/**", "/api/v1/rooms/**", "/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**", "/api/v1/products/**").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.PUT, "/api/v1/provinces/**", "/api/v1/cinemas/**", "/api/v1/rooms/**", "/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**", "/api/v1/products/**").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.DELETE, "/api/v1/provinces/**", "/api/v1/cinemas/**", "/api/v1/rooms/**", "/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**", "/api/v1/products/**").hasAuthority("ADMIN")
 
 					.requestMatchers("/api/v1/**").hasAuthority("ADMIN")
 					.anyRequest().authenticated())

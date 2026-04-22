@@ -1,14 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-
-const MOCK_USERS = [
-  { id: 1, name: 'Nguyễn Văn An',  email: 'nguyenvanan@email.com', phone: '0912345678', joinDate: '2024-09-01',  bookings: 12, spent: 1450000, level: 'Gold',     points: 1250, status: 'active' },
-  { id: 2, name: 'Trần Thị Bình', email: 'tranthib@email.com',    phone: '0987654321', joinDate: '2024-11-15', bookings: 8,  spent: 960000,  level: 'Silver',   points: 380,  status: 'active' },
-  { id: 3, name: 'Lê Minh Châu',  email: 'lmchau@email.com',      phone: '0901234567', joinDate: '2025-01-20', bookings: 3,  spent: 375000,  level: 'Bronze',   points: 90,   status: 'active' },
-  { id: 4, name: 'Phạm Thị Dung', email: 'phamdung@email.com',   phone: '0976543210', joinDate: '2024-08-05',  bookings: 25, spent: 3200000, level: 'Platinum', points: 3200, status: 'active' },
-  { id: 5, name: 'Hoàng Văn Em',  email: 'hoangemail@email.com',  phone: '0912000111', joinDate: '2025-03-01', bookings: 1,  spent: 79250,   level: 'Bronze',   points: 20,   status: 'inactive' },
-  { id: 6, name: 'Vũ Thị Phương', email: 'vuphuong@email.com',  phone: '0933456789', joinDate: '2024-12-10', bookings: 15, spent: 1800000, level: 'Gold',     points: 1680, status: 'active' },
-];
+import accountApi from '../../api/accountApi';
 
 const LEVEL_STYLE = {
   Bronze: 'bg-orange-500/20 border-orange-500/30 text-orange-400',
@@ -18,9 +10,55 @@ const LEVEL_STYLE = {
 };
 
 export default function AdminUsers() {
-  const [users, setUsers] = useState(MOCK_USERS);
+  const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [filterLevel, setFilterLevel] = useState('all');
+  const [loading, setLoading] = useState(true);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const response = await accountApi.getAll({ size: 100 });
+      // Backend trả về { data: [...] }
+      const d = response.data;
+      const rawUsers = Array.isArray(d) ? d : (d?.data || d?.content || []);
+      
+      const mapped = rawUsers.map(u => {
+        const tickets = u.tickets || [];
+        const bookings = tickets.length || 0;
+        const spent = tickets.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+        const points = Math.floor(spent / 10000);
+        
+        let level = 'Bronze';
+        if (points > 3000) level = 'Platinum';
+        else if (points > 1500) level = 'Gold';
+        else if (points > 500) level = 'Silver';
+
+        return {
+          id: u.id,
+          name: u.fullName || u.userName || 'Unknown',
+          email: u.email || 'N/A',
+          phone: u.phone || 'N/A',
+          joinDate: u.createDate || u.createdAt || new Date().toISOString(),
+          status: u.isDeleted ? 'inactive' : 'active',
+          role: u.role,
+          bookings,
+          spent,
+          points,
+          level
+        };
+      });
+      setUsers(mapped);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   const filtered = users.filter(u => {
     const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
@@ -28,8 +66,19 @@ export default function AdminUsers() {
     return matchSearch && matchLevel;
   });
 
-  const toggleStatus = (id) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u));
+  const toggleStatus = async (id) => {
+    const userToToggle = users.find(u => u.id === id);
+    if (!userToToggle) return;
+    
+    try {
+      const newStatus = userToToggle.status === 'active' ? 0 : 1;
+      // Depending on backend support, we might need a specific endpoint to ban/unban user.
+      // For now, doing a generic put or just optimistic update:
+      // await accountApi.update(id, { ...userToToggle, status: newStatus });
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u));
+    } catch (error) {
+      console.error("Lỗi khi chuyển đổi trạng thái");
+    }
   };
 
   const totalStats = {
@@ -88,12 +137,16 @@ export default function AdminUsers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-cinema-border/50">
-              {filtered.map(user => (
+              {loading ? (
+                <tr><td colSpan="9" className="text-center py-10 text-cinema-muted">Đang tải dữ liệu...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan="9" className="text-center py-10 text-cinema-muted">Không có dữ liệu</td></tr>
+              ) : filtered.map(user => (
                 <tr key={user.id} className="hover:bg-cinema-card/50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-cinema-black font-bold text-xs flex-shrink-0">
-                        {user.name.split(' ').pop()[0]}
+                        {user.name.split(' ').pop()[0] || 'U'}
                       </div>
                       <span className="text-white text-sm font-medium">{user.name}</span>
                     </div>

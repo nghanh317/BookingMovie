@@ -29,6 +29,14 @@ const ticketApi = {
   },
 
   /**
+   * Tạo url thanh toán VNPay / MoMo
+   * POST /api/v1/payments/{method}
+   */
+  createPaymentUrl: (method, data) => {
+    return axiosClient.post(`/api/v1/payments/${method}`, data);
+  },
+
+  /**
    * Cập nhật vé
    * PUT /api/v1/tickets/{id}
    */

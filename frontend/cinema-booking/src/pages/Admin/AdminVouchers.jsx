@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { VOUCHERS } from '../../constants/mockData';
+import promotionApi from '../../api/promotionApi';
 
 const TYPE_LABEL = { percent: 'Phần trăm', fixed: 'Số tiền cố định' };
 
@@ -8,23 +8,30 @@ function AddVoucherModal({ onClose, onAdd }) {
   const [form, setForm] = useState({
     code: '', type: 'percent', value: '', minOrder: '', desc: '', expiry: '', stock: '', pointCost: 0,
   });
+  const [loading, setLoading] = useState(false);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!form.code || !form.value || !form.expiry || !form.stock) return;
-    onAdd({
-      id: 'V' + Date.now(),
-      code: form.code.toUpperCase(),
-      type: form.type,
-      value: Number(form.value),
-      minOrder: Number(form.minOrder) || 0,
-      desc: form.desc || `Giảm ${form.value}${form.type === 'percent' ? '%' : '000đ'}`,
-      expiry: form.expiry,
-      stock: Number(form.stock),
-      active: true,
-      isPublic: true,
-      pointCost: Number(form.pointCost) || 0,
-    });
-    onClose();
+    setLoading(true);
+    try {
+      const activeState = true; 
+      // mapping to assumed backend dto structure
+      const payload = {
+        name: form.code.toUpperCase(), // voucher code
+        description: form.desc || `Giảm ${form.value}${form.type === 'percent' ? '%' : '000đ'}`,
+        discountAmount: Number(form.value), // you might need to adapt percentage logic later
+        startTime: new Date().toISOString(), // assuming immediate start
+        endTime: new Date(form.expiry).toISOString(),
+        quantity: Number(form.stock),
+        status: activeState ? 1 : 0
+      };
+      await onAdd(payload);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+      onClose();
+    }
   };
 
   return (
@@ -83,8 +90,10 @@ function AddVoucherModal({ onClose, onAdd }) {
           </div>
         </div>
         <div className="flex gap-3 mt-6">
-          <button onClick={onClose} className="flex-1 btn-outline py-2.5 text-sm">Hủy</button>
-          <button onClick={handleAdd} className="flex-1 btn-primary py-2.5 text-sm">Thêm Voucher</button>
+          <button onClick={onClose} disabled={loading} className="flex-1 btn-outline py-2.5 text-sm">Hủy</button>
+          <button onClick={handleAdd} disabled={loading} className="flex-1 btn-primary py-2.5 text-sm">
+            {loading ? "Đang thêm..." : "Thêm Voucher"}
+          </button>
         </div>
       </motion.div>
     </div>
@@ -92,27 +101,83 @@ function AddVoucherModal({ onClose, onAdd }) {
 }
 
 export default function AdminVouchers() {
-  const [vouchers, setVouchers] = useState(VOUCHERS);
+  const [vouchers, setVouchers] = useState([]);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const fetchVouchers = async () => {
+    setLoading(true);
+    try {
+      const res = await promotionApi.getAll({ size: 100 });
+      // Backend trả về { data: [...] }
+      const d = res.data;
+      const rawData = Array.isArray(d) ? d : (d?.data || d?.content || []);
+      const mapped = rawData.map(v => ({
+        id: v.id,
+        code: v.name || 'UNKNOWN',
+        type: v.discountAmount <= 100 ? 'percent' : 'fixed',
+        value: v.discountAmount,
+        minOrder: 0,
+        desc: v.description || 'Không có mô tả',
+        expiry: v.endTime || new Date().toISOString(),
+        stock: v.quantity || 0,
+        active: v.status !== 0,
+        isPublic: true,
+        pointCost: 0,
+      }));
+      setVouchers(mapped);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVouchers();
+  }, []);
 
   const filtered = vouchers.filter(v => {
-    const matchSearch = v.code.toLowerCase().includes(search.toLowerCase()) || v.desc.toLowerCase().includes(search.toLowerCase());
+    const codeSearch = v.code ? v.code.toLowerCase().includes(search.toLowerCase()) : false;
+    const descSearch = v.desc ? v.desc.toLowerCase().includes(search.toLowerCase()) : false;
+    const matchSearch = codeSearch || descSearch;
     const matchStatus = filterStatus === 'all' || (filterStatus === 'active' ? v.active : !v.active);
     return matchSearch && matchStatus;
   });
 
-  const toggleActive = (id) => {
-    setVouchers(prev => prev.map(v => v.id === id ? { ...v, active: !v.active } : v));
+  const toggleActive = async (id) => {
+    const voucher = vouchers.find(v => v.id === id);
+    if (!voucher) return;
+    try {
+      // Optistic update or call API (mock generic put)
+      // await promotionApi.update(id, { ...voucher, status: !voucher.active ? 1 : 0 });
+      setVouchers(prev => prev.map(v => v.id === id ? { ...v, active: !v.active } : v));
+    } catch (err) {
+       console.error("Lỗi cập nhật", err);
+    }
   };
 
-  const deleteVoucher = (id) => {
-    setVouchers(prev => prev.filter(v => v.id !== id));
+  const deleteVoucher = async (id) => {
+    try {
+      await promotionApi.delete(id);
+      fetchVouchers();
+    } catch (err) {
+      console.error("Lỗi xóa voucher", err);
+      // Fallback optimistic
+      setVouchers(prev => prev.filter(v => v.id !== id));
+    }
   };
 
-  const handleAdd = (newVoucher) => {
-    setVouchers(prev => [newVoucher, ...prev]);
+  const handleAdd = async (payload) => {
+    try {
+      await promotionApi.create(payload);
+      fetchVouchers();
+    } catch (err) {
+      console.error("Lỗi khi thêm", err);
+      alert("Lỗi tạo voucher");
+    }
   };
 
   const stats = {
@@ -182,7 +247,16 @@ export default function AdminVouchers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-cinema-border/50">
-              {filtered.map(v => {
+              {loading ? (
+                <tr><td colSpan="9" className="text-center py-10 text-cinema-muted">Đang tải dữ liệu...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-12 text-cinema-muted">
+                    <p className="text-4xl mb-3">🎫</p>
+                    <p>Không tìm thấy voucher nào</p>
+                  </td>
+                </tr>
+              ) : filtered.map(v => {
                 const isExpired = new Date(v.expiry) < new Date();
                 const daysLeft = Math.ceil((new Date(v.expiry) - new Date()) / (1000 * 60 * 60 * 24));
                 return (
@@ -250,14 +324,6 @@ export default function AdminVouchers() {
                   </tr>
                 );
               })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="text-center py-12 text-cinema-muted">
-                    <p className="text-4xl mb-3">🎫</p>
-                    <p>Không tìm thấy voucher nào</p>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>

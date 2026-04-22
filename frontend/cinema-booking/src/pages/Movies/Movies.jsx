@@ -41,7 +41,8 @@ export default function Movies() {
     const fetchMovies = async () => {
       try {
         const { data } = await movieApi.getAll({ page: 0, size: 100 });
-        const list = data.content || data.data || data;
+        // Backend trả về { data: [...] } hoặc data là array trực tiếp
+        const list = Array.isArray(data) ? data : (data?.data || data?.content || []);
         if (Array.isArray(list) && list.length > 0) {
           setMovies(list.map(mapMovieDTO));
         }

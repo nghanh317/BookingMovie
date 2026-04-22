@@ -21,21 +21,23 @@ export default function MovieCard({ movie, index = 0 }) {
       <div className="card overflow-hidden">
         {/* Poster */}
         <div className="relative overflow-hidden aspect-[2/3]">
-          <img
-            src={movie.poster}
-            alt={movie.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-            loading="lazy"
-            onError={(e) => {
-              e.target.src = `https://placehold.co/300x450/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title)}`;
-            }}
-          />
+          <Link to={`/movies/${movie.id}`} className="absolute inset-0 z-0 block">
+            <img
+              src={movie.poster}
+              alt={movie.title}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              loading="lazy"
+              onError={(e) => {
+                e.target.src = `https://placehold.co/300x450/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title)}`;
+              }}
+            />
+          </Link>
 
           {/* Overlay on hover */}
-          <div className="absolute inset-0 bg-gradient-cinema opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+          <div className="absolute inset-0 bg-gradient-cinema opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4 z-10">
             <Link
               to={`/booking/${movie.id}`}
-              className="w-full btn-primary text-sm py-2 text-center"
+              className="w-full btn-primary text-sm py-2 text-center pointer-events-auto"
               onClick={(e) => e.stopPropagation()}
             >
               🎟️ Đặt Vé Ngay
@@ -44,13 +46,13 @@ export default function MovieCard({ movie, index = 0 }) {
 
           {/* Age Rating Badge */}
           {ageInfo && (
-            <span className={`absolute top-2 left-2 badge ${ageInfo.color} text-white font-bold text-xs`}>
+            <span className={`absolute top-2 left-2 badge ${ageInfo.color} text-white font-bold text-xs pointer-events-none z-10`}>
               {ageInfo.label}
             </span>
           )}
 
           {/* Status Badge */}
-          <span className={`absolute top-2 right-2 badge text-xs font-semibold ${
+          <span className={`absolute top-2 right-2 badge text-xs font-semibold pointer-events-none z-10 ${
             movie.status === 'now_showing'
               ? 'bg-accent text-white'
               : 'bg-cinema-surface border border-cinema-border text-cinema-muted'

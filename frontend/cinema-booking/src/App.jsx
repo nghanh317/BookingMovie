@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/layout/Layout';
-import { RequireAuth, RequireAdmin } from './components/auth/ProtectedRoute';
+import { RequireAuth, RequireAdmin, BlockAdmin } from './components/auth/ProtectedRoute';
 
 import Home from './pages/Home/Home';
 import Movies from './pages/Movies/Movies';
@@ -14,12 +14,14 @@ import Register from './pages/Auth/Register';
 import ForgotPassword from './pages/Auth/ForgotPassword';
 import Profile from './pages/Profile/Profile';
 import Offers from './pages/Offers/Offers';
+import PaymentCallback from './pages/PaymentCallback/PaymentCallback';
 
 // Admin pages
 import AdminLayout from './pages/Admin/AdminLayout';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import AdminMovies from './pages/Admin/AdminMovies';
 import AdminShowtimes from './pages/Admin/AdminShowtimes';
+import AdminCinemas from './pages/Admin/AdminCinemas';
 import AdminUsers from './pages/Admin/AdminUsers';
 import AdminRevenue from './pages/Admin/AdminRevenue';
 import AdminVouchers from './pages/Admin/AdminVouchers';
@@ -28,16 +30,16 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ── Public routes ───────────────────────────── */}
-        <Route path="/" element={<Layout><Home /></Layout>} />
-        <Route path="/movies" element={<Layout><Movies /></Layout>} />
-        <Route path="/movies/:id" element={<Layout><MovieDetail /></Layout>} />
-        <Route path="/offers" element={<Layout><Offers /></Layout>} />
-        <Route path="/login" element={<Layout><Login /></Layout>} />
-        <Route path="/register" element={<Layout><Register /></Layout>} />
-        <Route path="/forgot-password" element={<Layout><ForgotPassword /></Layout>} />
+        {/* ── Routes dành cho USER (admin bị chặn → redirect /admin) ─── */}
+        <Route path="/" element={<BlockAdmin><Layout><Home /></Layout></BlockAdmin>} />
+        <Route path="/movies" element={<BlockAdmin><Layout><Movies /></Layout></BlockAdmin>} />
+        <Route path="/movies/:id" element={<BlockAdmin><Layout><MovieDetail /></Layout></BlockAdmin>} />
+        <Route path="/offers" element={<BlockAdmin><Layout><Offers /></Layout></BlockAdmin>} />
+        <Route path="/login" element={<BlockAdmin><Layout><Login /></Layout></BlockAdmin>} />
+        <Route path="/register" element={<BlockAdmin><Layout><Register /></Layout></BlockAdmin>} />
+        <Route path="/forgot-password" element={<BlockAdmin><Layout><ForgotPassword /></Layout></BlockAdmin>} />
 
-        {/* ── Protected: đăng nhập mới vào được ────────── */}
+        {/* ── Protected: chỉ user đã đăng nhập (admin cũng bị chặn) ─── */}
         <Route path="/booking/:movieId" element={
           <RequireAuth><Layout><Booking /></Layout></RequireAuth>
         } />
@@ -53,6 +55,10 @@ function App() {
         <Route path="/profile" element={
           <RequireAuth><Layout><Profile /></Layout></RequireAuth>
         } />
+        <Route path="/payment/callback" element={
+          <BlockAdmin><Layout><PaymentCallback /></Layout></BlockAdmin>
+        } />
+
 
         {/* ── Protected: chỉ admin mới vào được ─────────── */}
         <Route path="/admin" element={
@@ -63,6 +69,9 @@ function App() {
         } />
         <Route path="/admin/showtimes" element={
           <RequireAdmin><AdminLayout><AdminShowtimes /></AdminLayout></RequireAdmin>
+        } />
+        <Route path="/admin/cinemas" element={
+          <RequireAdmin><AdminLayout><AdminCinemas /></AdminLayout></RequireAdmin>
         } />
         <Route path="/admin/users" element={
           <RequireAdmin><AdminLayout><AdminUsers /></AdminLayout></RequireAdmin>

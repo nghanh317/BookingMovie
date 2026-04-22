@@ -79,7 +79,24 @@ public class MovieService implements IMovieService{
 	
 	@Override
 	public void createMovie (CreateMovieForm form) {
-		Movies createMovie = new Movies(form.getTitle(), form.getDescription(), form.getDuration(), form.getReleaseDate(), form.getDirector(), form.getCast(), form.getGenre(), form.getLanguage());
+		Movies createMovie = new Movies(
+				form.getTitle(),
+				form.getDescription() != null ? form.getDescription() : "",
+				form.getDuration() != null ? form.getDuration() : 0,
+				form.getReleaseDate(),
+				form.getDirector() != null ? form.getDirector() : "",
+				form.getCast() != null ? form.getCast() : "",
+				form.getGenre() != null ? form.getGenre() : "",
+				form.getLanguage() != null ? form.getLanguage() : "Tiếng Anh"
+		);
+		// Lưu các field bổ sung
+		if (form.getPosterUrl() != null) createMovie.setPosterUrl(form.getPosterUrl());
+		if (form.getTrailerUrl() != null) createMovie.setTrailerUrl(form.getTrailerUrl());
+		// Status tự động theo ngày chiếu (frontend gửi có thể override)
+		if (form.getStatus() != null) {
+			Movies.Status s = Movies.Status.toEnum(form.getStatus().toLowerCase());
+			if (s != null) createMovie.setStatus(s);
+		}
 		movieRepository.save(createMovie);
 	}
 	@Override
@@ -94,6 +111,12 @@ public class MovieService implements IMovieService{
 		updateMovie.setDescription(form.getDescription());
 		updateMovie.setReleaseDate(form.getReleaseDate());
 		updateMovie.setPosterUrl(form.getPosterUrl());
+		if (form.getTrailerUrl() != null) updateMovie.setTrailerUrl(form.getTrailerUrl());
+		// Cập nhật status theo ngày chiếu
+		if (form.getStatus() != null) {
+			Movies.Status s = Movies.Status.toEnum(form.getStatus().toLowerCase());
+			if (s != null) updateMovie.setStatus(s);
+		}
 		
 		movieRepository.save(updateMovie);
 		
