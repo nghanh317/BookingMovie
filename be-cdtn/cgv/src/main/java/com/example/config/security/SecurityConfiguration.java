@@ -47,6 +47,8 @@ public class SecurityConfiguration {
 			.cors(withDefaults())
 			.csrf((csrf) -> csrf.disable())
 			.authorizeHttpRequests((requests) -> requests
+//					Chatbot AI - ưu tiên cao nhất
+					.requestMatchers("/api/v1/ai/**").permitAll()
 //					AUTH - public (phải đặt trước các rule khác)
 					.requestMatchers("/api/v1/auth/**").permitAll()
 //					MOVIE - cho phép xem phim mà không cần đăng nhập
@@ -86,8 +88,10 @@ public class SecurityConfiguration {
 	@Bean
 	public CorsConfigurationSource corsConfigurationSource() {
 		final CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE"));
-		configuration.applyPermitDefaultValues();
+		configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+		configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+		configuration.setAllowedHeaders(Arrays.asList("*"));
+		configuration.setAllowCredentials(true);
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);
 		return source;
