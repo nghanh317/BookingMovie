@@ -27,7 +27,7 @@ function Field({ name, label, type = 'text', placeholder, autoComplete, form, se
 export default function Register() {
   const navigate = useNavigate();
   const { register } = useAuthStore();
-  const [form, setForm] = useState({ userName: '', fullName: '', email: '', phone: '', password: '', confirm: '' });
+  const [form, setForm] = useState({ userName: '', fullName: '', email: '', phone: '', passwordHash: '', confirm: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -39,9 +39,9 @@ export default function Register() {
     if (!form.userName.trim()) errs.userName = 'Vui lòng nhập tên đăng nhập';
     if (!form.fullName.trim()) errs.fullName = 'Vui lòng nhập họ tên';
     if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email không hợp lệ';
-    if (!form.phone || !/^(0|\+84)[0-9]{9}$/.test(form.phone)) errs.phone = 'Số điện thoại không hợp lệ';
-    if (!form.password || form.password.length < 8) errs.password = 'Mật khẩu tối thiểu 8 ký tự';
-    if (form.password !== form.confirm) errs.confirm = 'Mật khẩu không khớp';
+    if (!form.phone || !/^(0|\+84)[0-9]{8,10}$/.test(form.phone)) errs.phone = 'Số điện thoại không hợp lệ';
+    if (!form.passwordHash || form.passwordHash.length < 6) errs.passwordHash = 'Mật khẩu tối thiểu 6 ký tự';
+    if (form.passwordHash !== form.confirm) errs.confirm = 'Mật khẩu không khớp';
     if (!agreed) errs.agreed = 'Bạn cần đồng ý với điều khoản';
     return errs;
   };
@@ -51,15 +51,17 @@ export default function Register() {
     setApiError('');
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    
     setLoading(true);
+
+    // Gọi API đăng ký thật qua authStore
     const result = await register({
       userName: form.userName,
-      password: form.password,
+      passwordHash: form.passwordHash,
       email: form.email,
       phone: form.phone,
       fullName: form.fullName,
     });
+
     setLoading(false);
 
     if (!result.success) {
@@ -68,14 +70,14 @@ export default function Register() {
     }
 
     // Đăng ký thành công → chuyển sang trang login
-    navigate('/login');
+    navigate('/login', { state: { registered: true } });
   };
 
   const passwordStrength = (() => {
-    const p = form.password;
+    const p = form.passwordHash;
     if (!p) return 0;
     let score = 0;
-    if (p.length >= 8) score++;
+    if (p.length >= 6) score++;
     if (/[A-Z]/.test(p)) score++;
     if (/[0-9]/.test(p)) score++;
     if (/[^A-Za-z0-9]/.test(p)) score++;
@@ -123,7 +125,7 @@ export default function Register() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Field {...fieldProps} name="userName" label="Tên đăng nhập *" placeholder="username" autoComplete="username" />
+            <Field {...fieldProps} name="userName" label="Tên đăng nhập *" placeholder="username123" autoComplete="username" />
             <Field {...fieldProps} name="fullName" label="Họ và tên *" placeholder="Nguyễn Văn A" autoComplete="name" />
             <Field {...fieldProps} name="email" label="Email *" type="email" placeholder="email@example.com" autoComplete="email" />
             <Field {...fieldProps} name="phone" label="Số điện thoại *" type="tel" placeholder="0912345678" autoComplete="tel" />
@@ -138,17 +140,17 @@ export default function Register() {
               </div>
               <input
                 type={showPassword ? 'text' : 'password'}
-                value={form.password}
+                value={form.passwordHash}
                 onChange={e => {
-                  setForm(prev => ({ ...prev, password: e.target.value }));
-                  setErrors(prev => ({ ...prev, password: '' }));
+                  setForm(prev => ({ ...prev, passwordHash: e.target.value }));
+                  setErrors(prev => ({ ...prev, passwordHash: '' }));
                 }}
-                placeholder="Ít nhất 8 ký tự"
+                placeholder="Ít nhất 6 ký tự"
                 autoComplete="new-password"
-                className={`input-field ${errors.password ? 'border-red-500' : ''}`}
+                className={`input-field ${errors.passwordHash ? 'border-red-500' : ''}`}
               />
-              {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password}</p>}
-              {form.password && (
+              {errors.passwordHash && <p className="text-red-400 text-xs mt-1">{errors.passwordHash}</p>}
+              {form.passwordHash && (
                 <div className="mt-2">
                   <div className="flex gap-1">
                     {[1, 2, 3, 4].map(i => (

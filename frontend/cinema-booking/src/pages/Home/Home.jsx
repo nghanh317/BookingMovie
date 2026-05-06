@@ -1,33 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MOVIES } from '../../constants/mockData';
-import { movieApi } from '../../api';
+import { movieService } from '../../services';
 import MovieCard from '../../components/movie/MovieCard';
-
-/**
- * Chuyển đổi MovieDTO từ backend sang format frontend
- */
-function mapMovieDTO(dto) {
-  return {
-    id: dto.id,
-    title: dto.title || 'Không có tên',
-    originalTitle: dto.title,
-    poster: dto.posterUrl || `https://placehold.co/300x450/1E1E2C/A0A0B4?text=${encodeURIComponent(dto.title || 'Movie')}`,
-    backdrop: dto.posterUrl || `https://placehold.co/1920x1080/1A1A24/A0A0B4?text=${encodeURIComponent(dto.title || 'Movie')}`,
-    rating: 8.0,
-    genre: dto.genre ? dto.genre.split(',').map(g => g.trim()) : ['Chưa phân loại'],
-    duration: dto.duration || 0,
-    language: dto.language || 'N/A',
-    releaseDate: dto.releaseDate,
-    director: dto.director || 'N/A',
-    cast: dto.cast ? dto.cast.split(',').map(c => c.trim()) : [],
-    description: dto.description || '',
-    trailer: dto.trailerUrl || '',
-    status: dto.status === 'NOW_SHOWING' ? 'now_showing' : dto.status === 'COMING_SOON' ? 'coming_soon' : (dto.status || 'now_showing').toLowerCase(),
-    ageRating: 'T13',
-  };
-}
 
 // --- Hero Carousel ---
 function HeroBanner({ movies }) {
@@ -35,14 +10,16 @@ function HeroBanner({ movies }) {
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
-    if (featured.length === 0) return;
     const timer = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % featured.length);
+      if (featured.length > 0) {
+        setCurrent((prev) => (prev + 1) % featured.length);
+      }
     }, 5000);
     return () => clearInterval(timer);
   }, [featured.length]);
 
   if (featured.length === 0) return null;
+
   const movie = featured[current];
 
   return (
@@ -50,7 +27,7 @@ function HeroBanner({ movies }) {
       <AnimatePresence mode="wait">
         <motion.div key={movie.id} initial={{ opacity: 0, scale: 1.05 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="absolute inset-0">
-          <img src={movie.backdrop} alt={movie.title} className="w-full h-full object-cover"
+          <img src={movie.backdrop || movie.poster} alt={movie.title} className="w-full h-full object-cover"
             onError={(e) => { e.target.src = `https://placehold.co/1920x1080/1A1A24/A0A0B4?text=${encodeURIComponent(movie.title)}`; }} />
           <div className="absolute inset-0 bg-gradient-to-r from-cinema-black via-cinema-black/70 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-transparent to-transparent" />
@@ -82,7 +59,7 @@ function HeroBanner({ movies }) {
               ))}
             </div>
             <p className="text-cinema-muted text-sm leading-relaxed mb-8 line-clamp-3">{movie.description}</p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 items-center">
               <Link to={`/booking/${movie.id}`} className="btn-accent px-8 py-3 text-base">🎟️ Đặt Vé Ngay</Link>
               <Link to={`/movies/${movie.id}`} className="btn-outline px-8 py-3 text-base flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -176,20 +153,16 @@ function PromoBanner() {
 
 // --- Main Home Page ---
 export default function Home() {
-  const [movies, setMovies] = useState(MOVIES); // fallback: mock data
+  const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchMovies = async () => {
       try {
-        const { data } = await movieApi.getAll({ page: 0, size: 50 });
-        // Backend trả về { data: [...] } hoặc data là array trực tiếp
-        const list = Array.isArray(data) ? data : (data?.data || data?.content || []);
-        if (Array.isArray(list) && list.length > 0) {
-          setMovies(list.map(mapMovieDTO));
-        }
-      } catch (err) {
-        console.warn('⚠️ Không kết nối được backend, dùng mock data:', err.message);
+        const data = await movieService.getAll();
+        setMovies(data);
+      } catch (error) {
+        console.error("Failed to load movies:", error);
       } finally {
         setLoading(false);
       }
@@ -199,6 +172,17 @@ export default function Home() {
 
   const nowShowing = movies.filter(m => m.status === 'now_showing');
   const comingSoon = movies.filter(m => m.status === 'coming_soon');
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-cinema-muted">Đang tải danh sách phim...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in">
@@ -210,15 +194,13 @@ export default function Home() {
         <section>
           <SectionHeader title="Đang Chiếu" subtitle="Những bộ phim đang hot nhất hiện tại"
             linkTo="/movies?status=now_showing" linkText="Xem tất cả" />
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {nowShowing.map((movie, i) => <MovieCard key={movie.id} movie={movie} index={i} />)}
-            </div>
-          )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {nowShowing.length > 0 ? (
+              nowShowing.map((movie, i) => <MovieCard key={movie.id} movie={movie} index={i} />)
+            ) : (
+              <p className="col-span-full text-cinema-muted text-center py-8">Chưa có phim đang chiếu.</p>
+            )}
+          </div>
         </section>
 
         <PromoBanner />
@@ -228,7 +210,11 @@ export default function Home() {
           <SectionHeader title="Sắp Chiếu" subtitle="Những bom tấn sắp ra mắt – Đặt vé sớm để không lỡ!"
             linkTo="/movies?status=coming_soon" linkText="Xem tất cả" />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {comingSoon.map((movie, i) => <MovieCard key={movie.id} movie={movie} index={i} />)}
+            {comingSoon.length > 0 ? (
+              comingSoon.map((movie, i) => <MovieCard key={movie.id} movie={movie} index={i} />)
+            ) : (
+              <p className="col-span-full text-cinema-muted text-center py-8">Chưa có phim sắp chiếu.</p>
+            )}
           </div>
         </section>
 

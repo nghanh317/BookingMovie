@@ -14,7 +14,7 @@ public interface ITicketService {
 	
 	TicketDTO getById (Integer id);
 	
-	void createTicket (CreateTicketForm form);
+	TicketDTO createTicket (CreateTicketForm form);
 	
 	void updateTicket (Integer id , UpdateTicketForm form);
 	

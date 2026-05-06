@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/layout/Layout';
-import { RequireAuth, RequireAdmin, BlockAdmin } from './components/auth/ProtectedRoute';
+import ScrollToTop from './components/layout/ScrollToTop';
+import { RequireAuth, RequireAdmin } from './components/auth/ProtectedRoute';
 
 import Home from './pages/Home/Home';
 import Movies from './pages/Movies/Movies';
@@ -14,7 +15,15 @@ import Register from './pages/Auth/Register';
 import ForgotPassword from './pages/Auth/ForgotPassword';
 import Profile from './pages/Profile/Profile';
 import Offers from './pages/Offers/Offers';
-import PaymentCallback from './pages/PaymentCallback/PaymentCallback';
+import CinemaDetail from './pages/Cinema/CinemaDetail';
+import Cinemas from './pages/Cinema/Cinemas';
+import TopMovies from './pages/TopMovies/TopMovies';
+
+// Support pages
+import FAQ from './pages/Support/FAQ';
+import RefundPolicy from './pages/Support/RefundPolicy';
+import Terms from './pages/Support/Terms';
+import Privacy from './pages/Support/Privacy';
 
 // Admin pages
 import AdminLayout from './pages/Admin/AdminLayout';
@@ -29,17 +38,25 @@ import AdminVouchers from './pages/Admin/AdminVouchers';
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
-        {/* ── Routes dành cho USER (admin bị chặn → redirect /admin) ─── */}
-        <Route path="/" element={<BlockAdmin><Layout><Home /></Layout></BlockAdmin>} />
-        <Route path="/movies" element={<BlockAdmin><Layout><Movies /></Layout></BlockAdmin>} />
-        <Route path="/movies/:id" element={<BlockAdmin><Layout><MovieDetail /></Layout></BlockAdmin>} />
-        <Route path="/offers" element={<BlockAdmin><Layout><Offers /></Layout></BlockAdmin>} />
-        <Route path="/login" element={<BlockAdmin><Layout><Login /></Layout></BlockAdmin>} />
-        <Route path="/register" element={<BlockAdmin><Layout><Register /></Layout></BlockAdmin>} />
-        <Route path="/forgot-password" element={<BlockAdmin><Layout><ForgotPassword /></Layout></BlockAdmin>} />
+        {/* ── Public routes ───────────────────────────── */}
+        <Route path="/" element={<Layout><Home /></Layout>} />
+        <Route path="/movies" element={<Layout><Movies /></Layout>} />
+        <Route path="/movies/:id" element={<Layout><MovieDetail /></Layout>} />
+        <Route path="/offers" element={<Layout><Offers /></Layout>} />
+        <Route path="/cinemas" element={<Layout><Cinemas /></Layout>} />
+        <Route path="/cinemas/:id" element={<Layout><CinemaDetail /></Layout>} />
+        <Route path="/top-movies" element={<Layout><TopMovies /></Layout>} />
+        <Route path="/login" element={<Layout><Login /></Layout>} />
+        <Route path="/register" element={<Layout><Register /></Layout>} />
+        <Route path="/forgot-password" element={<Layout><ForgotPassword /></Layout>} />
+        <Route path="/faq" element={<Layout><FAQ /></Layout>} />
+        <Route path="/refund-policy" element={<Layout><RefundPolicy /></Layout>} />
+        <Route path="/terms" element={<Layout><Terms /></Layout>} />
+        <Route path="/privacy" element={<Layout><Privacy /></Layout>} />
 
-        {/* ── Protected: chỉ user đã đăng nhập (admin cũng bị chặn) ─── */}
+        {/* ── Protected: đăng nhập mới vào được ────────── */}
         <Route path="/booking/:movieId" element={
           <RequireAuth><Layout><Booking /></Layout></RequireAuth>
         } />
@@ -55,10 +72,6 @@ function App() {
         <Route path="/profile" element={
           <RequireAuth><Layout><Profile /></Layout></RequireAuth>
         } />
-        <Route path="/payment/callback" element={
-          <BlockAdmin><Layout><PaymentCallback /></Layout></BlockAdmin>
-        } />
-
 
         {/* ── Protected: chỉ admin mới vào được ─────────── */}
         <Route path="/admin" element={

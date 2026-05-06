@@ -77,7 +77,6 @@ public class SecurityConfiguration {
 
 					.requestMatchers("/api/v1/**").hasAuthority("ADMIN")
 					.anyRequest().authenticated())
-			.httpBasic(withDefaults())
 			.addFilterBefore(jwtAuthorizationFilter, UsernamePasswordAuthenticationFilter.class)
 			.exceptionHandling()
 			.authenticationEntryPoint(authExceptionHandler)

@@ -1,28 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { SEAT_ROWS, SEAT_COLS, SEAT_TYPES } from '../../constants/mockData';
-
-// Pre-defined unavailable seats for demo
-const UNAVAILABLE = new Set([
-  'A3','A4','A5','B2','B3','C7','C8','D1','D9','D10',
-  'E5','E6','F4','F5','G3','G8','H6','H7','H8',
-]);
-
-// VIP rows
-const VIP_ROWS = ['E', 'F', 'G'];
-// Couple seats (last 2 columns of last row)
-const COUPLE_COLS = [9, 10];
-const COUPLE_ROW = 'H';
-
-function getSeatType(row, col) {
-  if (row === COUPLE_ROW && COUPLE_COLS.includes(col)) return 'couple';
-  if (VIP_ROWS.includes(row)) return 'vip';
-  return 'standard';
-}
+import { roomService } from '../../services';
 
 function StepIndicator({ current }) {
-  const steps = ['Chọn suất chiếu', 'Chọn ghế', 'Bỏng & Nước', 'Thanh toán'];
+  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
   return (
     <div className="flex items-center justify-center gap-0 mb-8 flex-wrap gap-y-2">
       {steps.map((step, i) => (
@@ -51,7 +33,27 @@ export default function SeatSelection() {
   const navigate = useNavigate();
   const { movie, showtime, cinema } = location.state || {};
 
-  const [selected, setSelected] = useState(new Set());
+  const [selectedSeats, setSelectedSeats] = useState([]);
+  const [roomData, setRoomData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!showtime || !showtime.raw?.roomId) {
+      setLoading(false);
+      return;
+    }
+    const fetchRoom = async () => {
+      try {
+        const data = await roomService.getById(showtime.raw.roomId);
+        setRoomData(data);
+      } catch (err) {
+        console.error("Failed to fetch room seats", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRoom();
+  }, [showtime]);
 
   if (!movie || !showtime) {
     return (
@@ -64,89 +66,127 @@ export default function SeatSelection() {
     );
   }
 
-  const toggleSeat = (seatId, type) => {
-    if (UNAVAILABLE.has(seatId)) return;
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(seatId)) next.delete(seatId);
-      else next.add(seatId);
-      return next;
+  // Group seats by row
+  const seatsByRow = useMemo(() => {
+    if (!roomData || !roomData.seats) return {};
+    const grouped = {};
+    roomData.seats.forEach(seat => {
+      if (!grouped[seat.seatRow]) grouped[seat.seatRow] = [];
+      grouped[seat.seatRow].push(seat);
+    });
+    // Sort seats by seatNumber in each row
+    Object.keys(grouped).forEach(row => {
+      grouped[row].sort((a, b) => a.seatNumber - b.seatNumber);
+    });
+    return grouped;
+  }, [roomData]);
+
+  const toggleSeat = (seat) => {
+    if (seat.status !== 'AVAILABLE') return; // backend status is either AVAILABLE or something else
+    setSelectedSeats(prev => {
+      const isSelected = prev.find(s => s.id === seat.id);
+      if (isSelected) return prev.filter(s => s.id !== seat.id);
+      return [...prev, seat];
     });
   };
 
-  const totalPrice = [...selected].reduce((sum, seatId) => {
-    const row = seatId[0];
-    const col = parseInt(seatId.slice(1));
-    const type = getSeatType(row, col);
-    return sum + SEAT_TYPES[type].price;
-  }, 0);
+  // Determine pricing based on slot price and seat type (Thường/VIP/Ghế đôi)
+  const getSeatPrice = (seat) => {
+    const basePrice = showtime.price || 75000;
+    const typeName = seat.seatTypesName || '';
+    if (typeName.toLowerCase().includes('vip')) return basePrice + 35000;
+    if (typeName.toLowerCase().includes('đôi') || typeName.toLowerCase().includes('couple')) return basePrice * 2 + 50000;
+    return basePrice;
+  };
+
+  const totalPrice = selectedSeats.reduce((sum, seat) => sum + getSeatPrice(seat), 0);
 
   const handleProceed = () => {
-    if (selected.size === 0) return;
+    if (selectedSeats.length === 0) return;
     navigate(`/booking/${movieId}/snacks`, {
       state: {
         movie, showtime, cinema,
-        seats: [...selected],
+        seats: selectedSeats, // Pass array of seat objects { id, seatRow, seatNumber, seatTypesName... }
         totalPrice,
       }
     });
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-cinema-muted">Đang tải sơ đồ phòng chiếu...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!roomData || !roomData.seats || roomData.seats.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-white text-xl mb-4">Không có thông tin sơ đồ ghế cho phòng này</p>
+          <Link to={`/booking/${movieId}`} className="btn-primary">Quay lại chọn suất chiếu</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const rows = Object.keys(seatsByRow).sort();
+
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
-        <StepIndicator current={2} />
+        <StepIndicator current={4} />
 
         {/* Screen label */}
         <div className="mb-8 text-center">
           <div className="relative inline-block w-full max-w-lg">
             <div className="h-2 bg-gradient-to-r from-transparent via-primary to-transparent rounded-full mb-1 opacity-60" />
             <div className="h-6 bg-gradient-to-b from-primary/20 to-transparent rounded-t-[50%] w-full" />
-            <p className="text-cinema-muted text-xs mt-1 tracking-widest uppercase">Màn hình</p>
+            <p className="text-cinema-muted text-xs mt-1 tracking-widest uppercase">Màn hình {roomData.roomName}</p>
           </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Seat Map */}
-          <div className="flex-1 overflow-x-auto">
+          <div className="flex-1 overflow-x-auto pb-4">
             <div className="inline-block min-w-full">
-              {SEAT_ROWS.map(row => (
+              {rows.map(row => (
                 <div key={row} className="flex items-center gap-1.5 mb-1.5 justify-center">
                   <span className="text-cinema-muted text-xs w-5 text-right font-mono">{row}</span>
                   <div className="flex gap-1.5">
-                    {Array.from({ length: SEAT_COLS }, (_, i) => {
-                      const col = i + 1;
-                      const seatId = `${row}${col}`;
-                      const type = getSeatType(row, col);
-                      const isUnavailable = UNAVAILABLE.has(seatId);
-                      const isSelected = selected.has(seatId);
+                    {seatsByRow[row].map(seat => {
+                      const isUnavailable = seat.status !== 'AVAILABLE';
+                      const isSelected = !!selectedSeats.find(s => s.id === seat.id);
+                      const isVIP = seat.seatTypesName?.toLowerCase().includes('vip');
+                      const isCouple = seat.seatTypesName?.toLowerCase().includes('đôi') || seat.seatTypesName?.toLowerCase().includes('couple');
 
                       let seatClass = '';
                       if (isUnavailable) {
                         seatClass = 'bg-cinema-border/40 border-cinema-border/20 cursor-not-allowed opacity-40';
                       } else if (isSelected) {
                         seatClass = 'bg-green-500 border-green-400 shadow-lg shadow-green-500/30 scale-110';
-                      } else if (type === 'vip') {
+                      } else if (isVIP) {
                         seatClass = 'bg-yellow-900/30 border-yellow-700/50 hover:bg-yellow-700/40 hover:border-yellow-500 cursor-pointer';
-                      } else if (type === 'couple') {
+                      } else if (isCouple) {
                         seatClass = 'bg-red-900/30 border-red-700/50 hover:bg-red-700/40 hover:border-red-500 cursor-pointer';
                       } else {
                         seatClass = 'bg-cinema-surface border-cinema-border hover:bg-cinema-card hover:border-primary cursor-pointer';
                       }
 
-                      // Wide seat for couple
-                      const isCouple = type === 'couple';
-
                       return (
                         <motion.button
-                          key={seatId}
+                          key={seat.id}
                           whileTap={!isUnavailable ? { scale: 0.9 } : {}}
-                          onClick={() => toggleSeat(seatId, type)}
+                          onClick={() => toggleSeat(seat)}
                           disabled={isUnavailable}
-                          title={`${seatId} - ${SEAT_TYPES[type].label} - ${SEAT_TYPES[type].price.toLocaleString('vi-VN')}đ`}
+                          title={`${seat.seatRow}${seat.seatNumber} - ${seat.seatTypesName} - ${getSeatPrice(seat).toLocaleString('vi-VN')}đ`}
                           className={`${isCouple ? 'w-9' : 'w-7'} h-7 rounded-t-lg border text-[10px] font-mono transition-all duration-150 flex items-center justify-center ${seatClass}`}
                         >
-                          {isUnavailable ? '✕' : isSelected ? '✓' : col}
+                          {isUnavailable ? '✕' : isSelected ? '✓' : seat.seatNumber}
                         </motion.button>
                       );
                     })}
@@ -164,18 +204,15 @@ export default function SeatSelection() {
               <h3 className="font-heading font-bold text-white text-sm mb-3">Chú thích</h3>
               <div className="space-y-2.5 text-xs">
                 {[
-                  { color: 'bg-cinema-surface border border-cinema-border', label: 'Thường', price: '75.000đ' },
-                  { color: 'bg-yellow-900/30 border border-yellow-700/50', label: 'VIP', price: '110.000đ' },
-                  { color: 'bg-red-900/30 border border-red-700/50', label: 'Ghế đôi', price: '200.000đ' },
-                  { color: 'bg-green-500 border border-green-400', label: 'Đang chọn', price: '' },
-                  { color: 'bg-cinema-border/40 border border-cinema-border/20 opacity-40', label: 'Đã đặt', price: '' },
+                  { color: 'bg-cinema-surface border border-cinema-border', label: 'Thường' },
+                  { color: 'bg-yellow-900/30 border border-yellow-700/50', label: 'VIP' },
+                  { color: 'bg-red-900/30 border border-red-700/50', label: 'Ghế đôi' },
+                  { color: 'bg-green-500 border border-green-400', label: 'Đang chọn' },
+                  { color: 'bg-cinema-border/40 border border-cinema-border/20 opacity-40', label: 'Đã đặt/Hỏng' },
                 ].map(item => (
-                  <div key={item.label} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-6 h-5 rounded-t-md ${item.color}`} />
-                      <span className="text-cinema-muted">{item.label}</span>
-                    </div>
-                    {item.price && <span className="text-cinema-muted">{item.price}</span>}
+                  <div key={item.label} className="flex items-center gap-2">
+                    <div className={`w-6 h-5 rounded-t-md ${item.color}`} />
+                    <span className="text-cinema-muted">{item.label}</span>
                   </div>
                 ))}
               </div>
@@ -184,17 +221,19 @@ export default function SeatSelection() {
             {/* Summary */}
             <div className="card p-4">
               <h3 className="font-heading font-bold text-white text-sm mb-3">Ghế đã chọn</h3>
-              {selected.size > 0 ? (
+              {selectedSeats.length > 0 ? (
                 <>
                   <div className="flex flex-wrap gap-1 mb-3">
-                    {[...selected].sort().map(seat => (
-                      <span key={seat} className="badge bg-primary text-cinema-black font-bold text-xs">{seat}</span>
+                    {selectedSeats.map(seat => (
+                      <span key={seat.id} className="badge bg-primary text-cinema-black font-bold text-xs">
+                        {seat.seatRow}{seat.seatNumber}
+                      </span>
                     ))}
                   </div>
                   <div className="border-t border-cinema-border pt-3 mb-4">
                     <div className="flex justify-between text-sm">
                       <span className="text-cinema-muted">Số ghế:</span>
-                      <span className="text-white font-bold">{selected.size}</span>
+                      <span className="text-white font-bold">{selectedSeats.length}</span>
                     </div>
                     <div className="flex justify-between text-sm mt-1">
                       <span className="text-cinema-muted">Tổng tiền:</span>

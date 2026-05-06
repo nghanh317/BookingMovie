@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { VOUCHERS } from '../../constants/mockData';
 import useAuthStore from '../../store/authStore';
-import { promotionApi } from '../../api';
 
 // --- Voucher Card ---
 function VoucherCard({ voucher, owned, userPoints, onRedeem }) {
@@ -90,43 +89,13 @@ export default function Offers() {
   const { isLoggedIn, user } = useAuthStore();
   const [tab, setTab] = useState('owned');
   const [redeemedIds, setRedeemedIds] = useState([]);
-  const [vouchers, setVouchers] = useState(VOUCHERS);
-
-  // Fetch khuyến mãi từ backend
-  useEffect(() => {
-    const fetchPromotions = async () => {
-      try {
-        const { data } = await promotionApi.getAll({ page: 0, size: 50 });
-        const list = data.content || data.data || data;
-        if (Array.isArray(list) && list.length > 0) {
-          const mapped = list.map(p => ({
-            id: p.id,
-            code: p.promotionCode || `PROMO${p.id}`,
-            desc: p.description || p.promotionName || 'Khuyến mãi',
-            type: p.discountType === 'PERCENT' ? 'percent' : 'fixed',
-            value: Number(p.discountValue) || 0,
-            minOrder: Number(p.minOrderAmount) || 0,
-            expiry: p.endDate || new Date(Date.now() + 30 * 86400000).toISOString(),
-            pointCost: 0,
-            isPublic: true,
-            active: p.status === 'ACTIVE',
-            imageUrl: p.imageUrl,
-          }));
-          setVouchers(mapped);
-        }
-      } catch (err) {
-        console.warn('⚠️ Không lấy được khuyến mãi, dùng mock:', err.message);
-      }
-    };
-    fetchPromotions();
-  }, []);
 
   const myVoucherIds = user?.myVouchers || [];
-  const ownedVouchers = vouchers.filter(v => myVoucherIds.includes(v.id) || redeemedIds.includes(v.id));
-  const redeemableVouchers = vouchers.filter(v =>
+  const ownedVouchers = VOUCHERS.filter(v => myVoucherIds.includes(v.id) || redeemedIds.includes(v.id));
+  const redeemableVouchers = VOUCHERS.filter(v =>
     !myVoucherIds.includes(v.id) && !redeemedIds.includes(v.id) && v.pointCost > 0
   );
-  const publicVouchers = vouchers.filter(v => v.isPublic && v.active);
+  const publicVouchers = VOUCHERS.filter(v => v.isPublic && v.active);
 
   const handleRedeem = (voucher) => {
     if (user && user.points >= voucher.pointCost) {

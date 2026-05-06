@@ -3,10 +3,11 @@ import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PAYMENT_METHODS } from '../../constants/mockData';
 import useAuthStore from '../../store/authStore';
-import { ticketApi } from '../../api';
+import { sendBookingConfirmEmail } from '../../services/emailService';
+import { ticketService, paymentService } from '../../services';
 
 function StepIndicator({ current }) {
-  const steps = ['Chọn suất chiếu', 'Chọn ghế', 'Bỏng & Nước', 'Thanh toán'];
+  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
   return (
     <div className="flex items-center justify-center gap-0 mb-8 flex-wrap gap-y-2">
       {steps.map((step, i) => (
@@ -110,7 +111,7 @@ export default function Checkout() {
   const { user } = useAuthStore();
 
   const [paymentMethod, setPaymentMethod] = useState('momo');
-  // ✅ Tự động điền thông tin từ tài khoản đang đăng nhập (hỗ trợ cả mock & backend)
+  // ✅ Tự động điền thông tin từ tài khoản đang đăng nhập
   const [form, setForm] = useState({
     name: user?.fullName || user?.name || '',
     email: user?.email || '',
@@ -151,81 +152,85 @@ export default function Checkout() {
       setErrors(errs);
       return;
     }
+    
+    if (!user) {
+      alert("Vui lòng đăng nhập để đặt vé");
+      return;
+    }
+
     setProcessing(true);
-
-    let ticketCode = 'CB' + Math.random().toString(36).slice(2, 8).toUpperCase();
-
-    // Thử tạo vé thật qua API
     try {
-      const ticketData = {
-        accountsId: user?.id || 1, // Fallback to account 1 if not logged in
-        slotsId: showtime?.id || 1, // Fallback slot
+      const ticketPayload = {
+        accountsId: user.id,
+        slotsId: showtime.id,
         discountAmount: 0,
-        note: `Ghế: ${seats.join(', ')} - SDT: ${form.phone}`,
-        seats: seats.map((s, index) => ({ seatId: index + 1 })), // Temporary mock mapping for seats
-        products: snacks.map(s => ({ productId: s.id, quantity: s.quantity })),
+        note: `Thanh toán qua ${paymentMethod.toUpperCase()}`,
+        seats: seats.map(s => ({ seatId: s.id })),
+        products: snacks.map(snack => ({ productId: snack.id, quantity: snack.quantity }))
       };
       
-      const res = await ticketApi.create(ticketData);
-      if (res.data?.ticketsCode) {
-        ticketCode = res.data.ticketsCode;
-      } else if (res.ticketsCode) {
-        ticketCode = res.ticketsCode;
-      }
+      const res = await ticketService.create(ticketPayload);
       
-      // TÍCH HỢP THANH TOÁN VNPAY & MOMO
+      const bookingCode = res?.ticketsCode || 'CB' + Math.random().toString(36).slice(2, 8).toUpperCase();
+      const seatNames = seats.map(s => `${s.seatRow}${s.seatNumber}`).join(', ');
+      
+      const newBooking = {
+        id: res?.id,
+        code: bookingCode,
+        movie: movie.title || movie.name,
+        seats: seatNames,
+        snacks: snacks.length > 0 ? snacks.map(s => `${s.icon} ${s.name} ×${s.quantity}`).join(', ') : null,
+        total: grandTotal.toLocaleString('vi-VN') + 'đ',
+      };
+
+      // Lưu booking vào sessionStorage để dùng ở trang Callback
+      sessionStorage.setItem('pendingBooking', JSON.stringify(newBooking));
+
+      // Nếu là VNPay hoặc MoMo -> Chuyển hướng thanh toán
       if (paymentMethod === 'vnpay' || paymentMethod === 'momo') {
         try {
-          const returnUrl = window.location.origin + '/payment/callback';
-          const payRes = await ticketApi.createPaymentUrl(paymentMethod, {
-             amount: grandTotal,
-             orderInfo: ticketCode,
-             returnUrl: returnUrl
-          });
-          const redirectUrl = payRes.data?.url || payRes.url || payRes?.url;
-          if (redirectUrl) {
-             sessionStorage.setItem('pendingBooking', JSON.stringify({
-               code: ticketCode,
-               movie: movie.title || movie.name,
-               seats: seats.join(', '),
-               snacks: snacks.length > 0 ? snacks.map(s => `${s.icon} ${s.name} ×${s.quantity}`).join(', ') : null,
-               total: grandTotal.toLocaleString('vi-VN') + 'đ'
-             }));
-             window.location.href = redirectUrl;
-             return;
+          const paymentRequest = {
+            amount: grandTotal,
+            orderInfo: bookingCode, // Sử dụng mã vé làm TxnRef
+            returnUrl: `${window.location.origin}/payment-callback`
+          };
+
+          let payRes;
+          if (paymentMethod === 'vnpay') {
+            payRes = await paymentService.createVNPay(paymentRequest);
+          } else {
+            payRes = await paymentService.createMoMo(paymentRequest);
           }
-        } catch (paymentErr) {
-          console.warn('Lỗi gọi API thanh toán:', paymentErr);
-          // Fallback to success simulated
+
+          if (payRes && payRes.url) {
+            window.location.href = payRes.url;
+            return; // Dừng xử lý tiếp theo
+          } else {
+            throw new Error("Không lấy được URL thanh toán");
+          }
+        } catch (payErr) {
+          console.error("Lỗi khởi tạo thanh toán:", payErr);
+          alert("Lỗi khi kết nối với cổng thanh toán. Vui lòng thử lại.");
+          setProcessing(false);
+          return;
         }
       }
 
+      // Nếu là phương thức khác (ví dụ tiền mặt/thẻ tại quầy)
+      setBooking(newBooking);
+      setSuccess(true);
     } catch (err) {
-      console.warn('⚠️ Không thể tạo vé qua API, dùng mã tạm:', err.response?.data || err.message);
-      // In production, you might want to uncomment this to block booking on API failure
-      // alert("Lỗi khi thanh toán: " + (err.response?.data?.message || err.message));
-      // setProcessing(false);
-      // return;
+      console.error("Lỗi đặt vé:", err);
+      alert("Có lỗi xảy ra khi đặt vé. Vui lòng thử lại.");
+    } finally {
+      setProcessing(false);
     }
-
-    // Simulate processing delay
-    await new Promise(r => setTimeout(r, 1000));
-    setProcessing(false);
-
-    setBooking({
-      code: ticketCode,
-      movie: movie.title || movie.name,
-      seats: seats.join(', '),
-      snacks: snacks.length > 0 ? snacks.map(s => `${s.icon} ${s.name} ×${s.quantity}`).join(', ') : null,
-      total: grandTotal.toLocaleString('vi-VN') + 'đ',
-    });
-    setSuccess(true);
   };
 
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
-        <StepIndicator current={3} />
+        <StepIndicator current={5} />
 
         <div className="grid md:grid-cols-5 gap-6">
           {/* Left: Form */}
@@ -285,21 +290,43 @@ export default function Checkout() {
                         <text x="38" y="26" fill="white" fontSize="16" fontWeight="bold" fontFamily="Arial, sans-serif">MoMo</text>
                       </svg>
                     ),
-                    zalopay: (
-                      <svg viewBox="0 0 130 40" className="h-8 w-auto" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="130" height="40" rx="8" fill="#0068FF"/>
-                        <text x="10" y="27" fill="white" fontSize="17" fontWeight="bold" fontFamily="Arial, sans-serif">Zalo</text>
-                        <rect x="68" y="8" width="2" height="24" fill="white" opacity="0.4"/>
-                        <text x="76" y="27" fill="#FFD700" fontSize="17" fontWeight="bold" fontFamily="Arial, sans-serif">Pay</text>
+                    vnpay: (
+                      <svg viewBox="0 0 140 40" className="h-8 w-auto" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="140" height="40" rx="8" fill="#0A2E6E"/>
+                        {/* VN text red */}
+                        <text x="8" y="17" fill="#E31837" fontSize="14" fontWeight="900" fontFamily="Arial, sans-serif">VN</text>
+                        <text x="8" y="33" fill="#FFFFFF" fontSize="14" fontWeight="900" fontFamily="Arial, sans-serif">PAY</text>
+                        {/* divider */}
+                        <rect x="44" y="7" width="1.5" height="26" fill="#E31837" opacity="0.5"/>
+                        {/* QR icon */}
+                        <rect x="52" y="10" width="8" height="8" rx="1" fill="none" stroke="white" strokeWidth="1.2"/>
+                        <rect x="54" y="12" width="4" height="4" rx="0.5" fill="white"/>
+                        <rect x="52" y="22" width="8" height="8" rx="1" fill="none" stroke="white" strokeWidth="1.2"/>
+                        <rect x="54" y="24" width="4" height="4" rx="0.5" fill="white"/>
+                        <rect x="63" y="10" width="8" height="8" rx="1" fill="none" stroke="white" strokeWidth="1.2"/>
+                        <rect x="65" y="12" width="4" height="4" rx="0.5" fill="white"/>
+                        <rect x="63" y="22" width="3" height="3" fill="white"/>
+                        <rect x="68" y="22" width="3" height="3" fill="white"/>
+                        <rect x="63" y="27" width="3" height="3" fill="white"/>
+                        <text x="78" y="27" fill="#E8C84A" fontSize="10" fontWeight="bold" fontFamily="Arial, sans-serif">QR Code</text>
                       </svg>
                     ),
-                    vnpay: (
-                      <svg viewBox="0 0 110 40" className="h-8 w-auto" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="110" height="40" rx="8" fill="#0A2E6E"/>
-                        <text x="8" y="17" fill="#E31837" fontSize="13" fontWeight="900" fontFamily="Arial, sans-serif">VN</text>
-                        <text x="8" y="32" fill="white" fontSize="13" fontWeight="900" fontFamily="Arial, sans-serif">PAY</text>
-                        <rect x="42" y="8" width="2" height="24" fill="#E31837" opacity="0.6"/>
-                        <text x="50" y="26" fill="white" fontSize="11" fontFamily="Arial, sans-serif">QR Code</text>
+                    vnpay2: (
+                      <svg viewBox="0 0 140 40" className="h-8 w-auto" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="140" height="40" rx="8" fill="#005BAA"/>
+                        {/* VN text */}
+                        <text x="8" y="17" fill="#FFD700" fontSize="14" fontWeight="900" fontFamily="Arial, sans-serif">VN</text>
+                        <text x="8" y="33" fill="#FFFFFF" fontSize="14" fontWeight="900" fontFamily="Arial, sans-serif">PAY</text>
+                        {/* divider */}
+                        <rect x="44" y="7" width="1.5" height="26" fill="white" opacity="0.3"/>
+                        {/* Bank card icon */}
+                        <rect x="52" y="12" width="26" height="17" rx="3" fill="none" stroke="white" strokeWidth="1.2"/>
+                        <rect x="52" y="16" width="26" height="4" fill="white" opacity="0.3"/>
+                        <rect x="55" y="22" width="8" height="2" rx="1" fill="white" opacity="0.7"/>
+                        <rect x="65" y="22" width="5" height="2" rx="1" fill="white" opacity="0.5"/>
+                        {/* ATM text */}
+                        <text x="84" y="23" fill="white" fontSize="11" fontWeight="bold" fontFamily="Arial, sans-serif">ATM</text>
+                        <text x="82" y="33" fill="#A8D4FF" fontSize="8" fontFamily="Arial, sans-serif">Ngân hàng</text>
                       </svg>
                     ),
                     card: (
@@ -360,27 +387,27 @@ export default function Checkout() {
 
               <div className="flex gap-3 mb-4 pb-4 border-b border-cinema-border">
                 <img
-                  src={movie.heroImage || movie.poster}
+                  src={movie.poster || movie.image}
                   alt={movie.title || movie.name}
                   className="w-14 h-20 object-cover rounded-lg flex-shrink-0"
                   onError={e => { e.target.src = 'https://placehold.co/80x120/1E1E2C/A0A0B4'; }}
                 />
                 <div>
                   <p className="text-white font-semibold text-sm leading-snug">{movie.title || movie.name}</p>
-                  {cinema && <p className="text-cinema-muted text-xs mt-1">{cinema.name || cinema.cinemasName}</p>}
+                  {cinema && <p className="text-cinema-muted text-xs mt-1">{cinema.name}</p>}
                   {showtime && (
                     <p className="text-cinema-muted text-xs">
-                      {new Date(showtime.date || showtime.showTime).toLocaleDateString('vi-VN')} • {showtime.time}
+                      {new Date(showtime.date).toLocaleDateString('vi-VN')} • {showtime.time}
                     </p>
                   )}
-                  {showtime && <span className="badge bg-cinema-surface border border-cinema-border text-cinema-muted text-[10px] mt-1 inline-block">{showtime.type || '2D'}</span>}
+                  {showtime && <span className="badge bg-cinema-surface border border-cinema-border text-cinema-muted text-[10px] mt-1 inline-block">{showtime.type}</span>}
                 </div>
               </div>
 
               <div className="space-y-2 text-sm mb-4 pb-4 border-b border-cinema-border">
                 <div className="flex justify-between">
                   <span className="text-cinema-muted">Ghế ({seats.length})</span>
-                  <span className="text-white">{seats.join(', ')}</span>
+                  <span className="text-white">{seats.map(s => `${s.seatRow}${s.seatNumber}`).join(', ')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-cinema-muted">Tiền vé</span>

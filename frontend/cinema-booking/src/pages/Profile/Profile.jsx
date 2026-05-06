@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import reviewService from '../../services/reviewService';
+import { movieService } from '../../services';
 import useAuthStore from '../../store/authStore';
-import { accountApi } from '../../api';
+import useFavoriteStore from '../../store/favoriteStore';
+import useNotificationStore from '../../store/notificationStore';
+import MovieCard from '../../components/movie/MovieCard';
+
+// Mock booking history data
 const MOCK_BOOKINGS = [
   {
     id: 'CB2F4A9K',
@@ -67,12 +73,12 @@ const MOCK_USER = {
   totalBookings: 12,
   totalSpent: 1450000,
   memberLevel: 'Gold',
+  points: 2450,
 };
 
 const STATUS_CONFIG = {
   upcoming: { label: 'Sắp tới', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
   completed: { label: 'Đã xem', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
-  cancelled: { label: 'Đã huỷ', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
 };
 
 function Avatar({ name, size = 'lg' }) {
@@ -85,7 +91,7 @@ function Avatar({ name, size = 'lg' }) {
   );
 }
 
-function BookingCard({ booking }) {
+function BookingCard({ booking, onRate }) {
   const status = STATUS_CONFIG[booking.status];
   return (
     <motion.div
@@ -134,15 +140,15 @@ function BookingCard({ booking }) {
         </p>
         <div className="flex flex-col gap-1 mt-2">
           <span className="text-cinema-muted text-[10px] font-mono">#{booking.id}</span>
-          {booking.status === 'upcoming' && (
-            <button className="text-red-400 hover:text-red-300 text-xs transition-colors">
-              Huỷ vé
-            </button>
-          )}
           {booking.status === 'completed' && (
-            <button className="text-primary hover:text-primary/80 text-xs transition-colors">
-              Xem lại
-            </button>
+            <div className="flex flex-col gap-1 items-end">
+              <button className="text-primary hover:text-primary/80 text-xs transition-colors">
+                Xem lại
+              </button>
+              <button onClick={() => onRate && onRate(booking)} className="text-accent hover:text-accent/80 text-xs transition-colors mt-1 font-semibold">
+                Đánh giá
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -153,80 +159,107 @@ function BookingCard({ booking }) {
 const TABS = [
   { id: 'overview', label: 'Tổng quan', icon: '👤' },
   { id: 'bookings', label: 'Vé của tôi', icon: '🎟️' },
+  { id: 'favorites', label: 'Phim yêu thích', icon: '❤️' },
+  { id: 'offers', label: 'Ưu đãi', icon: '🎁' },
   { id: 'settings', label: 'Cài đặt', icon: '⚙️' },
 ];
 
 export default function Profile() {
-  const { user: authUser } = useAuthStore();
-  const [activeTab, setActiveTab] = useState('overview');
+  const { user } = useAuthStore();
+  const { favorites } = useFavoriteStore();
+  const { addNotification } = useNotificationStore();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const tabParam = searchParams.get('tab');
+
+  const [activeTab, setActiveTab] = useState(tabParam || 'overview');
   const [filterStatus, setFilterStatus] = useState('all');
   const [editMode, setEditMode] = useState(false);
-  const [bookings, setBookings] = useState(MOCK_BOOKINGS);
+  const [userData, setUserData] = useState(MOCK_USER);
+  const [moviesData, setMoviesData] = useState([]);
+  const [formData, setFormData] = useState({ ...MOCK_USER });
+  const [ownedVouchers, setOwnedVouchers] = useState([
+    { id: '1', code: 'GOLD20', desc: 'Giảm 20% cho lần đặt vé tiếp theo', exp: '31/03/2026', color: 'border-primary/40 bg-primary/5' },
+    { id: '2', code: 'WEEKEND15', desc: 'Giảm 15% vào cuối tuần', exp: '15/04/2026', color: 'border-blue-500/40 bg-blue-500/5' },
+    { id: '3', code: 'POPCORNFREE', desc: 'Tặng 1 bắp ngọt lớn khi mua 2 vé', exp: '20/04/2026', color: 'border-green-500/40 bg-green-500/5' },
+  ]);
 
-  // Tạo userData từ auth store (hỗ trợ cả mock & backend user)
-  const defaultUserData = {
-    name: authUser?.fullName || authUser?.name || MOCK_USER.name,
-    email: authUser?.email || MOCK_USER.email,
-    phone: authUser?.phone || MOCK_USER.phone,
-    avatar: null,
-    joinDate: authUser?.createDate || MOCK_USER.joinDate,
-    totalBookings: 0,
-    totalSpent: 0,
-    memberLevel: 'Gold',
-  };
+  const redeemableOffers = [
+    { id: 'r1', code: 'POINT50K', title: 'Voucher 50.000đ', points: 500, desc: 'Giảm trực tiếp 50k vào tổng hóa đơn', color: 'border-orange-500/40 bg-orange-500/5' },
+    { id: 'r2', code: 'FREE2D', title: 'Vé xem phim 2D', points: 1000, desc: 'Đổi 1 vé xem phim 2D miễn phí', color: 'border-blue-500/40 bg-blue-500/5' },
+    { id: 'r3', code: 'VIPCOMBO', title: 'Combo Bắp Nước VIP', points: 800, desc: '2 nước lớn + 1 bắp phô mai lớn', color: 'border-primary/40 bg-primary/5' },
+  ];
 
-  const [userData, setUserData] = useState(defaultUserData);
-  const [formData, setFormData] = useState({ ...defaultUserData });
-
-  // Fetch thông tin chi tiết tài khoản (kèm vé) từ backend
-  useEffect(() => {
-    const fetchAccountDetail = async () => {
-      if (!authUser?.id) return;
-      try {
-        const { data } = await accountApi.getById(authUser.id);
-        const updated = {
-          ...defaultUserData,
-          name: data.fullName || defaultUserData.name,
-          email: data.email || defaultUserData.email,
-          phone: data.phone || defaultUserData.phone,
-          joinDate: data.createDate || defaultUserData.joinDate,
-          totalBookings: data.tickets?.length || 0,
-          totalSpent: data.tickets?.reduce((sum, t) => sum + (t.finalAmount || 0), 0) || 0,
-        };
-        setUserData(updated);
-        setFormData({ ...updated });
-
-        // Map tickets vào bookings
-        if (data.tickets && data.tickets.length > 0) {
-          const mapped = data.tickets.map(t => ({
-            id: t.ticketsCode || t.id,
-            movie: 'Vé #' + (t.ticketsCode || t.id),
-            poster: 'https://placehold.co/80x120/1E1E2C/A0A0B4',
-            cinema: '-',
-            date: new Date().toISOString().split('T')[0],
-            time: '-',
-            type: '-',
-            hall: '-',
-            seats: [],
-            total: t.finalAmount || t.totalAmount || 0,
-            status: t.status === 'ACTIVE' ? 'upcoming' : t.status === 'CANCELLED' ? 'cancelled' : 'completed',
-          }));
-          setBookings(mapped);
-        }
-      } catch (err) {
-        console.warn('⚠️ Không lấy được thông tin tài khoản, dùng mock:', err.message);
-      }
-    };
-    fetchAccountDetail();
-  }, [authUser?.id]);
+  // Review Modal state
+  const [reviewModal, setReviewModal] = useState({ open: false, booking: null });
+  const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' });
+  const [reviewSuccess, setReviewSuccess] = useState(false);
 
   const filteredBookings = filterStatus === 'all'
-    ? bookings
-    : bookings.filter(b => b.status === filterStatus);
+    ? MOCK_BOOKINGS.filter(b => b.status !== 'cancelled')
+    : MOCK_BOOKINGS.filter(b => b.status === filterStatus && b.status !== 'cancelled');
+
+  useEffect(() => {
+    movieService.getAll().then(setMoviesData);
+  }, []);
+
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  // Cuộn lên đầu trang mỗi khi chuyển đổi activeTab
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab]);
 
   const handleSaveProfile = () => {
     setUserData({ ...formData });
     setEditMode(false);
+  };
+
+  const handleOpenReview = (booking) => {
+    setReviewModal({ open: true, booking });
+    setReviewForm({ rating: 0, comment: '' });
+    setReviewSuccess(false);
+  };
+
+  const handleSubmitReview = (e) => {
+    e.preventDefault();
+    if (!reviewForm.rating || !reviewForm.comment.trim()) return;
+    
+    // Simulate API call and save to reviewService
+    reviewService.create({
+      // Vì booking.movie là chuỗi, ta fake movieId (thực tế cần ID của phim từ history)
+      movieId: 1, // Mock
+      userId: user?.id || user?.userId || 0,
+      userName: user?.fullName || user?.userName || userData.name,
+      userInitials: 'MB',
+      rating: reviewForm.rating,
+      comment: reviewForm.comment,
+    });
+
+    setTimeout(() => {
+      setReviewSuccess(true);
+      setTimeout(() => {
+        setReviewModal({ open: false, booking: null });
+        setReviewSuccess(false);
+      }, 2000);
+    }, 500);
+  };
+
+  const handleRedeem = (offer) => {
+    if (userData.points < offer.points) {
+      addNotification({ type: 'error', title: 'Không đủ điểm', message: `Bạn cần thêm ${offer.points - userData.points} điểm để đổi ${offer.title}.` });
+      return;
+    }
+    setUserData({ ...userData, points: userData.points - offer.points });
+    setOwnedVouchers([
+      { id: Date.now().toString(), code: offer.code, desc: offer.desc, exp: '30 ngày kể từ ngày đổi', color: offer.color },
+      ...ownedVouchers
+    ]);
+    addNotification({ type: 'success', title: 'Đổi ưu đãi thành công', message: `Bạn đã đổi thành công ${offer.title} với ${offer.points} điểm.` });
   };
 
   return (
@@ -317,7 +350,7 @@ export default function Profile() {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {bookings.slice(0, 2).map(b => (
+                  {MOCK_BOOKINGS.slice(0, 2).map(b => (
                     <div key={b.id} className="flex gap-3 items-center">
                       <img src={b.poster} alt={b.movie} className="w-10 h-14 object-cover rounded-lg flex-shrink-0"
                         onError={e => { e.target.src = 'https://placehold.co/60x84/1E1E2C/A0A0B4'; }} />
@@ -333,25 +366,18 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Vouchers / Benefits */}
+              {/* Quick Summary */}
               <div className="card p-5">
-                <h3 className="font-heading font-bold text-white mb-4">Ưu đãi của tôi</h3>
-                <div className="space-y-3">
-                  {[
-                    { code: 'GOLD20', desc: 'Giảm 20% cho lần đặt vé tiếp theo', exp: '31/03/2026', color: 'border-primary/40 bg-primary/5' },
-                    { code: 'WEEKEND15', desc: 'Giảm 15% vào cuối tuần', exp: '15/04/2026', color: 'border-blue-500/40 bg-blue-500/5' },
-                  ].map(v => (
-                    <div key={v.code} className={`rounded-xl border p-3 ${v.color}`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-mono font-bold text-primary text-sm">{v.code}</span>
-                        <button className="text-xs text-cinema-muted hover:text-white transition-colors border border-cinema-border px-2 py-0.5 rounded">
-                          Sao chép
-                        </button>
-                      </div>
-                      <p className="text-cinema-text text-xs">{v.desc}</p>
-                      <p className="text-cinema-muted text-[10px] mt-1">HSD: {v.exp}</p>
-                    </div>
-                  ))}
+                <h3 className="font-heading font-bold text-white mb-4">Hoạt động</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center pb-4 border-b border-cinema-border">
+                    <span className="text-cinema-muted text-sm">Phim yêu thích</span>
+                    <span className="text-white font-bold">{favorites.length} phim</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-cinema-muted text-sm">Ưu đãi khả dụng</span>
+                    <span className="text-white font-bold">{ownedVouchers.length} voucher</span>
+                  </div>
                 </div>
               </div>
 
@@ -360,7 +386,7 @@ export default function Profile() {
                 <h3 className="font-heading font-bold text-white mb-4">Điểm thành viên</h3>
                 <div className="flex items-center gap-4 mb-3">
                   <div className="text-center">
-                    <p className="text-primary font-heading font-extrabold text-3xl">2,450</p>
+                    <p className="text-primary font-heading font-extrabold text-3xl">{userData.points.toLocaleString('vi-VN')}</p>
                     <p className="text-cinema-muted text-xs mt-0.5">điểm hiện tại</p>
                   </div>
                   <div className="flex-1">
@@ -371,10 +397,10 @@ export default function Profile() {
                     <div className="h-3 bg-cinema-surface rounded-full overflow-hidden border border-cinema-border">
                       <div
                         className="h-full bg-gradient-gold rounded-full transition-all duration-1000"
-                        style={{ width: `${(2450 / 5000) * 100}%` }}
+                        style={{ width: `${(userData.points / 5000) * 100}%` }}
                       />
                     </div>
-                    <p className="text-cinema-muted text-xs mt-1.5">Còn 2,550 điểm để lên hạng <span className="text-white font-semibold">Platinum</span></p>
+                    <p className="text-cinema-muted text-xs mt-1.5">Còn {(5000 - userData.points).toLocaleString('vi-VN')} điểm để lên hạng <span className="text-white font-semibold">Platinum</span></p>
                   </div>
                 </div>
               </div>
@@ -394,7 +420,6 @@ export default function Profile() {
                   { value: 'all', label: 'Tất cả' },
                   { value: 'upcoming', label: '🕐 Sắp tới' },
                   { value: 'completed', label: '✅ Đã xem' },
-                  { value: 'cancelled', label: '❌ Đã huỷ' },
                 ].map(f => (
                   <button
                     key={f.value}
@@ -413,7 +438,7 @@ export default function Profile() {
               {/* Booking list */}
               <div className="space-y-3">
                 {filteredBookings.length > 0 ? (
-                  filteredBookings.map(b => <BookingCard key={b.id} booking={b} />)
+                  filteredBookings.map(b => <BookingCard key={b.id} booking={b} onRate={handleOpenReview} />)
                 ) : (
                   <div className="text-center py-16">
                     <div className="text-5xl mb-3">🎟️</div>
@@ -421,6 +446,91 @@ export default function Profile() {
                     <p className="text-cinema-muted text-sm mb-4">Đặt vé ngay để trải nghiệm điện ảnh!</p>
                     <Link to="/movies" className="btn-primary inline-block px-6 py-2.5 text-sm">Xem phim ngay</Link>
                   </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'favorites' && (
+            <motion.div
+              key="favorites"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              {moviesData.filter(m => favorites.includes(m.id)).length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {moviesData.filter(m => favorites.includes(m.id)).map((movie, index) => (
+                    <MovieCard key={movie.id} movie={movie} index={index} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16 bg-cinema-card border border-cinema-border rounded-2xl">
+                  <div className="text-5xl mb-3">❤️</div>
+                  <p className="text-white font-semibold mb-1">Chưa có phim yêu thích</p>
+                  <p className="text-cinema-muted text-sm mb-4">Hãy thêm các bộ phim bạn muốn xem vào đây nhé!</p>
+                  <Link to="/movies" className="btn-primary inline-block px-6 py-2.5 text-sm">Khám phá phim</Link>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === 'offers' && (
+            <motion.div
+              key="offers"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              <div className="card p-6 mb-6">
+                <h3 className="font-heading font-bold text-white mb-4 text-lg border-b border-cinema-border pb-3">Đổi điểm thưởng</h3>
+                <div className="flex items-center gap-3 mb-6 bg-primary/10 border border-primary/20 p-4 rounded-xl">
+                  <div className="w-10 h-10 rounded-full bg-gradient-gold flex items-center justify-center text-xl shadow-glow-gold">💎</div>
+                  <div>
+                    <p className="text-cinema-muted text-sm">Điểm hiện có</p>
+                    <p className="text-white font-bold text-xl">{userData.points.toLocaleString('vi-VN')} <span className="text-primary text-sm font-normal">điểm</span></p>
+                  </div>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {redeemableOffers.map(v => (
+                    <div key={v.id} className={`rounded-xl border p-5 ${v.color} flex flex-col`}>
+                      <div className="mb-2">
+                        <span className="font-heading font-bold text-white text-base block">{v.title}</span>
+                        <p className="text-cinema-muted text-sm mt-1">{v.desc}</p>
+                      </div>
+                      <div className="mt-auto pt-4 flex items-center justify-between border-t border-cinema-border/50">
+                        <span className="font-bold text-primary">{v.points} điểm</span>
+                        <button 
+                          onClick={() => handleRedeem(v)}
+                          className="btn-primary text-xs px-4 py-1.5 hover:scale-105"
+                        >
+                          Đổi ngay
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="card p-6">
+                <h3 className="font-heading font-bold text-white mb-6 text-lg border-b border-cinema-border pb-3">Ưu đãi đang có</h3>
+                {ownedVouchers.length > 0 ? (
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {ownedVouchers.map(v => (
+                      <div key={v.id} className={`rounded-xl border p-5 ${v.color}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono font-bold text-primary text-lg">{v.code}</span>
+                          <button className="text-sm text-cinema-muted hover:text-white transition-colors border border-cinema-border px-3 py-1 rounded-lg bg-cinema-black/40">
+                            Sao chép
+                          </button>
+                        </div>
+                        <p className="text-white font-medium mb-1">{v.desc}</p>
+                        <p className="text-cinema-muted text-xs">HSD: {v.exp}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-cinema-muted text-center py-8">Bạn chưa có ưu đãi nào khả dụng.</p>
                 )}
               </div>
             </motion.div>
@@ -531,6 +641,82 @@ export default function Profile() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Review Modal */}
+      <AnimatePresence>
+        {reviewModal.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cinema-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-cinema-dark border border-cinema-border rounded-2xl p-6 w-full max-w-md shadow-2xl relative"
+            >
+              <button
+                onClick={() => setReviewModal({ open: false, booking: null })}
+                className="absolute top-4 right-4 text-cinema-muted hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <h3 className="font-heading font-bold text-xl text-white mb-2">Đánh giá phim</h3>
+              <p className="text-cinema-muted text-sm mb-6 flex items-center gap-2">
+                <span className="font-semibold text-white">{reviewModal.booking?.movie}</span>
+              </p>
+
+              {reviewSuccess ? (
+                <div className="text-center py-8">
+                  <div className="text-5xl mb-4">✅</div>
+                  <h4 className="text-white font-bold text-lg mb-2">Đánh giá thành công!</h4>
+                  <p className="text-cinema-muted text-sm">Cảm ơn bạn đã chia sẻ cảm nhận.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmitReview} className="space-y-5">
+                  <div>
+                    <label className="block text-cinema-muted text-sm mb-2 font-medium">Điểm đánh giá <span className="text-red-400">*</span></label>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                          className="hover:scale-110 transition-transform"
+                        >
+                          <svg className={`w-8 h-8 ${reviewForm.rating >= star ? 'text-primary' : 'text-cinema-border'}`} fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-cinema-muted text-sm mb-2 font-medium">Cảm nhận của bạn <span className="text-red-400">*</span></label>
+                    <textarea
+                      value={reviewForm.comment}
+                      onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                      placeholder="Chia sẻ vài dòng về bộ phim..."
+                      rows={4}
+                      className="input-field resize-none w-full"
+                      required
+                    ></textarea>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={!reviewForm.rating || !reviewForm.comment.trim()}
+                    className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Gửi đánh giá
+                  </button>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

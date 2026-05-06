@@ -21,6 +21,7 @@ const bookingSeatApi = {
   /**
    * Đặt ghế
    * POST /api/v1/bookingSeats
+   * Body: { slotId, seatIds[], ticketId }
    */
   create: (data) => {
     return axiosClient.post('/api/v1/bookingSeats', data);

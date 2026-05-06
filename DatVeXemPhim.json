@@ -1,0 +1,1419 @@
+{
+  "info": {
+    "_postman_id": "1dd91abd-8eb5-4a83-a68e-621321f0856e",
+    "name": "DatVeXemPhim",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "49693192",
+    "_collection_link": "https://go.postman.co/collection/49693192-1dd91abd-8eb5-4a83-a68e-621321f0856e?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "BookingSeats",
+      "item": [
+        {
+          "name": "New Request",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "localhost:8080/api/v1/bookingSeats",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "bookingSeats"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cinema",
+      "item": [
+        {
+          "name": "lay danh sach cac rap",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "localhost:8080/api/v1/cinemas",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "cinemas"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Xoa 1 rap",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/cinemas/4",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "cinemas",
+                "4"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "lay ra thong tin 1 rap",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/cinemas/4",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "cinemas",
+                "4"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "cap nhat 1 rap",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"cinemaName\": \"CGV Vincom Hải Phòng\",\r\n    \"address\": \"Lê Chân\",\r\n    \"phone\": \"0973284727\",\r\n    \"email\": \"vincomhp@gmail.com\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/cinemas/4",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "cinemas",
+                "4"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Movie",
+      "item": [
+        {
+          "name": "Lay danh sach cac phim",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": []
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/movies",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "movies"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lay thong tin 1 phim",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"cinemaName\": \"CGV Vincom Hải Phòng\",\r\n    \"address\": \"Lê Chân\",\r\n    \"phone\": \"0973284727\",\r\n    \"email\": \"vincomhp@gmail.com\"\r\n}"
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/movies/17",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "movies",
+                "17"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cap nhat 1 phim",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"title\": \"Mắt biếc\",\r\n     \"description\": \"Mắt biếc xoay quanh mối tình đơn phương của Ngạn với Hà Lan, cô bạn gái có cặp mắt hút hồn nhưng cá tính bướng bỉnh. Một chuyện tình nhiều cung bậc, từ ngộ nghĩnh trẻ con, rồi tình yêu thuở học trò trong sáng, trải qua bao biến cố, trở thành một cuộc “đuổi hình bắt bóng” buồn da diết nhưng không nguôi hi vọng. Câu chuyện càng trở nên éo le hơn khi Trà Long - con gái của Hà Lan lớn lên lại nhen nhóm một tình yêu như thế với Ngạn.\",\r\n    \"duration\": 117,\r\n    \"releaseDate\": \"2026-04-30\",\r\n    \"director\": \"Victor Vũ\",\r\n    \"cast\": \"Trần Nghĩa, Trúc Anh\",\r\n    \"genre\": \"Tình cảm\",\r\n    \"language\": \"Tiếng Việt\",\r\n    \"posterUrl\": \"https://dep.com.vn/wp-content/uploads/2019/12/poster-chinh-thuc-bo-phim-mat-biec.jpg\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/movies/17",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "movies",
+                "17"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Tạo 1 phim",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"title\": \"Mắt biếc\",\r\n     \"description\": \"Mắt biếc xoay quanh mối tình đơn phương của Ngạn với Hà Lan, cô bạn gái có cặp mắt hút hồn nhưng cá tính bướng bỉnh. Một chuyện tình nhiều cung bậc, từ ngộ nghĩnh trẻ con, rồi tình yêu thuở học trò trong sáng, trải qua bao biến cố, trở thành một cuộc “đuổi hình bắt bóng” buồn da diết nhưng không nguôi hi vọng. Câu chuyện càng trở nên éo le hơn khi Trà Long - con gái của Hà Lan lớn lên lại nhen nhóm một tình yêu như thế với Ngạn.\",\r\n    \"duration\": 117,\r\n    \"releaseDate\": \"2026-04-30\",\r\n    \"director\": \"Victor Vũ\",\r\n    \"cast\": \"Trần Nghĩa, Trúc Anh\",\r\n    \"genre\": \"Tình cảm\",\r\n    \"language\": \"Tiếng Việt\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/movies",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "movies"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Xóa 1 phim",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "localhost:8080/api/v1/movies/16",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "movies",
+                "16"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "user xem cac phim",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "Abcd1234*",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "user1",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/movies",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "movies"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "user xem thong tin 1 phim",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "Abcd1234*",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "user1",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/movies/17",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "movies",
+                "17"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "MovieCinema",
+      "item": [
+        {
+          "name": "New Request",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"cinemaName\": \"CGV Vincom Hải Phòng\",\r\n    \"address\": \"Lê Chân\",\r\n    \"phone\": \"0973284727\",\r\n    \"email\": \"vincomhp@gmail.com\"\r\n}"
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/movieCinemas",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "movieCinemas"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Promotion",
+      "item": [
+        {
+          "name": "lay danh sach cac chuong trinh",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "admin",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"cinemaName\": \"CGV Vincom Hải Phòng\",\r\n    \"address\": \"Lê Chân\",\r\n    \"phone\": \"0973284727\",\r\n    \"email\": \"vincomhp@gmail.com\"\r\n}"
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/promotions",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "promotions"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Room",
+      "item": [
+        {
+          "name": "lay danh sach cac phong",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "Abcd1234*",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "user1",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/rooms",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "rooms"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Tạo 1 ghế mới",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "Lấy thông tin 1 phòng",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "user1",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/rooms/2",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "rooms",
+                "2"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chatbot",
+      "item": [
+        {
+          "name": "New Request",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "Abcd1234*",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "user1",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"prompt\": \"nay tôi buồn thì xem phim nào hơp lí\"\r\n}\r\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "localhost:8080/api/v1/ai/chat",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "ai",
+                "chat"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Gửi mail",
+      "item": [
+        {
+          "name": "Booking",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "password",
+                  "value": "123456",
+                  "type": "string"
+                },
+                {
+                  "key": "username",
+                  "value": "user10",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"accountsId\": 19, \r\n    \"slotsId\": 10,\r\n    \"discountAmount\": 0,\r\n    \"note\": \"Test gửi mail đặt vé\",\r\n    \"seats\": [\r\n        {\"seatId\": 1},\r\n        {\"seatId\": 2}\r\n    ],\r\n    \"products\": [\r\n        {\"productId\": 1, \"quantity\": 1}\r\n    ]\r\n}\r\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/tickets",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "tickets"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "đki thành công",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "accounts",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "admin",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "123456",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/accounts",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "v1",
+            "accounts"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"userName\": \"admin\",\r\n    \"passwordHash\": \"123456\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/auth/login",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "Vary",
+              "value": "Origin"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Method"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Headers"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "0"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            },
+            {
+              "key": "Pragma",
+              "value": "no-cache"
+            },
+            {
+              "key": "Expires",
+              "value": "0"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "Transfer-Encoding",
+              "value": "chunked"
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 10 Apr 2026 03:06:58 GMT"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=60"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": 2,\n    \"userName\": \"admin\",\n    \"email\": \"admin@cgv.com\",\n    \"phone\": \"0987654321\",\n    \"fullName\": \"admin\",\n    \"role\": \"ADMIN\",\n    \"token\": \"eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTc3NjY1NDQxN30.EEMWrUxVuLpBp1IYbrSl-pifeRsbdkBbPnBIdqxyneuIyagZQK47TV32V77S8J-uAqTG_JxPFPGf_nkY6gx4ZA\",\n    \"createDate\": \"08-03-2026 17:55:50\",\n    \"tickets\": []\n}"
+        },
+        {
+          "name": "lay danh sach accounts",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/accounts",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "accounts"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "Vary",
+              "value": "Origin"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Method"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Headers"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "0"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            },
+            {
+              "key": "Pragma",
+              "value": "no-cache"
+            },
+            {
+              "key": "Expires",
+              "value": "0"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "Transfer-Encoding",
+              "value": "chunked"
+            },
+            {
+              "key": "Date",
+              "value": "Mon, 13 Apr 2026 06:47:19 GMT"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=60"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"data\": [\n        {\n            \"id\": 1,\n            \"userName\": \"trongprovip1\",\n            \"email\": \"duongtrong1306@gmail.com\",\n            \"phone\": \"0972199914\",\n            \"fullName\": \"trongprovip\",\n            \"role\": \"USER\",\n            \"token\": null,\n            \"createDate\": \"08-03-2026 17:55:24\",\n            \"tickets\": []\n        },\n        {\n            \"id\": 2,\n            \"userName\": \"admin\",\n            \"email\": \"admin@cgv.com\",\n            \"phone\": \"0987654321\",\n            \"fullName\": \"admin\",\n            \"role\": \"ADMIN\",\n            \"token\": null,\n            \"createDate\": \"08-03-2026 17:55:50\",\n            \"tickets\": []\n        },\n        {\n            \"id\": 3,\n            \"userName\": \"trongahaha\",\n            \"email\": \"duongtrong13062004@gmail.com\",\n            \"phone\": \"0987654322\",\n            \"fullName\": \"trongahihi\",\n            \"role\": \"USER\",\n            \"token\": null,\n            \"createDate\": \"08-03-2026 17:56:29\",\n            \"tickets\": [\n                {\n                    \"id\": 1,\n                    \"ticketsCode\": \"CGV1773017700438497\",\n                    \"totalAmount\": 146000,\n                    \"discountAmount\": 0,\n                    \"finalAmount\": 146000,\n                    \"paymentStatus\": \"PAID\",\n                    \"status\": \"CONFIRMED\"\n                },\n                {\n                    \"id\": 2,\n                    \"ticketsCode\": \"CGV1773017957638259\",\n                    \"totalAmount\": 80000,\n                    \"discountAmount\": 0,\n                    \"finalAmount\": 80000,\n                    \"paymentStatus\": \"PAID\",\n                    \"status\": \"CONFIRMED\"\n                },\n                {\n                    \"id\": 3,\n                    \"ticketsCode\": \"CGV1773018015247750\",\n                    \"totalAmount\": 120000,\n                    \"discountAmount\": 0,\n                    \"finalAmount\": 120000,\n                    \"paymentStatus\": \"UNPAID\",\n                    \"status\": \"CANCELLED\"\n                },\n                {\n                    \"id\": 4,\n                    \"ticketsCode\": \"CGV1773037880838228\",\n                    \"totalAmount\": 120000,\n                    \"discountAmount\": 0,\n                    \"finalAmount\": 120000,\n                    \"paymentStatus\": \"PAID\",\n                    \"status\": \"CONFIRMED\"\n                }\n            ]\n        },\n        {\n            \"id\": 5,\n            \"userName\": \"fsdfsdfsdfsd\",\n            \"email\": \"hanh11236ng@gmail.com\",\n            \"phone\": \"0987654321\",\n            \"fullName\": \"gfdgdfgdf\",\n            \"role\": \"USER\",\n            \"token\": null,\n            \"createDate\": \"08-04-2026 09:04:59\",\n            \"tickets\": [\n                {\n                    \"id\": 5,\n                    \"ticketsCode\": \"CGV1775641348085620\",\n                    \"totalAmount\": 282000,\n                    \"discountAmount\": 0,\n                    \"finalAmount\": 282000,\n                    \"paymentStatus\": \"UNPAID\",\n                    \"status\": \"PENDING\"\n                },\n                {\n                    \"id\": 6,\n                    \"ticketsCode\": \"CGV1775642167443603\",\n                    \"totalAmount\": 146000,\n                    \"discountAmount\": 0,\n                    \"finalAmount\": 146000,\n                    \"paymentStatus\": \"UNPAID\",\n                    \"status\": \"PENDING\"\n                },\n                {\n                    \"id\": 7,\n                    \"ticketsCode\": \"CGV1775642596938532\",\n                    \"totalAmount\": 126000,\n                    \"discountAmount\": 0,\n                    \"finalAmount\": 126000,\n                    \"paymentStatus\": \"UNPAID\",\n                    \"status\": \"PENDING\"\n                },\n                {\n                    \"id\": 8,\n                    \"ticketsCode\": \"CGV1775643387637459\",\n                    \"totalAmount\": 96000,\n                    \"discountAmount\": 0,\n                    \"finalAmount\": 96000,\n                    \"paymentStatus\": \"PAID\",\n                    \"status\": \"CONFIRMED\"\n                },\n                {\n                    \"id\": 9,\n                    \"ticketsCode\": \"CGV1775643523020194\",\n                    \"totalAmount\": 96000,\n                    \"discountAmount\": 0,\n                    \"finalAmount\": 96000,\n                    \"paymentStatus\": \"PAID\",\n                    \"status\": \"CONFIRMED\"\n                },\n                {\n                    \"id\": 10,\n                    \"ticketsCode\": \"CGV1775719753967347\",\n                    \"totalAmount\": 80000,\n                    \"discountAmount\": 0,\n                    \"finalAmount\": 80000,\n                    \"paymentStatus\": \"UNPAID\",\n                    \"status\": \"PENDING\"\n                },\n                {\n                    \"id\": 11,\n                    \"ticketsCode\": \"CGV1775719851095231\",\n                    \"totalAmount\": 80000,\n                    \"discountAmount\": 0,\n                    \"finalAmount\": 80000,\n                    \"paymentStatus\": \"UNPAID\",\n                    \"status\": \"PENDING\"\n                }\n            ]\n        },\n        {\n            \"id\": 6,\n            \"userName\": \"testad\",\n            \"email\": \"testad@gmail.com\",\n            \"phone\": \"0987654321\",\n            \"fullName\": \"testad\",\n            \"role\": \"USER\",\n            \"token\": null,\n            \"createDate\": \"09-04-2026 09:20:45\",\n            \"tickets\": []\n        },\n        {\n            \"id\": 7,\n            \"userName\": \"nva\",\n            \"email\": \"nva@gmail.com\",\n            \"phone\": \"0987654321\",\n            \"fullName\": \"nguyen van a\",\n            \"role\": \"USER\",\n            \"token\": null,\n            \"createDate\": \"10-04-2026 06:38:01\",\n            \"tickets\": []\n        },\n        {\n            \"id\": 8,\n            \"userName\": \"nvb\",\n            \"email\": \"nvb@gmail.com\",\n            \"phone\": \"0987654321\",\n            \"fullName\": \"nguyn van b\",\n            \"role\": \"USER\",\n            \"token\": null,\n            \"createDate\": \"10-04-2026 08:28:11\",\n            \"tickets\": []\n        },\n        {\n            \"id\": 9,\n            \"userName\": \"abc\",\n            \"email\": \"abc@gmail.com\",\n            \"phone\": \"0987654321\",\n            \"fullName\": \"abc\",\n            \"role\": \"ADMIN\",\n            \"token\": null,\n            \"createDate\": \"13-04-2026 06:21:18\",\n            \"tickets\": []\n        }\n    ]\n}"
+        },
+        {
+          "name": "lay ra danh sach 1 tk",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/accounts/5",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "accounts",
+                "5"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "Vary",
+              "value": "Origin"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Method"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Headers"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "0"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            },
+            {
+              "key": "Pragma",
+              "value": "no-cache"
+            },
+            {
+              "key": "Expires",
+              "value": "0"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "Transfer-Encoding",
+              "value": "chunked"
+            },
+            {
+              "key": "Date",
+              "value": "Mon, 13 Apr 2026 06:49:31 GMT"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=60"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": 5,\n    \"userName\": \"fsdfsdfsdfsd\",\n    \"email\": \"hanh11236ng@gmail.com\",\n    \"phone\": \"0987654321\",\n    \"fullName\": \"gfdgdfgdf\",\n    \"role\": \"USER\",\n    \"token\": null,\n    \"createDate\": \"08-04-2026 09:04:59\",\n    \"tickets\": [\n        {\n            \"id\": 5,\n            \"ticketsCode\": \"CGV1775641348085620\",\n            \"totalAmount\": 282000,\n            \"discountAmount\": 0,\n            \"finalAmount\": 282000,\n            \"paymentStatus\": \"UNPAID\",\n            \"status\": \"PENDING\"\n        },\n        {\n            \"id\": 6,\n            \"ticketsCode\": \"CGV1775642167443603\",\n            \"totalAmount\": 146000,\n            \"discountAmount\": 0,\n            \"finalAmount\": 146000,\n            \"paymentStatus\": \"UNPAID\",\n            \"status\": \"PENDING\"\n        },\n        {\n            \"id\": 7,\n            \"ticketsCode\": \"CGV1775642596938532\",\n            \"totalAmount\": 126000,\n            \"discountAmount\": 0,\n            \"finalAmount\": 126000,\n            \"paymentStatus\": \"UNPAID\",\n            \"status\": \"PENDING\"\n        },\n        {\n            \"id\": 8,\n            \"ticketsCode\": \"CGV1775643387637459\",\n            \"totalAmount\": 96000,\n            \"discountAmount\": 0,\n            \"finalAmount\": 96000,\n            \"paymentStatus\": \"PAID\",\n            \"status\": \"CONFIRMED\"\n        },\n        {\n            \"id\": 9,\n            \"ticketsCode\": \"CGV1775643523020194\",\n            \"totalAmount\": 96000,\n            \"discountAmount\": 0,\n            \"finalAmount\": 96000,\n            \"paymentStatus\": \"PAID\",\n            \"status\": \"CONFIRMED\"\n        },\n        {\n            \"id\": 10,\n            \"ticketsCode\": \"CGV1775719753967347\",\n            \"totalAmount\": 80000,\n            \"discountAmount\": 0,\n            \"finalAmount\": 80000,\n            \"paymentStatus\": \"UNPAID\",\n            \"status\": \"PENDING\"\n        },\n        {\n            \"id\": 11,\n            \"ticketsCode\": \"CGV1775719851095231\",\n            \"totalAmount\": 80000,\n            \"discountAmount\": 0,\n            \"finalAmount\": 80000,\n            \"paymentStatus\": \"UNPAID\",\n            \"status\": \"PENDING\"\n        }\n    ]\n}"
+        },
+        {
+          "name": "cap nhat accounts",
+          "originalRequest": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"userName\": \"test1\",\r\n    \"email\": \"test@gmail.com\",\r\n    \"phone\": \"0987654321\",\r\n    \"fullName\": \"test123\" ,\r\n    \"role\": \"USER\"  \r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/accounts/7",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "accounts",
+                "7"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "Vary",
+              "value": "Origin"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Method"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Headers"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "0"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            },
+            {
+              "key": "Pragma",
+              "value": "no-cache"
+            },
+            {
+              "key": "Expires",
+              "value": "0"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "Content-Length",
+              "value": "0"
+            },
+            {
+              "key": "Date",
+              "value": "Mon, 13 Apr 2026 07:06:48 GMT"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=60"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            }
+          ],
+          "cookie": [],
+          "body": null
+        },
+        {
+          "name": "xoa accounts",
+          "originalRequest": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/accounts/7",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "accounts",
+                "7"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "Vary",
+              "value": "Origin"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Method"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Headers"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "0"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            },
+            {
+              "key": "Pragma",
+              "value": "no-cache"
+            },
+            {
+              "key": "Expires",
+              "value": "0"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "Content-Length",
+              "value": "0"
+            },
+            {
+              "key": "Date",
+              "value": "Mon, 13 Apr 2026 07:08:36 GMT"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=60"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            }
+          ],
+          "cookie": [],
+          "body": null
+        },
+        {
+          "name": "gui mail",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/accounts",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "accounts"
+              ]
+            }
+          },
+          "_postman_previewlanguage": null,
+          "header": null,
+          "cookie": [],
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "accounts",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"userName\": \"nguyenvana\",\r\n    \"passwordHash\": \"123456\",\r\n    \"email\": \"nguyenvana@gmail.com\",\r\n    \"phone\": \"0123456789\",\r\n    \"fullName\": \"Nguyễn Văn A\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/register",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

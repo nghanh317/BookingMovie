@@ -1,183 +1,338 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import promotionApi from '../../api/promotionApi';
+import { VOUCHERS } from '../../constants/mockData';
+import useNotificationStore from '../../store/notificationStore';
+import DatePickerInput from '../../components/ui/DatePickerInput';
 
 const TYPE_LABEL = { percent: 'Phần trăm', fixed: 'Số tiền cố định' };
 
-function AddVoucherModal({ onClose, onAdd }) {
-  const [form, setForm] = useState({
-    code: '', type: 'percent', value: '', minOrder: '', desc: '', expiry: '', stock: '', pointCost: 0,
-  });
-  const [loading, setLoading] = useState(false);
+function fmt(n) {
+  return new Intl.NumberFormat('vi-VN').format(n);
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
 
-  const handleAdd = async () => {
+// ── Add Modal ──────────────────────────────────────────────
+function AddVoucherModal({ onClose, onAdd }) {
+  const today = new Date().toISOString().split('T')[0];
+  const [form, setForm] = useState({
+    code: '', name: '', type: 'percent', value: '', maxDiscount: '',
+    minOrder: '', desc: '', startDate: today, expiry: '', stock: '',
+    usesPerUser: 1, pointCost: 0,
+  });
+
+  const handleAdd = () => {
     if (!form.code || !form.value || !form.expiry || !form.stock) return;
-    setLoading(true);
-    try {
-      const activeState = true; 
-      // mapping to assumed backend dto structure
-      const payload = {
-        name: form.code.toUpperCase(), // voucher code
-        description: form.desc || `Giảm ${form.value}${form.type === 'percent' ? '%' : '000đ'}`,
-        discountAmount: Number(form.value), // you might need to adapt percentage logic later
-        startTime: new Date().toISOString(), // assuming immediate start
-        endTime: new Date(form.expiry).toISOString(),
-        quantity: Number(form.stock),
-        status: activeState ? 1 : 0
-      };
-      await onAdd(payload);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-      onClose();
-    }
+    onAdd({
+      id: 'V' + Date.now(),
+      code: form.code.toUpperCase(),
+      name: form.name || form.code.toUpperCase(),
+      type: form.type,
+      value: Number(form.value),
+      maxDiscount: Number(form.maxDiscount) || 0,
+      minOrder: Number(form.minOrder) || 0,
+      desc: form.desc || `Giảm ${form.value}${form.type === 'percent' ? '%' : '000đ'}`,
+      startDate: form.startDate,
+      expiry: form.expiry,
+      stock: Number(form.stock),
+      usedCount: 0,
+      usesPerUser: Number(form.usesPerUser) || 1,
+      active: true,
+      isPublic: true,
+      pointCost: Number(form.pointCost) || 0,
+    });
+    onClose();
   };
+
+  const f = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-        className="bg-cinema-card border border-cinema-border rounded-2xl p-6 w-full max-w-md shadow-card-hover"
-      >
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        className="bg-cinema-card border border-cinema-border rounded-2xl p-6 w-full max-w-lg shadow-card-hover overflow-y-auto max-h-[90vh]">
         <h3 className="font-heading font-bold text-white text-lg mb-5">➕ Thêm Voucher Mới</h3>
         <div className="space-y-3">
           <div>
+            <label className="text-cinema-muted text-xs mb-1 block">Tên chương trình</label>
+            <input className="input-field" placeholder="VD: Ưu đãi mùa hè" value={form.name} onChange={e => f('name', e.target.value)} />
+          </div>
+          <div>
             <label className="text-cinema-muted text-xs mb-1 block">Mã voucher *</label>
-            <input className="input-field uppercase" placeholder="VD: SUMMER20"
-              value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} />
+            <input className="input-field uppercase" placeholder="VD: SUMMER20" value={form.code} onChange={e => f('code', e.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-cinema-muted text-xs mb-1 block">Loại giảm giá *</label>
-              <select className="input-field cursor-pointer" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
+              <select className="input-field cursor-pointer" value={form.type} onChange={e => f('type', e.target.value)}>
                 <option value="percent">Phần trăm (%)</option>
                 <option value="fixed">Số tiền cố định (đ)</option>
               </select>
             </div>
             <div>
               <label className="text-cinema-muted text-xs mb-1 block">Giá trị *</label>
-              <input type="number" className="input-field" placeholder={form.type === 'percent' ? '20' : '50000'}
-                value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} />
+              <input type="number" className="input-field" placeholder={form.type === 'percent' ? '20' : '50000'} value={form.value} onChange={e => f('value', e.target.value)} />
+            </div>
+          </div>
+          {form.type === 'percent' && (
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">Giảm tối đa (đ)</label>
+              <input type="number" className="input-field" placeholder="100000" value={form.maxDiscount} onChange={e => f('maxDiscount', e.target.value)} />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">Đơn tối thiểu (đ)</label>
+              <input type="number" className="input-field" placeholder="100000" value={form.minOrder} onChange={e => f('minOrder', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">Số lượng *</label>
+              <input type="number" className="input-field" placeholder="100" value={form.stock} onChange={e => f('stock', e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-cinema-muted text-xs mb-1 block">Đơn tối thiểu (đ)</label>
-              <input type="number" className="input-field" placeholder="100000"
-                value={form.minOrder} onChange={e => setForm({ ...form, minOrder: e.target.value })} />
+              <label className="text-cinema-muted text-xs mb-1 block">Ngày bắt đầu</label>
+              <DatePickerInput
+                value={form.startDate}
+                onChange={iso => f('startDate', iso)}
+                className="input-field"
+              />
             </div>
             <div>
-              <label className="text-cinema-muted text-xs mb-1 block">Số lượng *</label>
-              <input type="number" className="input-field" placeholder="100"
-                value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} />
+              <label className="text-cinema-muted text-xs mb-1 block">Ngày kết thúc *</label>
+              <DatePickerInput
+                value={form.expiry}
+                onChange={iso => f('expiry', iso)}
+                className="input-field"
+              />
             </div>
           </div>
-          <div>
-            <label className="text-cinema-muted text-xs mb-1 block">Hạn sử dụng *</label>
-            <input type="date" className="input-field" value={form.expiry}
-              onChange={e => setForm({ ...form, expiry: e.target.value })} />
-          </div>
-          <div>
-            <label className="text-cinema-muted text-xs mb-1 block">Điểm cần đổi (0 = tặng tự động)</label>
-            <input type="number" className="input-field" placeholder="0"
-              value={form.pointCost} onChange={e => setForm({ ...form, pointCost: e.target.value })} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">Số lần dùng/user</label>
+              <input type="number" className="input-field" min={1} value={form.usesPerUser} onChange={e => f('usesPerUser', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">Điểm đổi (0 = tặng)</label>
+              <input type="number" className="input-field" placeholder="0" value={form.pointCost} onChange={e => f('pointCost', e.target.value)} />
+            </div>
           </div>
           <div>
             <label className="text-cinema-muted text-xs mb-1 block">Mô tả</label>
-            <input className="input-field" placeholder="Mô tả ngắn về voucher"
-              value={form.desc} onChange={e => setForm({ ...form, desc: e.target.value })} />
+            <input className="input-field" placeholder="Mô tả ngắn về voucher" value={form.desc} onChange={e => f('desc', e.target.value)} />
           </div>
         </div>
         <div className="flex gap-3 mt-6">
-          <button onClick={onClose} disabled={loading} className="flex-1 btn-outline py-2.5 text-sm">Hủy</button>
-          <button onClick={handleAdd} disabled={loading} className="flex-1 btn-primary py-2.5 text-sm">
-            {loading ? "Đang thêm..." : "Thêm Voucher"}
-          </button>
+          <button onClick={onClose} className="flex-1 btn-outline py-2.5 text-sm">Hủy</button>
+          <button onClick={handleAdd} className="flex-1 btn-primary py-2.5 text-sm">Thêm Voucher</button>
         </div>
       </motion.div>
     </div>
   );
 }
 
+// ── Edit Modal ────────────────────────────────────────────
+function EditVoucherModal({ voucher, onClose, onSave }) {
+  const today = new Date().toISOString().split('T')[0];
+  const hasUsed = voucher.usedCount > 0;
+  const startedAlready = voucher.startDate && voucher.startDate <= today;
+  const [form, setForm] = useState({ ...voucher });
+  const [errors, setErrors] = useState({});
+
+  const locked = (field) => {
+    if (!hasUsed) return false;
+    return ['code', 'type', 'value', 'maxDiscount'].includes(field);
+  };
+
+  const f = (key, val) => {
+    setForm(prev => ({ ...prev, [key]: val }));
+    setErrors(prev => ({ ...prev, [key]: null }));
+  };
+
+  const validate = () => {
+    const errs = {};
+    if (hasUsed) {
+      if (Number(form.stock) < voucher.usedCount)
+        errs.stock = `Không được nhỏ hơn số đã dùng (${voucher.usedCount})`;
+      if (startedAlready && form.startDate !== voucher.startDate)
+        errs.startDate = 'Không thể sửa ngày bắt đầu khi voucher đã chạy';
+      if (form.expiry < voucher.expiry)
+        errs.expiry = 'Không được rút ngắn ngày kết thúc';
+    }
+    return errs;
+  };
+
+  const handleSave = () => {
+    const errs = validate();
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    onSave({ ...form, value: Number(form.value), stock: Number(form.stock), usesPerUser: Number(form.usesPerUser), minOrder: Number(form.minOrder), maxDiscount: Number(form.maxDiscount), pointCost: Number(form.pointCost) });
+    onClose();
+  };
+
+  const Field = ({ label, fieldKey, type = 'text', children, note }) => (
+    <div>
+      <label className="text-cinema-muted text-xs mb-1 block">
+        {label}
+        {locked(fieldKey) && <span className="ml-1 text-red-400 text-[10px]">🔒 Không thể sửa</span>}
+        {note && <span className="ml-1 text-yellow-400 text-[10px]">{note}</span>}
+      </label>
+      {children || (
+        <input
+          type={type}
+          disabled={locked(fieldKey)}
+          className={`input-field ${locked(fieldKey) ? 'opacity-50 cursor-not-allowed bg-cinema-dark' : ''}`}
+          value={form[fieldKey] || ''}
+          onChange={e => f(fieldKey, e.target.value)}
+        />
+      )}
+      {errors[fieldKey] && <p className="text-red-400 text-xs mt-1">{errors[fieldKey]}</p>}
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        className="bg-cinema-card border border-cinema-border rounded-2xl p-6 w-full max-w-lg shadow-card-hover overflow-y-auto max-h-[90vh]">
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <h3 className="font-heading font-bold text-white text-lg">✏️ Cập Nhật Voucher</h3>
+            <p className="text-cinema-muted text-xs mt-1">
+              {hasUsed
+                ? <span className="text-yellow-400">⚠️ Voucher đã có {voucher.usedCount} lượt dùng – một số trường bị khoá</span>
+                : <span className="text-green-400">✅ Chưa có lượt dùng – được sửa tất cả</span>}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <Field label="Tên chương trình" fieldKey="name" />
+          <Field label="Mã voucher" fieldKey="code" note={hasUsed ? '🔒' : ''} />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Loại giảm giá" fieldKey="type">
+              <select disabled={locked('type')} className={`input-field cursor-pointer ${locked('type') ? 'opacity-50 cursor-not-allowed bg-cinema-dark' : ''}`}
+                value={form.type} onChange={e => f('type', e.target.value)}>
+                <option value="percent">Phần trăm (%)</option>
+                <option value="fixed">Số tiền cố định (đ)</option>
+              </select>
+            </Field>
+            <Field label="Giá trị" fieldKey="value" type="number" />
+          </div>
+          {form.type === 'percent' && (
+            <Field label="Giảm tối đa (đ)" fieldKey="maxDiscount" type="number" />
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">
+                Số lượng
+                {hasUsed && <span className="ml-1 text-yellow-400 text-[10px]">⚠️ Chỉ được tăng (đã dùng: {voucher.usedCount})</span>}
+              </label>
+              <input type="number" min={voucher.usedCount} className="input-field"
+                value={form.stock} onChange={e => f('stock', e.target.value)} />
+              {errors.stock && <p className="text-red-400 text-xs mt-1">{errors.stock}</p>}
+            </div>
+            <Field label="Số lần dùng/user" fieldKey="usesPerUser" type="number" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">
+                Ngày bắt đầu
+                {hasUsed && startedAlready && <span className="ml-1 text-red-400 text-[10px]">🔒 Đã bắt đầu</span>}
+                {hasUsed && !startedAlready && <span className="ml-1 text-yellow-400 text-[10px]">⚠️ Chưa bắt đầu – được sửa</span>}
+              </label>
+              <DatePickerInput
+                value={form.startDate || ''}
+                onChange={iso => {
+                  if (hasUsed && startedAlready) return;
+                  f('startDate', iso);
+                }}
+                disabled={hasUsed && startedAlready}
+                className={`input-field ${hasUsed && startedAlready ? 'opacity-50' : ''}`}
+              />
+              {errors.startDate && <p className="text-red-400 text-xs mt-1">{errors.startDate}</p>}
+            </div>
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">
+                Ngày kết thúc
+                {hasUsed && <span className="ml-1 text-yellow-400 text-[10px]">⚠️ Chỉ được gia hạn thêm</span>}
+              </label>
+              <DatePickerInput
+                value={form.expiry}
+                onChange={iso => f('expiry', iso)}
+                minISO={hasUsed ? voucher.expiry : undefined}
+                className="input-field"
+              />
+              {errors.expiry && <p className="text-red-400 text-xs mt-1">{errors.expiry}</p>}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Đơn tối thiểu (đ)" fieldKey="minOrder" type="number" />
+            <Field label="Điểm đổi" fieldKey="pointCost" type="number" />
+          </div>
+          <Field label="Mô tả" fieldKey="desc" />
+          <div>
+            <label className="text-cinema-muted text-xs mb-1 block">Trạng thái</label>
+            <select className="input-field cursor-pointer" value={form.active ? 'true' : 'false'}
+              onChange={e => f('active', e.target.value === 'true')}>
+              <option value="true">● Hoạt động</option>
+              <option value="false">○ Vô hiệu</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 btn-outline py-2.5 text-sm">Hủy</button>
+          <button onClick={handleSave} className="flex-1 btn-primary py-2.5 text-sm">Lưu thay đổi</button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────
 export default function AdminVouchers() {
-  const [vouchers, setVouchers] = useState([]);
+  const [vouchers, setVouchers] = useState(VOUCHERS);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const fetchVouchers = async () => {
-    setLoading(true);
-    try {
-      const res = await promotionApi.getAll({ size: 100 });
-      // Backend trả về { data: [...] }
-      const d = res.data;
-      const rawData = Array.isArray(d) ? d : (d?.data || d?.content || []);
-      const mapped = rawData.map(v => ({
-        id: v.id,
-        code: v.name || 'UNKNOWN',
-        type: v.discountAmount <= 100 ? 'percent' : 'fixed',
-        value: v.discountAmount,
-        minOrder: 0,
-        desc: v.description || 'Không có mô tả',
-        expiry: v.endTime || new Date().toISOString(),
-        stock: v.quantity || 0,
-        active: v.status !== 0,
-        isPublic: true,
-        pointCost: 0,
-      }));
-      setVouchers(mapped);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchVouchers();
-  }, []);
+  const [editingVoucher, setEditingVoucher] = useState(null);
 
   const filtered = vouchers.filter(v => {
-    const codeSearch = v.code ? v.code.toLowerCase().includes(search.toLowerCase()) : false;
-    const descSearch = v.desc ? v.desc.toLowerCase().includes(search.toLowerCase()) : false;
-    const matchSearch = codeSearch || descSearch;
+    const matchSearch = v.code.toLowerCase().includes(search.toLowerCase()) ||
+      v.desc.toLowerCase().includes(search.toLowerCase()) ||
+      (v.name || '').toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === 'all' || (filterStatus === 'active' ? v.active : !v.active);
     return matchSearch && matchStatus;
   });
 
-  const toggleActive = async (id) => {
-    const voucher = vouchers.find(v => v.id === id);
-    if (!voucher) return;
-    try {
-      // Optistic update or call API (mock generic put)
-      // await promotionApi.update(id, { ...voucher, status: !voucher.active ? 1 : 0 });
-      setVouchers(prev => prev.map(v => v.id === id ? { ...v, active: !v.active } : v));
-    } catch (err) {
-       console.error("Lỗi cập nhật", err);
-    }
-  };
+  const { addNotification } = useNotificationStore();
 
-  const deleteVoucher = async (id) => {
-    try {
-      await promotionApi.delete(id);
-      fetchVouchers();
-    } catch (err) {
-      console.error("Lỗi xóa voucher", err);
-      // Fallback optimistic
-      setVouchers(prev => prev.filter(v => v.id !== id));
+  const toggleActive = (id) => {
+    const v = vouchers.find(x => x.id === id);
+    if (v) {
+      addNotification({ title: 'Trạng thái voucher', message: `Đã ${v.active ? 'vô hiệu hóa' : 'kích hoạt'} voucher: ${v.code}`, type: v.active ? 'warn' : 'success', isAdmin: true });
     }
+    setVouchers(prev => prev.map(v => v.id === id ? { ...v, active: !v.active } : v));
   };
-
-  const handleAdd = async (payload) => {
-    try {
-      await promotionApi.create(payload);
-      fetchVouchers();
-    } catch (err) {
-      console.error("Lỗi khi thêm", err);
-      alert("Lỗi tạo voucher");
+  
+  const deleteVoucher = (id) => {
+    const v = vouchers.find(x => x.id === id);
+    if (v) {
+      addNotification({ title: 'Thành công', message: `Đã xoá hiển thị voucher: ${v.code}`, type: 'success', isAdmin: true });
     }
+    setVouchers(prev => prev.filter(v => v.id !== id));
+  };
+  
+  const handleAdd = (nv) => {
+    setVouchers(prev => [nv, ...prev]);
+    addNotification({ title: 'Thành công', message: `Đã thêm voucher mới: ${nv.code}`, type: 'success', isAdmin: true });
+  };
+  
+  const handleSave = (updated) => {
+    setVouchers(prev => prev.map(v => v.id === updated.id ? updated : v));
+    addNotification({ title: 'Thành công', message: `Đã cập nhật voucher: ${updated.code}`, type: 'success', isAdmin: true });
   };
 
   const stats = {
@@ -202,10 +357,10 @@ export default function AdminVouchers() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Tổng voucher',     value: stats.total,     icon: '🎫', color: 'border-blue-500/30 bg-blue-500/5' },
-          { label: 'Đang hoạt động',   value: stats.active,    icon: '✅', color: 'border-green-500/30 bg-green-500/5' },
-          { label: 'Hết hạn',          value: stats.expired,   icon: '⏰', color: 'border-red-500/30 bg-red-500/5' },
-          { label: 'Đổi bằng điểm',    value: stats.pointBased, icon: '⭐', color: 'border-primary/30 bg-primary/5' },
+          { label: 'Tổng voucher',   value: stats.total,     icon: '🎫', color: 'border-blue-500/30 bg-blue-500/5' },
+          { label: 'Đang hoạt động', value: stats.active,    icon: '✅', color: 'border-green-500/30 bg-green-500/5' },
+          { label: 'Hết hạn',        value: stats.expired,   icon: '⏰', color: 'border-red-500/30 bg-red-500/5' },
+          { label: 'Đổi bằng điểm',  value: stats.pointBased, icon: '⭐', color: 'border-primary/30 bg-primary/5' },
         ].map((stat, i) => (
           <motion.div key={stat.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
             className={`rounded-xl border p-4 ${stat.color}`}>
@@ -219,17 +374,12 @@ export default function AdminVouchers() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="🔍 Tìm theo mã hoặc mô tả..." className="input-field max-w-xs" />
+          placeholder="🔍 Tìm theo mã, tên, mô tả..." className="input-field max-w-xs" />
         <div className="flex gap-1 bg-cinema-surface rounded-lg p-1 border border-cinema-border">
-          {[
-            { key: 'all', label: 'Tất cả' },
-            { key: 'active', label: '✅ Hoạt động' },
-            { key: 'inactive', label: '🔴 Vô hiệu' },
-          ].map(f => (
+          {[{ key: 'all', label: 'Tất cả' }, { key: 'active', label: '✅ Hoạt động' }, { key: 'inactive', label: '🔴 Vô hiệu' }].map(f => (
             <button key={f.key} onClick={() => setFilterStatus(f.key)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                filterStatus === f.key ? 'bg-primary text-cinema-black' : 'text-cinema-muted hover:text-white'
-              }`}>{f.label}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${filterStatus === f.key ? 'bg-primary text-cinema-black' : 'text-cinema-muted hover:text-white'}`}>
+              {f.label}
             </button>
           ))}
         </div>
@@ -241,95 +391,78 @@ export default function AdminVouchers() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-cinema-border bg-cinema-dark">
-                {['Mã voucher', 'Mô tả', 'Giá trị', 'Đơn tối thiểu', 'Đổi điểm', 'Số lượng', 'Hạn dùng', 'Trạng thái', 'Thao tác'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-cinema-muted text-xs font-medium whitespace-nowrap">{h}</th>
+                {['Mã / Tên', 'Giá trị', 'Tối đa', 'Đơn tối thiểu', 'Số lượng', 'Lần/user', 'Ngày BĐ – KT', 'Điểm', 'Trạng thái', 'Thao tác'].map(h => (
+                  <th key={h} className="text-left px-3 py-3 text-cinema-muted text-xs font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-cinema-border/50">
-              {loading ? (
-                <tr><td colSpan="9" className="text-center py-10 text-cinema-muted">Đang tải dữ liệu...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="text-center py-12 text-cinema-muted">
-                    <p className="text-4xl mb-3">🎫</p>
-                    <p>Không tìm thấy voucher nào</p>
-                  </td>
-                </tr>
-              ) : filtered.map(v => {
+              {filtered.map(v => {
                 const isExpired = new Date(v.expiry) < new Date();
                 const daysLeft = Math.ceil((new Date(v.expiry) - new Date()) / (1000 * 60 * 60 * 24));
                 return (
                   <tr key={v.id} className="hover:bg-cinema-card/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <span className="font-mono font-bold text-primary tracking-widest bg-primary/10 px-2 py-0.5 rounded text-sm">
-                        {v.code}
-                      </span>
+                    <td className="px-3 py-3">
+                      <span className="font-mono font-bold text-primary tracking-wider bg-primary/10 px-2 py-0.5 rounded text-xs">{v.code}</span>
+                      <p className="text-cinema-muted text-xs mt-1 max-w-[140px] truncate">{v.name || v.desc}</p>
                     </td>
-                    <td className="px-4 py-3 text-cinema-muted text-sm max-w-[180px]">
-                      <p className="line-clamp-2">{v.desc}</p>
-                    </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <span className={`font-heading font-bold text-base ${v.type === 'percent' ? 'text-accent' : 'text-primary'}`}>
-                        {v.type === 'percent' ? `${v.value}%` : `${(v.value/1000).toFixed(0)}K`}
+                        {v.type === 'percent' ? `${v.value}%` : `${(v.value / 1000).toFixed(0)}K`}
                       </span>
-                      <p className="text-cinema-muted text-[10px]">{TYPE_LABEL[v.type]}</p>
                     </td>
-                    <td className="px-4 py-3 text-cinema-muted text-sm">
-                      {v.minOrder > 0 ? `${(v.minOrder/1000).toFixed(0)}K` : '—'}
+                    <td className="px-3 py-3 text-cinema-muted text-sm">
+                      {v.maxDiscount > 0 ? `${(v.maxDiscount / 1000).toFixed(0)}K` : '—'}
                     </td>
-                    <td className="px-4 py-3 text-sm">
-                      {v.pointCost > 0
-                        ? <span className="flex items-center gap-1 text-yellow-400">⭐ {v.pointCost}</span>
-                        : <span className="text-cinema-muted">—</span>
-                      }
+                    <td className="px-3 py-3 text-cinema-muted text-sm">
+                      {v.minOrder > 0 ? `${(v.minOrder / 1000).toFixed(0)}K` : '—'}
                     </td>
-                    <td className="px-4 py-3 text-white font-semibold text-sm">{v.stock}</td>
-                    <td className="px-4 py-3">
-                      <p className="text-cinema-muted text-xs">{new Date(v.expiry).toLocaleDateString('vi-VN')}</p>
-                      {!isExpired
-                        ? <p className={`text-[10px] mt-0.5 ${daysLeft <= 7 ? 'text-orange-400' : 'text-green-400'}`}>
-                            Còn {daysLeft} ngày
-                          </p>
-                        : <p className="text-[10px] mt-0.5 text-red-400">Đã hết hạn</p>
-                      }
+                    <td className="px-3 py-3 text-sm">
+                      <span className="text-white font-semibold">{v.stock}</span>
+                      {v.usedCount > 0 && <span className="text-cinema-muted text-[10px] ml-1">(dùng: {v.usedCount})</span>}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`badge text-xs border ${
-                        !v.active
-                          ? 'bg-red-500/20 border-red-500/30 text-red-400'
-                          : isExpired
-                          ? 'bg-orange-500/20 border-orange-500/30 text-orange-400'
-                          : 'bg-green-500/20 border-green-500/30 text-green-400'
-                      }`}>
+                    <td className="px-3 py-3 text-white text-sm text-center">{v.usesPerUser || 1}</td>
+                    <td className="px-3 py-3">
+                      <p className="text-cinema-muted text-[11px]">{fmtDate(v.startDate)}</p>
+                      <p className={`text-[11px] font-semibold ${isExpired ? 'text-red-400' : daysLeft <= 7 ? 'text-orange-400' : 'text-green-400'}`}>
+                        → {fmtDate(v.expiry)}
+                      </p>
+                    </td>
+                    <td className="px-3 py-3 text-sm">
+                      {v.pointCost > 0 ? <span className="flex items-center gap-1 text-yellow-400">⭐ {v.pointCost}</span> : <span className="text-cinema-muted">—</span>}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className={`badge text-xs border ${!v.active ? 'bg-red-500/20 border-red-500/30 text-red-400' : isExpired ? 'bg-orange-500/20 border-orange-500/30 text-orange-400' : 'bg-green-500/20 border-green-500/30 text-green-400'}`}>
                         {!v.active ? '○ Vô hiệu' : isExpired ? '⏰ Hết hạn' : '● Hoạt động'}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
+                    <td className="px-3 py-3">
+                      <div className="flex gap-1.5">
+                        <button onClick={() => setEditingVoucher(v)}
+                          className="px-2.5 py-1.5 rounded-lg border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 text-xs transition-all">Sửa</button>
                         <button onClick={() => toggleActive(v.id)}
-                          className={`px-2.5 py-1.5 rounded-lg border text-xs transition-all ${
-                            v.active
-                              ? 'border-red-500/30 text-red-400 hover:bg-red-500/10'
-                              : 'border-green-500/30 text-green-400 hover:bg-green-500/10'
-                          }`}>
+                          className={`px-2.5 py-1.5 rounded-lg border text-xs transition-all ${v.active ? 'border-red-500/30 text-red-400 hover:bg-red-500/10' : 'border-green-500/30 text-green-400 hover:bg-green-500/10'}`}>
                           {v.active ? 'Tắt' : 'Bật'}
                         </button>
                         <button onClick={() => deleteVoucher(v.id)}
-                          className="px-2.5 py-1.5 rounded-lg border border-cinema-border text-cinema-muted hover:border-red-500/50 hover:text-red-400 text-xs transition-all">
-                          Xóa
-                        </button>
+                          className="px-2.5 py-1.5 rounded-lg border border-cinema-border text-cinema-muted hover:border-red-500/50 hover:text-red-400 text-xs transition-all">Xóa</button>
                       </div>
                     </td>
                   </tr>
                 );
               })}
+              {filtered.length === 0 && (
+                <tr><td colSpan={10} className="text-center py-12 text-cinema-muted">
+                  <p className="text-4xl mb-3">🎫</p><p>Không tìm thấy voucher nào</p>
+                </td></tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
       {showAdd && <AddVoucherModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />}
+      {editingVoucher && <EditVoucherModal voucher={editingVoucher} onClose={() => setEditingVoucher(null)} onSave={handleSave} />}
     </div>
   );
 }

@@ -3,7 +3,6 @@ package com.example.service.Cinema;
 import java.util.List;
 
 import org.modelmapper.ModelMapper;
-import org.modelmapper.TypeToken;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -30,22 +29,30 @@ public class CinemaService implements ICinemaService{
 	private ModelMapper modelMapper;
 	
 	
-	@Override
-	public Page<CinemaDTO> getAllCinema(Pageable pageable,CinemaFilterForm filterform) {
-		Specification<Cinemas> where = CinemaSpecification.buildWhere(filterform);
-	    Page<Cinemas> cinemaPage = cinemaRepository.findAll(where, pageable);
+	private CinemaDTO toDTO(Cinemas cinema) {
+		CinemaDTO dto = modelMapper.map(cinema, CinemaDTO.class);
+		if (cinema.getProvinces() != null) {
+			dto.setProvinceId(cinema.getProvinces().getId());
+		}
+		return dto;
+	}
 
-	   List<CinemaDTO> dto = modelMapper.map(cinemaPage.getContent(), new TypeToken<List<CinemaDTO>>() {}.getType());
-	        
-	    Page<CinemaDTO> dtoPage = new PageImpl<>(dto, pageable, cinemaPage.getTotalElements());
-	    return dtoPage;
+	@Override
+	public Page<CinemaDTO> getAllCinema(Pageable pageable, CinemaFilterForm filterform) {
+		Specification<Cinemas> where = CinemaSpecification.buildWhere(filterform);
+		Page<Cinemas> cinemaPage = cinemaRepository.findAll(where, pageable);
+
+		List<CinemaDTO> dto = cinemaPage.getContent().stream()
+				.map(this::toDTO)
+				.collect(java.util.stream.Collectors.toList());
+
+		return new PageImpl<>(dto, pageable, cinemaPage.getTotalElements());
 	}
 
 	@Override
 	public CinemaDTO getById(Integer id) {
 		Cinemas cinema = cinemaRepository.findById(id).get();
-		
-		return modelMapper.map(cinema, CinemaDTO.class);
+		return toDTO(cinema);
 	}
 	@Override
 	public void createCinema(CreateCinemaForm form) {
@@ -75,6 +82,12 @@ public class CinemaService implements ICinemaService{
 		updateCinema.setEmail(form.getEmail());
 		updateCinema.setLatitude(form.getLatitude());
 		updateCinema.setLongitude(form.getLongitude());
+		
+		if (form.getProvinceId() != null) {
+			Provinces province = new Provinces();
+			province.setId(form.getProvinceId());
+			updateCinema.setProvinces(province);
+		}
 		
 		cinemaRepository.save(updateCinema);
 	}

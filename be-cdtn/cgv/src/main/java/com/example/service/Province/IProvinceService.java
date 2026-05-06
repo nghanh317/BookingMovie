@@ -17,7 +17,7 @@ public interface IProvinceService {
 	
 	Page<CinemaDTO> getCinemasByProvinceId(Integer provinceId, Pageable pageable);
 	
-	void createProvince (CreateProvinceForm form);
+	ProvinceDTO createProvince (CreateProvinceForm form);
 	
 	void updateProvince (Integer id, UpdateProvinceForm form);
 	

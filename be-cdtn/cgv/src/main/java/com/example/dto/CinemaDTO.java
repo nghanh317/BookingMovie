@@ -14,6 +14,8 @@ import com.example.entity.Cinemas;
 public class CinemaDTO {
 	private Integer id;
 	
+	private Integer provinceId;
+
 	private String provincesName;
 
 	private String cinemaName;
@@ -51,6 +53,10 @@ public class CinemaDTO {
 		public static class SlotDTO {
 			
 			private Integer id;
+			
+			private Integer moviesId;
+
+			private String moviesTitle;
 			
 			private Date showTime;
 			

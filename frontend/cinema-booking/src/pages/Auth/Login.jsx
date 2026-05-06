@@ -1,26 +1,36 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import useAuthStore from '../../store/authStore';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuthStore();
+  const registeredSuccess = location.state?.registered;
 
-  const [form, setForm] = useState({ userName: '', password: '' });
+  const [form, setForm] = useState({ userName: '', passwordHash: '' });
+
+  // Điền nhanh thông tin demo
+  const fillDemo = (type) => {
+    if (type === 'admin') setForm({ userName: 'admin', passwordHash: 'admin123' });
+    else setForm({ userName: 'user', passwordHash: 'user123' });
+    setError('');
+  };
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.userName || !form.password) {
+    if (!form.userName || !form.passwordHash) {
       setError('Vui lòng nhập đầy đủ thông tin');
       return;
     }
 
     setLoading(true);
-    const result = await login(form.userName, form.password);
+    // Gọi API thật qua authStore (async)
+    const result = await login(form.userName, form.passwordHash);
     setLoading(false);
 
     if (!result.success) {
@@ -28,8 +38,8 @@ export default function Login() {
       return;
     }
 
-    // ✅ Điều hướng theo role
-    if (result.role === 'ADMIN') {
+    // ✅ Điều hướng theo role (backend trả 'admin' hoặc 'user' sau khi normalize)
+    if (result.role === 'admin') {
       navigate('/admin');
     } else {
       navigate('/');
@@ -65,6 +75,15 @@ export default function Login() {
 
         {/* Form */}
         <div className="card p-8">
+          {registeredSuccess && (
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-3 text-green-400 text-sm mb-4 flex items-center gap-2">
+              <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              Đăng ký thành công! Vui lòng đăng nhập.
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm mb-4 flex items-center gap-2">
               <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -93,8 +112,8 @@ export default function Login() {
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  value={form.password}
-                  onChange={e => { setForm({ ...form, password: e.target.value }); setError(''); }}
+                  value={form.passwordHash}
+                  onChange={e => { setForm({ ...form, passwordHash: e.target.value }); setError(''); }}
                   placeholder="••••••••"
                   className="input-field pr-10"
                   autoComplete="current-password"

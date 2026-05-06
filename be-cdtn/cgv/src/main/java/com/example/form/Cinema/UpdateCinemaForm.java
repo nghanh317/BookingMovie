@@ -20,4 +20,6 @@ public class UpdateCinemaForm {
 	private BigDecimal latitude;
 	
 	private BigDecimal longitude;
+
+	private Integer provinceId;
 }

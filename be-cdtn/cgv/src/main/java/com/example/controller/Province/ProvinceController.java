@@ -43,8 +43,8 @@ public class ProvinceController {
 	}
 	
 	@PostMapping
-	public void createProvince (@RequestBody CreateProvinceForm form) {
-		provinceService.createProvince(form);
+	public ProvinceDTO createProvince (@RequestBody CreateProvinceForm form) {
+		return provinceService.createProvince(form);
 	}
 	
 	@PutMapping ("/{id}")

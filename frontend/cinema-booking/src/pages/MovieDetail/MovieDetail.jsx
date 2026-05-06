@@ -1,48 +1,21 @@
-import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MOVIES, CINEMAS, SHOWTIMES, AGE_RATINGS } from '../../constants/mockData';
-import { movieApi } from '../../api';
+import { AGE_RATINGS } from '../../constants/mockData';
+import { movieService } from '../../services';
 import MovieCard from '../../components/movie/MovieCard';
-
-/**
- * Chuyển đổi MovieDTO từ backend sang format frontend
- */
-function mapMovieDTO(dto) {
-  return {
-    id: dto.id,
-    title: dto.title || 'Không có tên',
-    originalTitle: dto.title,
-    poster: dto.posterUrl || `https://placehold.co/300x450/1E1E2C/A0A0B4?text=${encodeURIComponent(dto.title || 'Movie')}`,
-    backdrop: dto.posterUrl || `https://placehold.co/1920x1080/1A1A24/A0A0B4?text=${encodeURIComponent(dto.title || 'Movie')}`,
-    rating: 8.0,
-    genre: dto.genre ? dto.genre.split(',').map(g => g.trim()) : ['Chưa phân loại'],
-    duration: dto.duration || 0,
-    language: dto.language || 'N/A',
-    releaseDate: dto.releaseDate,
-    director: dto.director || 'N/A',
-    cast: dto.cast ? dto.cast.split(',').map(c => c.trim()) : [],
-    description: dto.description || '',
-    trailer: dto.trailerUrl || '',
-    status: dto.status === 'NOW_SHOWING' ? 'now_showing' : dto.status === 'COMING_SOON' ? 'coming_soon' : (dto.status || 'now_showing').toLowerCase(),
-    ageRating: 'T13',
-  };
-}
+import ReviewSection from '../../components/movie/ReviewSection';
+import useFavoriteStore from '../../store/favoriteStore';
+import useNotificationStore from '../../store/notificationStore';
 
 function StarRating({ rating }) {
   return (
     <div className="flex items-center gap-1.5">
-      {[1, 2, 3, 4, 5].map((star) => {
-        const filled = rating / 2 >= star;
-        const half = !filled && rating / 2 >= star - 0.5;
-        return (
-          <svg key={star} className={`w-5 h-5 ${filled || half ? 'text-primary' : 'text-cinema-border'}`} fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-          </svg>
-        );
-      })}
-      <span className="text-white font-bold ml-1">{rating}</span>
-      <span className="text-cinema-muted text-sm">/10</span>
+      <svg className="w-6 h-6 text-primary" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+      </svg>
+      <span className="text-white font-bold ml-1 text-lg">{rating ? rating.toFixed(1) : '0'}</span>
+      <span className="text-cinema-muted text-sm mt-0.5">/10</span>
     </div>
   );
 }
@@ -50,53 +23,43 @@ function StarRating({ rating }) {
 export default function MovieDetail() {
   const { id } = useParams();
   const [movie, setMovie] = useState(null);
-  const [relatedMovies, setRelatedMovies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [relatedMovies, setRelatedMovies] = useState([]);
+  const { isFavorite, toggleFavorite } = useFavoriteStore();
+  const { addNotification } = useNotificationStore();
+  const favorite = movie ? isFavorite(movie.id) : false;
+  const [isReminded, setIsReminded] = useState(false);
 
   useEffect(() => {
-    const fetchMovie = async () => {
+    const loadMovie = async () => {
       setLoading(true);
       try {
-        // Thử lấy từ backend
-        const { data } = await movieApi.getById(Number(id));
-        const mapped = mapMovieDTO(data);
-        setMovie(mapped);
-
-        // Lấy phim tương tự
-        try {
-          const allRes = await movieApi.getAll({ page: 0, size: 50 });
-          const allList = allRes.data.content || allRes.data.data || allRes.data;
-          if (Array.isArray(allList)) {
-            const allMapped = allList.map(mapMovieDTO);
-            setRelatedMovies(
-              allMapped.filter(m => m.id !== mapped.id && m.genre.some(g => mapped.genre.includes(g))).slice(0, 6)
-            );
-          }
-        } catch {
-          // fallback related from mock
-          setRelatedMovies(MOVIES.filter(m => m.id !== mapped.id).slice(0, 6));
+        const m = await movieService.getById(id);
+        setMovie(m);
+        // Load related movies
+        const allMovies = await movieService.getAll();
+        if (m && m.genre && Array.isArray(m.genre)) {
+          const related = allMovies
+            .filter(item => item.id !== m.id && Array.isArray(item.genre) && item.genre.some(g => m.genre.includes(g)))
+            .slice(0, 6);
+          setRelatedMovies(related);
         }
-      } catch (err) {
-        console.warn('⚠️ Không lấy được phim từ backend, dùng mock:', err.message);
-        // Fallback to mock
-        const mockMovie = MOVIES.find(m => m.id === Number(id));
-        setMovie(mockMovie || null);
-        if (mockMovie) {
-          setRelatedMovies(
-            MOVIES.filter(m => m.id !== mockMovie.id && m.genre.some(g => mockMovie.genre.includes(g))).slice(0, 6)
-          );
-        }
+      } catch (error) {
+        console.error("Failed to load movie details:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchMovie();
+    loadMovie();
   }, [id]);
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-cinema-muted">Đang tải thông tin phim...</p>
+        </div>
       </div>
     );
   }
@@ -120,7 +83,7 @@ export default function MovieDetail() {
       {/* Backdrop Hero */}
       <div className="relative h-[70vh] min-h-[450px] overflow-hidden">
         <img
-          src={movie.backdrop}
+          src={movie.backdrop || movie.poster}
           alt={movie.title}
           className="w-full h-full object-cover"
           onError={e => { e.target.src = `https://placehold.co/1920x1080/1A1A24/A0A0B4?text=${encodeURIComponent(movie.title)}`; }}
@@ -177,7 +140,7 @@ export default function MovieDetail() {
               {[
                 { label: 'Thời lượng', value: `${movie.duration} phút` },
                 { label: 'Ngôn ngữ', value: movie.language },
-                { label: 'Khởi chiếu', value: movie.releaseDate ? new Date(movie.releaseDate).toLocaleDateString('vi-VN') : 'N/A' },
+                { label: 'Khởi chiếu', value: new Date(movie.releaseDate).toLocaleDateString('vi-VN') },
                 { label: 'Đạo diễn', value: movie.director },
               ].map(item => (
                 <div key={item.label} className="bg-cinema-surface rounded-xl p-3 border border-cinema-border">
@@ -189,7 +152,7 @@ export default function MovieDetail() {
 
             {/* Genre tags */}
             <div className="flex flex-wrap gap-2 mb-4">
-              {movie.genre.map(g => (
+              {movie.genre && movie.genre.map(g => (
                 <span key={g} className="badge bg-primary/10 border border-primary/30 text-primary text-xs">{g}</span>
               ))}
             </div>
@@ -198,49 +161,80 @@ export default function MovieDetail() {
             <p className="text-cinema-muted leading-relaxed mb-6 max-w-xl">{movie.description}</p>
 
             {/* Cast */}
-            {movie.cast.length > 0 && (
-              <div className="mb-6">
-                <p className="text-cinema-muted text-xs mb-1.5">Diễn viên</p>
-                <p className="text-white text-sm">{movie.cast.join(' • ')}</p>
-              </div>
-            )}
+            <div className="mb-6">
+              <p className="text-cinema-muted text-xs mb-1.5">Diễn viên</p>
+              <p className="text-white text-sm">{movie.cast && movie.cast.join(' • ')}</p>
+            </div>
 
             {/* CTA */}
-            {movie.status === 'now_showing' ? (
-              <div className="flex flex-wrap gap-3">
-                <Link to={`/booking/${movie.id}`} className="btn-accent px-8 py-3">
-                  🎟️ Đặt Vé Ngay
-                </Link>
-                {movie.trailer && (
+            <div className="flex flex-wrap gap-3 items-center">
+              {movie.status === 'now_showing' ? (
+                <>
+                  <Link to={`/booking/${movie.id}`} className="btn-accent px-8 py-3 text-base">
+                    🎟️ Đặt Vé Ngay
+                  </Link>
                   <button
                     onClick={() => document.getElementById('trailer-section')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="btn-outline px-6 py-3 flex items-center gap-2"
+                    className="btn-outline px-6 py-3 text-base flex items-center gap-2"
                   >
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z"/>
                     </svg>
                     Xem Trailer
                   </button>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-3 items-center">
-                <button className="btn-outline px-6 py-3 flex items-center gap-2">
-                  🔔 Nhắc Tôi Khi Ra Mắt
-                </button>
-                {movie.trailer && (
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => {
+                      setIsReminded(true);
+                      addNotification({
+                        type: 'success',
+                        title: 'Đăng ký nhận thông báo',
+                        message: `Chúng tôi sẽ thông báo cho bạn khi phim ${movie.title} chính thức khởi chiếu vào ngày ${new Date(movie.releaseDate).toLocaleDateString('vi-VN')}.`,
+                        date: new Date().toISOString()
+                      });
+                    }}
+                    disabled={isReminded}
+                    className={`px-6 py-3 text-base flex items-center gap-2 transition-all ${
+                      isReminded 
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/50 cursor-default rounded-xl' 
+                        : 'btn-outline'
+                    }`}
+                  >
+                    {isReminded ? '✅ Đã đăng ký nhắc nhở' : '🔔 Nhắc Tôi Khi Ra Mắt'}
+                  </button>
                   <button
                     onClick={() => document.getElementById('trailer-section')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="btn-outline px-6 py-3 flex items-center gap-2"
+                    className="btn-outline px-6 py-3 text-base flex items-center gap-2"
                   >
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z"/>
                     </svg>
                     Xem Trailer
                   </button>
-                )}
-              </div>
-            )}
+                </>
+              )}
+              
+              <button
+                onClick={() => {
+                  toggleFavorite(movie.id);
+                  if (!favorite) {
+                    addNotification({ type: 'success', title: 'Đã thêm vào yêu thích', message: `Đã thêm "${movie.title}" vào danh sách phim yêu thích.` });
+                  }
+                }}
+                className={`p-3 rounded-xl border flex items-center justify-center transition-all ${
+                  favorite 
+                    ? 'bg-red-500/10 border-red-500/50 text-red-500' 
+                    : 'bg-cinema-surface border-cinema-border text-cinema-muted hover:text-white hover:border-cinema-muted'
+                }`}
+                title={favorite ? "Bỏ yêu thích" : "Thêm vào yêu thích"}
+              >
+                <svg className={`w-6 h-6 ${favorite ? 'fill-current' : 'fill-none'} transition-transform ${favorite ? 'scale-110' : 'hover:scale-110'}`} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </button>
+            </div>
           </motion.div>
         </div>
 
@@ -263,13 +257,18 @@ export default function MovieDetail() {
           </section>
         )}
 
+        {/* Reviews Section */}
+        <div className="container-section">
+          <ReviewSection movieId={movie.id} />
+        </div>
+
         {/* Related Movies */}
         {relatedMovies.length > 0 && (
           <section className="mt-16 mb-12">
             <div className="flex items-end justify-between mb-6">
               <h2 className="section-title">Phim Tương Tự</h2>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 items-start">
               {relatedMovies.map((m, i) => (
                 <MovieCard key={m.id} movie={m} index={i} />
               ))}

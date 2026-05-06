@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { ticketService } from '../../services';
 
 export default function PaymentCallback() {
   const [searchParams] = useSearchParams();
@@ -9,31 +10,46 @@ export default function PaymentCallback() {
   const [bookingInfo, setBookingInfo] = useState(null);
 
   useEffect(() => {
-    // Check parameters from VNPay / MoMo
-    const vnp_ResponseCode = searchParams.get('vnp_ResponseCode');
-    const momo_Status = searchParams.get('status');
+    const handleCallback = async () => {
+      // Check parameters from VNPay / MoMo
+      const vnp_ResponseCode = searchParams.get('vnp_ResponseCode');
+      const momo_Status = searchParams.get('status');
 
-    let isSuccess = false;
-    
-    // VNPay success code is '00', MoMo is often '0' or 'SUCCESS'
-    if (vnp_ResponseCode === '00' || momo_Status === 'SUCCESS' || momo_Status === '0') {
-       isSuccess = true;
-    }
+      let isSuccess = false;
+      if (vnp_ResponseCode === '00' || momo_Status === 'SUCCESS' || momo_Status === '0') {
+        isSuccess = true;
+      }
 
-    // Retrieve pending booking info
-    const pendingJson = sessionStorage.getItem('pendingBooking');
-    if (pendingJson) {
-      setBookingInfo(JSON.parse(pendingJson));
-    }
+      // Retrieve pending booking info
+      const pendingJson = sessionStorage.getItem('pendingBooking');
+      let booking = null;
+      if (pendingJson) {
+        booking = JSON.parse(pendingJson);
+        setBookingInfo(booking);
+      }
 
-    if (isSuccess) {
-      setStatus('success');
-      // Xoá thông tin sau khi load thành công
-      sessionStorage.removeItem('pendingBooking');
-    } else {
-      setStatus('failed');
-    }
+      if (isSuccess && booking?.id) {
+        try {
+          // Cập nhật trạng thái vé trên backend
+          await ticketService.update(booking.id, {
+            paymentStatus: 'PAID',
+            status: 'CONFIRMED'
+          });
+          setStatus('success');
+          sessionStorage.removeItem('pendingBooking');
+        } catch (err) {
+          console.error("Lỗi cập nhật trạng thái vé:", err);
+          setStatus('failed');
+        }
+      } else if (isSuccess) {
+        // Fallback if no booking info in session (e.g. refreshed page)
+        setStatus('success');
+      } else {
+        setStatus('failed');
+      }
+    };
 
+    handleCallback();
   }, [searchParams]);
 
   return (
