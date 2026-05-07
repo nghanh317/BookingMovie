@@ -24,12 +24,12 @@ const normalize = (movie) => ({
   language: movie.language || 'Tiếng Anh',
   releaseDate: movie.releaseDate || movie.release_date || '',
   director: movie.director || '',
-  cast: Array.isArray(movie.cast)
-    ? movie.cast
-    : (movie.cast || '').split(',').map((c) => c.trim()).filter(Boolean),
+  cast: movie.cast || '',
   description: movie.description || movie.content || '',
+  posterUrl: movie.posterUrl || movie.poster || '',
+  trailerUrl: movie.trailerUrl || movie.trailer || '',
   trailer: (() => {
-    const raw = movie.trailer || movie.trailerUrl || '';
+    const raw = movie.trailerUrl || movie.trailer || '';
     if (!raw) return '';
     // Convert watch?v=... to /embed/...
     let videoId = '';
@@ -52,7 +52,10 @@ const movieService = {
     try {
       const res = await api.get('/v1/movies');
       const data = Array.isArray(res.data) ? res.data : res.data?.content || res.data?.data || [];
-      return data.map(normalize);
+      // Lọc bỏ những phim đã bị xóa (isDeleted: true) trước khi mapping
+      return data
+        .filter((m) => !m.isDeleted && !m.is_deleted)
+        .map(normalize);
     } catch (err) {
       console.warn('[movieService] getAll failed, using mock data:', err.message);
       return MOVIES; // fallback

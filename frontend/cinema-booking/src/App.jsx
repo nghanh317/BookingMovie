@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import ScrollToTop from './components/layout/ScrollToTop';
 import { RequireAuth, RequireAdmin } from './components/auth/ProtectedRoute';
+import ToastContainer from './components/ui/ToastContainer';
 
 import Home from './pages/Home/Home';
 import Movies from './pages/Movies/Movies';
@@ -39,6 +40,7 @@ function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <ToastContainer />
       <Routes>
         {/* ── Public routes ───────────────────────────── */}
         <Route path="/" element={<Layout><Home /></Layout>} />

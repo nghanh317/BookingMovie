@@ -4,11 +4,18 @@ import movieService from '../../services/movieService';
 import useNotificationStore from '../../store/notificationStore';
 import DatePickerInput from '../../components/ui/DatePickerInput';
 
-function MovieFormModal({ movie, onClose, onSave }) {
+function MovieFormModal({ movie, onClose, onSave, saving }) {
   const [form, setForm] = useState(movie || {
-    title: '', originalTitle: '', rating: '', genre: [], duration: '',
-    language: 'Tiếng Anh', releaseDate: '', director: '', description: '',
-    ageRating: 'T13', status: 'coming_soon', poster: '', backdrop: '', trailer: ''
+    title: '', 
+    description: '',
+    duration: '',
+    releaseDate: '', 
+    director: '', 
+    cast: '',
+    genre: [], 
+    language: 'Tiếng Anh', 
+    posterUrl: '', 
+    trailerUrl: ''
   });
 
   const GENRE_OPTIONS = ['Hành động','Tình cảm','Hài','Kinh dị','Hoạt hình','Khoa học viễn tưởng','Drama','Gia đình','Phiêu lưu'];
@@ -18,6 +25,17 @@ function MovieFormModal({ movie, onClose, onSave }) {
       ...prev,
       genre: prev.genre.includes(g) ? prev.genre.filter(x => x !== g) : [...prev.genre, g]
     }));
+  };
+
+  const handleSubmit = () => {
+    // Chuyển genre từ mảng sang chuỗi nếu cần (tùy backend)
+    // Nhưng backend CreateMovieForm nhận String genre;
+    const payload = {
+      ...form,
+      genre: Array.isArray(form.genre) ? form.genre.join(', ') : form.genre
+    };
+    onSave(payload);
+    onClose();
   };
 
   return (
@@ -41,17 +59,12 @@ function MovieFormModal({ movie, onClose, onSave }) {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label className="block text-cinema-muted text-xs mb-1.5">Tên phim *</label>
+              <label className="block text-cinema-muted text-xs mb-1.5">Tên phim (Title) *</label>
               <input value={form.title} onChange={e => setForm({...form, title: e.target.value})}
-                placeholder="Avengers: Secret Wars" className="input-field" />
+                placeholder="Ví dụ: Avengers: Endgame" className="input-field" />
             </div>
             <div>
-              <label className="block text-cinema-muted text-xs mb-1.5">Tên gốc</label>
-              <input value={form.originalTitle || ''} onChange={e => setForm({...form, originalTitle: e.target.value})}
-                className="input-field" />
-            </div>
-            <div>
-              <label className="block text-cinema-muted text-xs mb-1.5">Đạo diễn</label>
+              <label className="block text-cinema-muted text-xs mb-1.5">Đạo diễn (Director)</label>
               <input value={form.director || ''} onChange={e => setForm({...form, director: e.target.value})}
                 className="input-field" />
             </div>
@@ -61,12 +74,7 @@ function MovieFormModal({ movie, onClose, onSave }) {
                 placeholder="120" className="input-field" />
             </div>
             <div>
-              <label className="block text-cinema-muted text-xs mb-1.5">Đánh giá (1-10)</label>
-              <input type="number" step="0.1" min="0" max="10" value={form.rating} onChange={e => setForm({...form, rating: e.target.value})}
-                placeholder="8.5" className="input-field" />
-            </div>
-            <div>
-              <label className="block text-cinema-muted text-xs mb-1.5">Ngày khởi chiếu</label>
+              <label className="block text-cinema-muted text-xs mb-1.5">Ngày khởi chiếu (Release Date)</label>
               <DatePickerInput
                 value={form.releaseDate}
                 onChange={iso => setForm({...form, releaseDate: iso})}
@@ -78,21 +86,14 @@ function MovieFormModal({ movie, onClose, onSave }) {
               <select value={form.language} onChange={e => setForm({...form, language: e.target.value})} className="input-field cursor-pointer">
                 <option>Tiếng Anh</option>
                 <option>Tiếng Việt</option>
+                <option>Tiếng Nhật</option>
                 <option>Tiếng Hàn</option>
               </select>
             </div>
-            <div>
-              <label className="block text-cinema-muted text-xs mb-1.5">Xếp hạng tuổi</label>
-              <select value={form.ageRating} onChange={e => setForm({...form, ageRating: e.target.value})} className="input-field cursor-pointer">
-                {['P','K','T13','T16','T18'].map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-cinema-muted text-xs mb-1.5">Trạng thái</label>
-              <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="input-field cursor-pointer">
-                <option value="now_showing">Đang chiếu</option>
-                <option value="coming_soon">Sắp chiếu</option>
-              </select>
+            <div className="col-span-2">
+              <label className="block text-cinema-muted text-xs mb-1.5">Diễn viên (Cast)</label>
+              <input value={form.cast || ''} onChange={e => setForm({...form, cast: e.target.value})}
+                placeholder="Robert Downey Jr., Chris Evans, ..." className="input-field" />
             </div>
             <div className="col-span-2">
               <label className="block text-cinema-muted text-xs mb-1.5">Thể loại</label>
@@ -109,30 +110,39 @@ function MovieFormModal({ movie, onClose, onSave }) {
               </div>
             </div>
             <div className="col-span-2">
-              <label className="block text-cinema-muted text-xs mb-1.5">Mô tả</label>
+              <label className="block text-cinema-muted text-xs mb-1.5">Mô tả (Description)</label>
               <textarea value={form.description || ''} onChange={e => setForm({...form, description: e.target.value})}
                 rows={3} placeholder="Nội dung phim..." className="input-field resize-none" />
             </div>
             <div className="col-span-2">
-              <label className="block text-cinema-muted text-xs mb-1.5">Link Poster</label>
-              <input value={form.poster || ''} onChange={e => setForm({...form, poster: e.target.value})}
-                placeholder="https://..." className="input-field" />
+              <label className="block text-cinema-muted text-xs mb-1.5">Link Poster (Poster URL)</label>
+              <input value={form.posterUrl || ''} onChange={e => setForm({...form, posterUrl: e.target.value})}
+                placeholder="https://example.com/poster.jpg" className="input-field" />
             </div>
             <div className="col-span-2">
-              <label className="block text-cinema-muted text-xs mb-1.5">Link Ảnh Bìa (Backdrop)</label>
-              <input value={form.backdrop || ''} onChange={e => setForm({...form, backdrop: e.target.value})}
-                placeholder="https://..." className="input-field" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-cinema-muted text-xs mb-1.5">Link Trailer</label>
-              <input value={form.trailer || ''} onChange={e => setForm({...form, trailer: e.target.value})}
-                placeholder="https://..." className="input-field" />
+              <label className="block text-cinema-muted text-xs mb-1.5">Link Trailer (YouTube URL)</label>
+              <input value={form.trailerUrl || ''} onChange={e => setForm({...form, trailerUrl: e.target.value})}
+                placeholder="https://youtube.com/watch?v=..." className="input-field" />
             </div>
           </div>
           <div className="flex gap-3 pt-2">
             <button onClick={onClose} className="flex-1 btn-outline py-2.5 text-sm">Huỷ</button>
-            <button onClick={() => { onSave(form); onClose(); }} className="flex-1 btn-primary py-2.5 text-sm">
-              {movie ? 'Lưu thay đổi' : 'Thêm phim'}
+            <button 
+              onClick={handleSubmit} 
+              disabled={saving}
+              className="flex-1 btn-primary py-2.5 text-sm flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Đang lưu...
+                </>
+              ) : (
+                movie ? 'Lưu thay đổi' : 'Thêm phim'
+              )}
             </button>
           </div>
         </div>
@@ -160,20 +170,7 @@ export default function AdminMovies() {
       .finally(() => setLoading(false));
   }, []);
 
-  const { addNotification } = useNotificationStore();
-
-  const showToast = (msg, type = 'success') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-    if (type === 'success') {
-      addNotification({
-        title: 'Thành công',
-        message: msg,
-        type: 'success',
-        isAdmin: true
-      });
-    }
-  };
+  const { addNotification, addToast } = useNotificationStore();
 
   const filtered = movies.filter(m => {
     const matchSearch = m.title.toLowerCase().includes(search.toLowerCase());
@@ -188,21 +185,24 @@ export default function AdminMovies() {
         // Cập nhật
         const updated = await movieService.update(modal.id, form);
         setMovies(prev => prev.map(m => m.id === modal.id ? { ...m, ...updated } : m));
-        showToast(`✅ Đã cập nhật phim: ${form.title}`);
+        addToast(`Đã cập nhật phim: ${form.title}`, 'success');
       } else {
         // Thêm mới
         const created = await movieService.create(form);
         setMovies(prev => [...prev, created]);
-        showToast(`✅ Đã thêm phim mới: ${form.title}`);
+        addToast(`Đã thêm phim mới: ${form.title}`, 'success');
+        
+        // Thêm vào Notification Center (lịch sử)
+        addNotification({
+          title: 'Phim mới',
+          message: `Admin đã thêm phim mới: ${form.title}`,
+          type: 'success',
+          isAdmin: true
+        });
       }
+      setModal(null); // Chỉ đóng modal khi thành công
     } catch (err) {
-      // Fallback: cập nhật local state khi API lỗi
-      if (modal && modal !== 'add') {
-        setMovies(prev => prev.map(m => m.id === modal.id ? { ...m, ...form } : m));
-      } else {
-        setMovies(prev => [...prev, { ...form, id: Date.now(), cast: [], poster: '', backdrop: '', trailer: '' }]);
-      }
-      showToast(`⚠️ Đã lưu cục bộ: ${form.title} (API chưa kết nối)`, 'warn');
+      addToast(`Lỗi khi lưu phim: ${err.message}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -210,9 +210,15 @@ export default function AdminMovies() {
 
   const handleDelete = async (id) => {
     const movie = movies.find(m => m.id === id);
-    setMovies(prev => prev.filter(m => m.id !== id));
-    setDeleteId(null);
-    showToast(`✅ Đã xóa hiển thị phim: ${movie?.title}`);
+    try {
+      await movieService.remove(id);
+      setMovies(prev => prev.filter(m => m.id !== id));
+      addToast(`Đã xóa phim: ${movie?.title}`, 'success');
+    } catch (err) {
+      addToast('Lỗi khi xóa phim', 'error');
+    } finally {
+      setDeleteId(null);
+    }
   };
 
   return (
@@ -341,6 +347,7 @@ export default function AdminMovies() {
             movie={modal === 'add' ? null : modal}
             onClose={() => setModal(null)}
             onSave={handleSave}
+            saving={saving}
           />
         )}
       </AnimatePresence>

@@ -117,10 +117,9 @@ public class ProvinceService implements IProvinceService{
 	}
 	
 	@Override
-	public ProvinceDTO createProvince (CreateProvinceForm form) {
+	public void createProvince (CreateProvinceForm form) {
 		Provinces createProvinces = new Provinces(form.getProvinceName());
-		Provinces saved = provinceRepository.save(createProvinces);
-		return modelMapper.map(saved, ProvinceDTO.class);
+		provinceRepository.save(createProvinces);
 	}
 	
 	@Override

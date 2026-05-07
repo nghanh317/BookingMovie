@@ -63,9 +63,11 @@ export default function AdminLayout({ children }) {
   }, []);
 
   const { logout } = useAuthStore();
+  const { addToast } = useNotificationStore();
 
   const handleLogout = () => {
     logout();
+    addToast('Hẹn gặp lại bạn!', 'info');
     navigate('/login');
   };
 

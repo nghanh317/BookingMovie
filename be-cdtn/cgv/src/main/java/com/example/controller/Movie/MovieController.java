@@ -24,39 +24,46 @@ import com.example.form.Movie.UpdateMovieForm;
 import com.example.service.Movie.IMovieService;
 
 @RestController
-@RequestMapping ( "api/v1/movies")
+@RequestMapping("api/v1/movies")
 @CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
-public class MovieController{
-	
+public class MovieController {
+
 	@Autowired
 	private IMovieService movieService;
-	
+
 	@GetMapping
-	public Page<MovieDTO> getAllMovie (Pageable pageable, MovieFilterForm filterform){
+	public Page<MovieDTO> getAllMovie(Pageable pageable, MovieFilterForm filterform) {
 		return movieService.getAllMovie(pageable, filterform);
 	}
-	@GetMapping ("/{id}")
-	public MovieDTO getById (@PathVariable Integer id) {
+
+	@GetMapping("/{id}")
+	public MovieDTO getById(@PathVariable Integer id) {
 		return movieService.getById(id);
 	}
+
 	@GetMapping("/{id}/dates")
-    public ResponseEntity<List<DateDTO>> getShowDatesByMovieId(@PathVariable Integer id) {
-        List<DateDTO> dates = movieService.getShowDatesByMovieId(id);
-        return ResponseEntity.ok(dates);
-    }
-	@PostMapping
-	public void createMovie (@RequestBody CreateMovieForm form) {
-		 movieService.createMovie(form);
+	public ResponseEntity<List<DateDTO>> getShowDatesByMovieId(@PathVariable Integer id) {
+		List<DateDTO> dates = movieService.getShowDatesByMovieId(id);
+		return ResponseEntity.ok(dates);
 	}
-	@PutMapping ("/{id}")
-	public void updateMovie ( 
+
+	@PostMapping
+	public void createMovie(@RequestBody CreateMovieForm form) {
+		// In ra xem DTO có nhận được link chưa hay đang null
+    System.out.println("Poster nhận được: " + form.getPosterUrl());
+    System.out.println("Trailer nhận được: " + form.getTrailerUrl());
+		movieService.createMovie(form);
+	}
+
+	@PutMapping("/{id}")
+	public void updateMovie(
 			@PathVariable Integer id,
-			@RequestBody UpdateMovieForm form
-			) {
+			@RequestBody UpdateMovieForm form) {
 		movieService.updateMovie(id, form);
 	}
-	@DeleteMapping ("/{id}")
-	public void deleteMovie (@PathVariable Integer id) {
+
+	@DeleteMapping("/{id}")
+	public void deleteMovie(@PathVariable Integer id) {
 		movieService.deleteMovie(id);
 	}
 

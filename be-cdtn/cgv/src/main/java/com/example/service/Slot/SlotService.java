@@ -92,26 +92,14 @@ public class SlotService implements ISlotService {
 	@Override
 	@Transactional
 	public void createSlot(CreateSlotForm form) {
+		BigDecimal autoPrice = pricingService.calculatePrice(form.getShowTime());
+
 		Rooms room = roomRepository.findById(form.getRoomId())
 			.orElseThrow(() -> new RuntimeException("Room not found with id: " + form.getRoomId()));
 		
-		// Giá vé: dùng giá admin nhập nếu có, không thì tính tự động
-		BigDecimal price;
-		if (form.getPrice() != null && form.getPrice().compareTo(BigDecimal.ZERO) > 0) {
-			price = form.getPrice();
-		} else {
-			price = pricingService.calculatePrice(form.getShowTime());
-		}
+		Integer totalSeats = room.getTotalSeats();
 		
-		// Số ghế trống: dùng giá trị admin nhập nếu có, không thì lấy từ phòng
-		Integer emptySeats;
-		if (form.getEmptySeats() != null && form.getEmptySeats() > 0) {
-			emptySeats = form.getEmptySeats();
-		} else {
-			emptySeats = room.getTotalSeats();
-		}
-		
-		Slots createSlot = new Slots(form.getShowTime(), form.getEndTime(), price, emptySeats);
+		Slots createSlot = new Slots(form.getShowTime(), form.getEndTime(), autoPrice, totalSeats);
 		
 		Movies movie = new Movies();
 		movie.setId(form.getMovieId());

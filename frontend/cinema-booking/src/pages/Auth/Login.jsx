@@ -1,13 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import useAuthStore from '../../store/authStore';
+import useNotificationStore from '../../store/notificationStore';
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuthStore();
+  const { login, isLoggedIn, user } = useAuthStore();
+  const { addToast } = useNotificationStore();
   const registeredSuccess = location.state?.registered;
+
+  // 🛡️ Tự động chuyển hướng nếu đã đăng nhập
+  useEffect(() => {
+    if (isLoggedIn) {
+      if ((user?.role || '').toUpperCase() === 'ADMIN') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
+    }
+  }, [isLoggedIn, user, navigate]);
 
   const [form, setForm] = useState({ userName: '', passwordHash: '' });
 
@@ -29,16 +42,18 @@ export default function Login() {
     }
 
     setLoading(true);
-    // Gọi API thật qua authStore (async)
     const result = await login(form.userName, form.passwordHash);
     setLoading(false);
 
     if (!result.success) {
       setError(result.message);
+      addToast(result.message, 'error');
       return;
     }
-
-    // ✅ Điều hướng theo role (backend trả 'admin' hoặc 'user' sau khi normalize)
+    
+    addToast('Chào mừng bạn quay trở lại!', 'success');
+    // Chuyển hướng theo role đã được xử lý ở useEffect, 
+    // nhưng vẫn để ở đây để chuyển hướng ngay lập tức sau login thành công
     if (result.role === 'admin') {
       navigate('/admin');
     } else {
@@ -192,11 +207,33 @@ export default function Login() {
               Facebook
             </button>
           </div>
+          {/* Quick Login for Testing */}
+          <div className="mt-8 pt-6 border-t border-cinema-border/50">
+            <p className="text-center text-xs text-cinema-muted mb-4 uppercase tracking-widest font-semibold">Thử nhanh cho DEV</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                type="button"
+                onClick={() => fillDemo('admin')}
+                className="btn-outline py-2 border-primary/30 text-primary hover:bg-primary/10 transition-all text-xs flex flex-col items-center gap-1"
+              >
+                <span className="font-bold">ADMIN</span>
+                <span className="opacity-60 italic">admin / admin123</span>
+              </button>
+              <button 
+                type="button"
+                onClick={() => fillDemo('user')}
+                className="btn-outline py-2 border-accent/30 text-accent hover:bg-accent/10 transition-all text-xs flex flex-col items-center gap-1"
+              >
+                <span className="font-bold">USER</span>
+                <span className="opacity-60 italic">user / user123</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <p className="text-center text-cinema-muted text-sm mt-6">
           Chưa có tài khoản?{' '}
-          <Link to="/register" className="text-primary hover:text-primary/80 font-medium transition-colors">
+          <Link to="/register" className="text-primary hover:text-primary/80 font-medium transition-colors underline-offset-4 hover:underline">
             Đăng ký ngay
           </Link>
         </p>

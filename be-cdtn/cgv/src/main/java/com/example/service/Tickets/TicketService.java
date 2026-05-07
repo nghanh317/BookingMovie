@@ -1,7 +1,6 @@
 package com.example.service.Tickets;
 
 import java.math.BigDecimal;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -26,14 +25,12 @@ import com.example.entity.TicketsDetails;
 import com.example.form.Tickets.CreateTicketForm;
 import com.example.form.Tickets.TicketFilterForm;
 import com.example.form.Tickets.UpdateTicketForm;
-import com.example.repository.AccountRepository;
 import com.example.repository.BookingSeatRepository;
 import com.example.repository.ProductRepository;
 import com.example.repository.SeatRepository;
 import com.example.repository.SlotRepository;
 import com.example.repository.TicketDetailRepository;
 import com.example.repository.TicketRepository;
-import com.example.service.Email.EmailService;
 import com.example.specification.TicketSpecification;
 
 @Service
@@ -56,14 +53,6 @@ public class TicketService implements ITicketService{
 	
 	@Autowired
 	private ProductRepository productRepository;
-
-	@Autowired
-	private EmailService emailService;
-
-	@Autowired
-	private AccountRepository accountRepository;
-
-	private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
 	
 	@Override
 	public Page<TicketDTO> getAllTicket(Pageable pageable, TicketFilterForm filterForm) {
@@ -170,7 +159,7 @@ public class TicketService implements ITicketService{
 	
 	@Override
 	@Transactional
-	public TicketDTO createTicket(CreateTicketForm form) {
+	public void createTicket(CreateTicketForm form) {
 		Slots slot = slotRepository.findById(form.getSlotsId())
 			.orElseThrow(() -> new RuntimeException("Không tìm thấy suất chiếu"));
 		
@@ -355,70 +344,15 @@ public class TicketService implements ITicketService{
 
 		slot.setEmptySeats(slot.getEmptySeats() - numberOfSeatsToBook);
 		slotRepository.save(slot);
-
-		// Gửi mail xác nhận đặt vé thành công
-		try {
-			Accounts fullAccount = accountRepository.findById(form.getAccountsId()).orElse(null);
-			if (fullAccount != null) {
-				String movieName = slot.getMovies().getMovieName();
-				String seatsString = String.join(", ", seatNames);
-				String showTimeStr = dateFormat.format(slot.getShowTime());
-				String totalStr = String.format("%,.0f", finalAmount);
-				
-				emailService.sendBookingEmail(
-					fullAccount.getEmail(), 
-					fullAccount.getFullName(), 
-					movieName, 
-					seatsString, 
-					showTimeStr, 
-					totalStr
-				);
-			}
-		} catch (Exception e) {
-			System.out.println("Lỗi khi gửi mail đặt vé: " + e.getMessage());
-		}
-
-		return mapTicketToDTO(ticket);
 	}
 	
 	@Override
 	@Transactional
 	public void updateTicket(Integer id, UpdateTicketForm form) {
-		Tickets updateTicket = ticketRepository.findById(id).orElseThrow(() -> new RuntimeException("Ticket not found"));
-		
-		String oldPaymentStatus = updateTicket.getPaymentStatus();
+		Tickets updateTicket = ticketRepository.findById(id).get();
 		updateTicket.setPaymentStatus(form.getPaymentStatus());
 		updateTicket.setStatus(form.getStatus());
 		ticketRepository.save(updateTicket);
-
-		// Nếu trạng thái chuyển sang PAID thì gửi mail xác nhận thanh toán
-		if ("PAID".equalsIgnoreCase(form.getPaymentStatus()) && !"PAID".equalsIgnoreCase(oldPaymentStatus)) {
-			try {
-				Accounts account = updateTicket.getAccounts();
-				Slots slot = updateTicket.getSlots();
-				String movieName = slot.getMovies().getMovieName();
-				String showTimeStr = dateFormat.format(slot.getShowTime());
-				String totalStr = String.format("%,.0f", updateTicket.getFinalAmount());
-				
-				// Lấy danh sách ghế
-				List<BookingSeats> bookingSeats = bookingSeatRepository.findByTickets_IdAndIsDeleted(updateTicket.getId(), false);
-				String seatsString = bookingSeats.stream()
-					.map(bs -> bs.getSeats().getSeatRow() + bs.getSeats().getSeatNumber())
-					.collect(Collectors.joining(", "));
-
-				emailService.sendPaymentSuccessEmail(
-					account.getEmail(),
-					account.getFullName(),
-					movieName,
-					seatsString,
-					showTimeStr,
-					totalStr,
-					updateTicket.getTicketsCode()
-				);
-			} catch (Exception e) {
-				System.out.println("Lỗi khi gửi mail thanh toán: " + e.getMessage());
-			}
-		}
 	}
 
 	@Override

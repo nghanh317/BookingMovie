@@ -35,8 +35,8 @@ public class TicketController {
 	}
 	
 	@PostMapping
-	public TicketDTO createTicket (@RequestBody  CreateTicketForm form) {
-		return ticketService.createTicket(form);
+	public void createTicket (@RequestBody  CreateTicketForm form) {
+		ticketService.createTicket(form);
 	}
 	@PutMapping ("/{id}")
 	public void updateTicket (@PathVariable Integer id, @RequestBody UpdateTicketForm form) {

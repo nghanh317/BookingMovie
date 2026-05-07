@@ -16,7 +16,7 @@ import com.example.dto.AccountDTO;
 import com.example.form.Account.AccountForm;
 import com.example.service.Account.IAccountService;
 import com.example.service.Account.IJWTTokenService;
-import com.example.service.Email.EmailService;
+
 import com.example.form.Account.CreateAccountForm;
 
 import jakarta.validation.Valid;
@@ -43,9 +43,6 @@ public class AuthController {
 	@Autowired
 	private PasswordEncoder passwordEncoder;
 
-	@Autowired
-	private EmailService emailService;
-
 	@PostMapping("/login")
 	public AccountDTO login(@RequestBody @Valid AccountForm loginForm) {
 
@@ -66,12 +63,8 @@ public class AuthController {
 	}
 
 	@PostMapping("/register")
-	public String register(@RequestBody @Valid CreateAccountForm form) {
+	public void register(@RequestBody @Valid CreateAccountForm form) {
 		form.setPasswordHash(passwordEncoder.encode(form.getPasswordHash()));
 		service.createAccount(form);
-
-		//Goi ham gui mail chao mừng 
-		emailService.sendWelcomeEmail(form.getEmail(), form.getFullName());
-		return "Đăng ký thành công";
 	}
 }

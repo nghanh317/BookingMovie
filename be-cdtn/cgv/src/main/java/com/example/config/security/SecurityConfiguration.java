@@ -47,36 +47,39 @@ public class SecurityConfiguration {
 			.cors(withDefaults())
 			.csrf((csrf) -> csrf.disable())
 			.authorizeHttpRequests((requests) -> requests
-//					Chatbot AI - ưu tiên cao nhất
-					.requestMatchers("/api/v1/ai/**").permitAll()
-//					AUTH - public (phải đặt trước các rule khác)
-					.requestMatchers("/api/v1/auth/**").permitAll()
-//					MOVIE - cho phép xem phim mà không cần đăng nhập
-					.requestMatchers(HttpMethod.GET, "/api/v1/movies/**").permitAll()
-//					ACCOUNT (USER được lấy thông tin tài khoản của mình)
-					.requestMatchers(HttpMethod.GET, "/api/v1/accounts/**").hasAnyAuthority( "USER", "ADMIN")
+//					ACCOUNT
+					.requestMatchers(HttpMethod.GET, "/api/v1/accounts/**").hasAnyAuthority( "ADMIN")
 					.requestMatchers(HttpMethod.POST, "/api/v1/accounts/**").hasAuthority("ADMIN")
-					.requestMatchers(HttpMethod.PUT, "/api/v1/accounts/**").hasAnyAuthority("USER", "ADMIN") // Cho phép user update
+					.requestMatchers(HttpMethod.PUT, "/api/v1/accounts/**").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.DELETE, "/api/v1/accounts/**").hasAuthority("ADMIN")
-//					Movie - CUD cần ADMIN
+//					Movie
+					.requestMatchers(HttpMethod.GET, "/api/v1/movies/**").permitAll()
 					.requestMatchers(HttpMethod.POST, "/api/v1/movies/**").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.PUT, "/api/v1/movies/**").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.DELETE, "/api/v1/movies/**").hasAuthority("ADMIN")
-//					PROVINCE, CINEMAS, ROOMS, SLOTS, SEATS, PROMOTIONS, PRODUCTS - Public GET
-					.requestMatchers(HttpMethod.GET, "/api/v1/provinces/**", "/api/v1/cinemas/**", "/api/v1/rooms/**", 
-							"/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**", "/api/v1/products/**").permitAll()
+//					PROVINCE
+					.requestMatchers(HttpMethod.GET, "/api/v1/provinces/**").permitAll()
+					.requestMatchers(HttpMethod.POST, "/api/v1/provinces/**").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.PUT, "/api/v1/provinces/**").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.DELETE, "/api/v1/provinces/**").hasAuthority("ADMIN")
+//					CINEMAS
+					.requestMatchers(HttpMethod.GET, "/api/v1/cinemas/**").permitAll()
+					.requestMatchers(HttpMethod.POST, "/api/v1/cinemas/**").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.PUT, "/api/v1/cinemas/**").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.DELETE, "/api/v1/cinemas/**").hasAuthority("ADMIN")
+//					ROOM
+					.requestMatchers(HttpMethod.GET, "/api/v1/rooms/**").permitAll()
+					.requestMatchers(HttpMethod.POST, "/api/v1/rooms/**").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.PUT, "/api/v1/rooms/**").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.DELETE, "/api/v1/rooms/**").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.GET, "/api/v1/slots/**").permitAll()
 					
-//					TICKET & BOOKING SEAT - USER & ADMIN can create/view
-					.requestMatchers(HttpMethod.GET, "/api/v1/tickets/**", "/api/v1/bookingSeats/**").hasAnyAuthority("USER", "ADMIN")
-					.requestMatchers(HttpMethod.POST, "/api/v1/tickets/**", "/api/v1/bookingSeats/**").hasAnyAuthority("USER", "ADMIN")
-					
-//					Other methods for PROVINCE, CINEMA, etc. still require ADMIN
-					.requestMatchers(HttpMethod.POST, "/api/v1/provinces/**", "/api/v1/cinemas/**", "/api/v1/rooms/**", "/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**", "/api/v1/products/**").hasAuthority("ADMIN")
-					.requestMatchers(HttpMethod.PUT, "/api/v1/provinces/**", "/api/v1/cinemas/**", "/api/v1/rooms/**", "/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**", "/api/v1/products/**").hasAuthority("ADMIN")
-					.requestMatchers(HttpMethod.DELETE, "/api/v1/provinces/**", "/api/v1/cinemas/**", "/api/v1/rooms/**", "/api/v1/slots/**", "/api/v1/seats/**", "/api/v1/promotions/**", "/api/v1/products/**").hasAuthority("ADMIN")
-
+					//them api dki
+					.requestMatchers("/api/v1/auth/**").permitAll()
+					.requestMatchers("/error").permitAll()
 					.requestMatchers("/api/v1/**").hasAuthority("ADMIN")
 					.anyRequest().authenticated())
+			.httpBasic(withDefaults())
 			.addFilterBefore(jwtAuthorizationFilter, UsernamePasswordAuthenticationFilter.class)
 			.exceptionHandling()
 			.authenticationEntryPoint(authExceptionHandler)
@@ -87,10 +90,8 @@ public class SecurityConfiguration {
 	@Bean
 	public CorsConfigurationSource corsConfigurationSource() {
 		final CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOriginPatterns(Arrays.asList("*"));
-		configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-		configuration.setAllowedHeaders(Arrays.asList("*"));
-		configuration.setAllowCredentials(true);
+		configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE"));
+		configuration.applyPermitDefaultValues();
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);
 		return source;
