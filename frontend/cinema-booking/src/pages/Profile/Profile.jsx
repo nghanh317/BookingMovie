@@ -3,86 +3,20 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import reviewService from '../../services/reviewService';
 import { movieService } from '../../services';
+import ticketService from '../../services/ticketService';
 import useAuthStore from '../../store/authStore';
 import useFavoriteStore from '../../store/favoriteStore';
 import useNotificationStore from '../../store/notificationStore';
 import MovieCard from '../../components/movie/MovieCard';
 
-// Mock booking history data
-const MOCK_BOOKINGS = [
-  {
-    id: 'CB2F4A9K',
-    movie: 'Avengers: Secret Wars',
-    poster: 'https://images.unsplash.com/photo-1635805737707-575885ab0820?w=120&q=80',
-    cinema: 'CGV Vincom Center',
-    date: '2026-03-15',
-    time: '19:00',
-    type: 'IMAX',
-    hall: 'IMAX Hall',
-    seats: ['E5', 'E6'],
-    total: 260000,
-    status: 'completed',
-  },
-  {
-    id: 'CB8B1XPZ',
-    movie: 'Godzilla vs. Kong',
-    poster: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=120&q=80',
-    cinema: 'Lotte Cinema Landmark',
-    date: '2026-03-20',
-    time: '15:30',
-    type: '3D',
-    hall: 'Hall A',
-    seats: ['C3', 'C4', 'C5'],
-    total: 390000,
-    status: 'upcoming',
-  },
-  {
-    id: 'CB3K7RNM',
-    movie: 'Venom: The Last Dance',
-    poster: 'https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=120&q=80',
-    cinema: 'CGV Vincom Center',
-    date: '2026-02-20',
-    time: '21:30',
-    type: '2D',
-    hall: 'Cinema 3',
-    seats: ['F7'],
-    total: 79250,
-    status: 'completed',
-  },
-  {
-    id: 'CB9L2WQX',
-    movie: 'Spider-Man: Beyond the Spider-Verse',
-    poster: 'https://images.unsplash.com/photo-1559163499-413811fb2344?w=120&q=80',
-    cinema: 'BHD Star Cineplex',
-    date: '2026-04-05',
-    time: '10:00',
-    type: '2D',
-    hall: 'Cinema 2',
-    seats: ['B4', 'B5'],
-    total: 157500,
-    status: 'upcoming',
-  },
-];
-
-const MOCK_USER = {
-  name: 'Nguyễn Văn An',
-  email: 'nguyenvanan@email.com',
-  phone: '0912345678',
-  avatar: null,
-  joinDate: '2024-09-01',
-  totalBookings: 12,
-  totalSpent: 1450000,
-  memberLevel: 'Gold',
-  points: 2450,
-};
-
 const STATUS_CONFIG = {
   upcoming: { label: 'Sắp tới', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
   completed: { label: 'Đã xem', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+  cancelled: { label: 'Đã hủy', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
 };
 
 function Avatar({ name, size = 'lg' }) {
-  const initials = name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase();
+  const initials = (name || 'User').split(' ').map(n => n[0]).slice(-2).join('').toUpperCase();
   const sizeClass = size === 'lg' ? 'w-24 h-24 text-3xl' : 'w-10 h-10 text-sm';
   return (
     <div className={`${sizeClass} rounded-full bg-gradient-gold flex items-center justify-center font-heading font-bold text-cinema-black shadow-glow-gold`}>
@@ -92,20 +26,22 @@ function Avatar({ name, size = 'lg' }) {
 }
 
 function BookingCard({ booking, onRate }) {
-  const status = STATUS_CONFIG[booking.status];
+  const status = STATUS_CONFIG[booking.status] || STATUS_CONFIG.completed;
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="card p-4 flex gap-4 hover:border-cinema-muted/50 transition-colors"
     >
-      {/* Poster */}
-      <div className="flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden">
-        <img src={booking.poster} alt={booking.movie} className="w-full h-full object-cover"
-          onError={e => { e.target.src = 'https://placehold.co/80x120/1E1E2C/A0A0B4'; }} />
+      <div className="flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden bg-cinema-dark flex items-center justify-center">
+        {booking.poster ? (
+          <img src={booking.poster} alt={booking.movie} className="w-full h-full object-cover"
+            onError={e => { e.target.src = 'https://placehold.co/80x120/1E1E2C/A0A0B4'; }} />
+        ) : (
+          <span className="text-2xl opacity-30">🎬</span>
+        )}
       </div>
 
-      {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 flex-wrap">
           <h4 className="font-heading font-bold text-white text-sm leading-snug truncate">{booking.movie}</h4>
@@ -122,7 +58,7 @@ function BookingCard({ booking, onRate }) {
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            {new Date(booking.date).toLocaleDateString('vi-VN')} lúc {booking.time} · {booking.type}
+            {booking.date} lúc {booking.time} · {booking.type}
           </p>
           <p className="flex items-center gap-1.5">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,7 +69,6 @@ function BookingCard({ booking, onRate }) {
         </div>
       </div>
 
-      {/* Price & Actions */}
       <div className="flex-shrink-0 text-right flex flex-col justify-between">
         <p className="text-primary font-heading font-bold text-sm">
           {booking.total.toLocaleString('vi-VN')}đ
@@ -143,7 +78,7 @@ function BookingCard({ booking, onRate }) {
           {booking.status === 'completed' && (
             <div className="flex flex-col gap-1 items-end">
               <button className="text-primary hover:text-primary/80 text-xs transition-colors">
-                Xem lại
+                Xem vé
               </button>
               <button onClick={() => onRate && onRate(booking)} className="text-accent hover:text-accent/80 text-xs transition-colors mt-1 font-semibold">
                 Đánh giá
@@ -175,14 +110,24 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState(tabParam || 'overview');
   const [filterStatus, setFilterStatus] = useState('all');
   const [editMode, setEditMode] = useState(false);
-  const [userData, setUserData] = useState(MOCK_USER);
+  const [userData, setUserData] = useState({
+    name: user?.fullName || user?.userName || 'Người dùng',
+    email: user?.email || '',
+    phone: user?.phone || '',
+    joinDate: user?.createDate || new Date().toISOString(),
+    points: user?.points || 0,
+    memberLevel: (user?.points || 0) >= 5000 ? 'Platinum' : (user?.points || 0) >= 2000 ? 'Gold' : 'Silver',
+    totalBookings: user?.tickets?.length || 0,
+    totalSpent: 0
+  });
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [moviesData, setMoviesData] = useState([]);
-  const [formData, setFormData] = useState({ ...MOCK_USER });
-  const [ownedVouchers, setOwnedVouchers] = useState([
-    { id: '1', code: 'GOLD20', desc: 'Giảm 20% cho lần đặt vé tiếp theo', exp: '31/03/2026', color: 'border-primary/40 bg-primary/5' },
-    { id: '2', code: 'WEEKEND15', desc: 'Giảm 15% vào cuối tuần', exp: '15/04/2026', color: 'border-blue-500/40 bg-blue-500/5' },
-    { id: '3', code: 'POPCORNFREE', desc: 'Tặng 1 bắp ngọt lớn khi mua 2 vé', exp: '20/04/2026', color: 'border-green-500/40 bg-green-500/5' },
-  ]);
+  const [formData, setFormData] = useState({ ...userData });
+  const [ownedVouchers, setOwnedVouchers] = useState([]);
+  const [reviewModal, setReviewModal] = useState({ open: false, booking: null });
+  const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' });
+  const [reviewSuccess, setReviewSuccess] = useState(false);
 
   const redeemableOffers = [
     { id: 'r1', code: 'POINT50K', title: 'Voucher 50.000đ', points: 500, desc: 'Giảm trực tiếp 50k vào tổng hóa đơn', color: 'border-orange-500/40 bg-orange-500/5' },
@@ -190,26 +135,47 @@ export default function Profile() {
     { id: 'r3', code: 'VIPCOMBO', title: 'Combo Bắp Nước VIP', points: 800, desc: '2 nước lớn + 1 bắp phô mai lớn', color: 'border-primary/40 bg-primary/5' },
   ];
 
-  // Review Modal state
-  const [reviewModal, setReviewModal] = useState({ open: false, booking: null });
-  const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' });
-  const [reviewSuccess, setReviewSuccess] = useState(false);
-
-  const filteredBookings = filterStatus === 'all'
-    ? MOCK_BOOKINGS.filter(b => b.status !== 'cancelled')
-    : MOCK_BOOKINGS.filter(b => b.status === filterStatus && b.status !== 'cancelled');
-
   useEffect(() => {
-    movieService.getAll().then(setMoviesData);
+    setLoading(true);
+    Promise.all([
+      movieService.getAll(),
+      ticketService.getAll()
+    ]).then(([moviesRes, ticketsRes]) => {
+      setMoviesData(moviesRes?.content || moviesRes || []);
+      
+      const ticketList = ticketsRes?.data || ticketsRes?.content || (Array.isArray(ticketsRes) ? ticketsRes : []);
+      const normalizedBookings = ticketList.map(t => ({
+        id: t.ticketsCode || t.id,
+        movie: t.movieName || 'Phim',
+        poster: t.movieImageUrl,
+        cinema: t.cinemaName || 'CGV Cinema',
+        date: t.ticketsDate ? t.ticketsDate.split(' ')[0] : '—',
+        time: t.ticketsDate ? t.ticketsDate.split(' ')[1]?.substring(0, 5) : '—',
+        type: '2D',
+        hall: t.roomName || 'Cinema',
+        seats: t.seats?.map(s => `${s.seatsRow}${s.seatsNumber}`) || [],
+        total: t.finalAmount || t.totalAmount || 0,
+        status: t.paymentStatus === 'PAID' ? 'completed' : t.status === 'CANCELLED' ? 'cancelled' : 'upcoming',
+      }));
+      setBookings(normalizedBookings);
+      
+      const totalSpent = normalizedBookings.reduce((sum, b) => sum + b.total, 0);
+      setUserData(prev => ({
+        ...prev,
+        totalBookings: normalizedBookings.length,
+        totalSpent: totalSpent
+      }));
+    }).finally(() => setLoading(false));
   }, []);
 
+  const filteredBookings = filterStatus === 'all'
+    ? bookings.filter(b => b.status !== 'cancelled')
+    : bookings.filter(b => b.status === filterStatus && b.status !== 'cancelled');
+
   useEffect(() => {
-    if (tabParam) {
-      setActiveTab(tabParam);
-    }
+    if (tabParam) setActiveTab(tabParam);
   }, [tabParam]);
 
-  // Cuộn lên đầu trang mỗi khi chuyển đổi activeTab
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [activeTab]);
@@ -229,13 +195,11 @@ export default function Profile() {
     e.preventDefault();
     if (!reviewForm.rating || !reviewForm.comment.trim()) return;
     
-    // Simulate API call and save to reviewService
     reviewService.create({
-      // Vì booking.movie là chuỗi, ta fake movieId (thực tế cần ID của phim từ history)
-      movieId: 1, // Mock
+      movieId: 1, 
       userId: user?.id || user?.userId || 0,
       userName: user?.fullName || user?.userName || userData.name,
-      userInitials: 'MB',
+      userInitials: (user?.fullName || 'U').charAt(0),
       rating: reviewForm.rating,
       comment: reviewForm.comment,
     });
@@ -262,6 +226,14 @@ export default function Profile() {
     addNotification({ type: 'success', title: 'Đổi ưu đãi thành công', message: `Bạn đã đổi thành công ${offer.title} với ${offer.points} điểm.` });
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
@@ -278,16 +250,15 @@ export default function Profile() {
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
               <h1 className="font-heading font-extrabold text-2xl text-white">{userData.name}</h1>
               <span className={`badge inline-flex self-center sm:self-auto text-xs font-bold px-2.5 py-1 ${
+                userData.memberLevel === 'Platinum' ? 'bg-gradient-gold text-cinema-black' :
                 userData.memberLevel === 'Gold' ? 'bg-primary/20 border border-primary/40 text-primary' :
-                userData.memberLevel === 'Silver' ? 'bg-gray-400/20 border border-gray-400/40 text-gray-300' :
-                'bg-orange-500/20 border border-orange-500/40 text-orange-400'
+                'bg-gray-400/20 border border-gray-400/40 text-gray-300'
               }`}>
-                {userData.memberLevel === 'Gold' ? '⭐' : '🥈'} {userData.memberLevel} Member
+                {userData.memberLevel === 'Platinum' ? '👑' : userData.memberLevel === 'Gold' ? '⭐' : '🥈'} {userData.memberLevel} Member
               </span>
             </div>
-            <p className="text-cinema-muted text-sm mb-3">{userData.email} · {userData.phone}</p>
+            <p className="text-cinema-muted text-sm mb-3">{userData.email || 'Chưa cập nhật email'} · {userData.phone || 'Chưa cập nhật SĐT'}</p>
 
-            {/* Stats */}
             <div className="flex flex-wrap justify-center sm:justify-start gap-6">
               <div>
                 <p className="text-primary font-heading font-bold text-xl">{userData.totalBookings}</p>
@@ -295,7 +266,9 @@ export default function Profile() {
               </div>
               <div>
                 <p className="text-primary font-heading font-bold text-xl">
-                  {(userData.totalSpent / 1000000).toFixed(1)}M
+                  {userData.totalSpent >= 1000000 
+                    ? `${(userData.totalSpent / 1000000).toFixed(1)}M`
+                    : `${(userData.totalSpent / 1000).toFixed(0)}K`}
                 </p>
                 <p className="text-cinema-muted text-xs">Tổng chi tiêu</p>
               </div>
@@ -341,7 +314,6 @@ export default function Profile() {
               exit={{ opacity: 0 }}
               className="grid md:grid-cols-2 gap-5"
             >
-              {/* Recent Bookings */}
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-heading font-bold text-white">Vé gần đây</h3>
@@ -350,23 +322,32 @@ export default function Profile() {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {MOCK_BOOKINGS.slice(0, 2).map(b => (
-                    <div key={b.id} className="flex gap-3 items-center">
-                      <img src={b.poster} alt={b.movie} className="w-10 h-14 object-cover rounded-lg flex-shrink-0"
-                        onError={e => { e.target.src = 'https://placehold.co/60x84/1E1E2C/A0A0B4'; }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">{b.movie}</p>
-                        <p className="text-cinema-muted text-xs">{new Date(b.date).toLocaleDateString('vi-VN')}</p>
+                  {bookings.length > 0 ? (
+                    bookings.slice(0, 2).map(b => (
+                      <div key={b.id} className="flex gap-3 items-center">
+                        <div className="w-10 h-14 bg-cinema-dark rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
+                          {b.poster ? (
+                            <img src={b.poster} alt={b.movie} className="w-full h-full object-cover"
+                              onError={e => { e.target.src = 'https://placehold.co/60x84/1E1E2C/A0A0B4'; }} />
+                          ) : (
+                            <span className="text-lg opacity-30">🎬</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm font-medium truncate">{b.movie}</p>
+                          <p className="text-cinema-muted text-[11px]">{b.date} {b.time}</p>
+                        </div>
+                        <span className={`badge border text-[10px] px-1.5 py-0.5 ${STATUS_CONFIG[b.status]?.color || STATUS_CONFIG.completed.color}`}>
+                          {STATUS_CONFIG[b.status]?.label || 'Đã xem'}
+                        </span>
                       </div>
-                      <span className={`badge border text-xs ${STATUS_CONFIG[b.status].color}`}>
-                        {STATUS_CONFIG[b.status].label}
-                      </span>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-cinema-muted text-sm text-center py-4 italic">Chưa có lịch sử đặt vé</p>
+                  )}
                 </div>
               </div>
 
-              {/* Quick Summary */}
               <div className="card p-5">
                 <h3 className="font-heading font-bold text-white mb-4">Hoạt động</h3>
                 <div className="space-y-4">
@@ -381,26 +362,27 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Loyalty Progress */}
               <div className="card p-5 md:col-span-2">
                 <h3 className="font-heading font-bold text-white mb-4">Điểm thành viên</h3>
                 <div className="flex items-center gap-4 mb-3">
-                  <div className="text-center">
+                  <div className="text-center min-w-[80px]">
                     <p className="text-primary font-heading font-extrabold text-3xl">{userData.points.toLocaleString('vi-VN')}</p>
                     <p className="text-cinema-muted text-xs mt-0.5">điểm hiện tại</p>
                   </div>
                   <div className="flex-1">
                     <div className="flex justify-between text-xs mb-1.5">
-                      <span className="text-cinema-muted">Gold (2,000đ)</span>
-                      <span className="text-cinema-muted">Platinum (5,000đ)</span>
+                      <span className="text-cinema-muted">Silver</span>
+                      <span className="text-cinema-muted">Platinum (5,000)</span>
                     </div>
                     <div className="h-3 bg-cinema-surface rounded-full overflow-hidden border border-cinema-border">
                       <div
                         className="h-full bg-gradient-gold rounded-full transition-all duration-1000"
-                        style={{ width: `${(userData.points / 5000) * 100}%` }}
+                        style={{ width: `${Math.min((userData.points / 5000) * 100, 100)}%` }}
                       />
                     </div>
-                    <p className="text-cinema-muted text-xs mt-1.5">Còn {(5000 - userData.points).toLocaleString('vi-VN')} điểm để lên hạng <span className="text-white font-semibold">Platinum</span></p>
+                    {userData.points < 5000 && (
+                      <p className="text-cinema-muted text-xs mt-1.5">Còn {(5000 - userData.points).toLocaleString('vi-VN')} điểm để lên hạng <span className="text-white font-semibold">Platinum</span></p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -414,7 +396,6 @@ export default function Profile() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
             >
-              {/* Filter */}
               <div className="flex gap-2 mb-5 flex-wrap">
                 {[
                   { value: 'all', label: 'Tất cả' },
@@ -435,7 +416,6 @@ export default function Profile() {
                 ))}
               </div>
 
-              {/* Booking list */}
               <div className="space-y-3">
                 {filteredBookings.length > 0 ? (
                   filteredBookings.map(b => <BookingCard key={b.id} booking={b} onRate={handleOpenReview} />)
@@ -544,7 +524,6 @@ export default function Profile() {
               exit={{ opacity: 0 }}
               className="grid md:grid-cols-2 gap-5"
             >
-              {/* Edit Profile */}
               <div className="card p-6 md:col-span-2">
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="font-heading font-bold text-white">Thông tin cá nhân</h3>
@@ -585,7 +564,6 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Change Password */}
               <div className="card p-6">
                 <h3 className="font-heading font-bold text-white mb-4">Đổi mật khẩu</h3>
                 <div className="space-y-3">
@@ -599,7 +577,6 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Notification Settings */}
               <div className="card p-6">
                 <h3 className="font-heading font-bold text-white mb-4">Thông báo</h3>
                 <div className="space-y-3">
@@ -621,7 +598,6 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Danger Zone */}
               <div className="card p-6 border-red-500/20 bg-red-500/5 md:col-span-2">
                 <h3 className="font-heading font-bold text-red-400 mb-2">Vùng nguy hiểm</h3>
                 <p className="text-cinema-muted text-sm mb-4">Các thao tác này không thể hoàn tác. Hãy cân nhắc kỹ trước khi thực hiện.</p>
@@ -642,7 +618,6 @@ export default function Profile() {
         </AnimatePresence>
       </div>
 
-      {/* Review Modal */}
       <AnimatePresence>
         {reviewModal.open && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cinema-black/80 backdrop-blur-sm">
