@@ -24,7 +24,9 @@ const normalize = (movie) => ({
   language: movie.language || 'Tiếng Anh',
   releaseDate: movie.releaseDate || movie.release_date || '',
   director: movie.director || '',
-  cast: movie.cast || '',
+  cast: Array.isArray(movie.cast)
+    ? movie.cast
+    : (movie.cast || '').split(',').map((c) => c.trim()).filter(Boolean),
   description: movie.description || movie.content || '',
   posterUrl: movie.posterUrl || movie.poster || '',
   trailerUrl: movie.trailerUrl || movie.trailer || '',
