@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 
 /**
@@ -7,8 +7,10 @@ import useAuthStore from '../../store/authStore';
  */
 export function RequireAuth({ children }) {
   const { isLoggedIn } = useAuthStore();
+  const location = useLocation();
+
   if (!isLoggedIn) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
   return children;
 }
@@ -20,8 +22,10 @@ export function RequireAuth({ children }) {
  */
 export function RequireAdmin({ children }) {
   const { isLoggedIn, user } = useAuthStore();
+  const location = useLocation();
+
   if (!isLoggedIn) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
   if ((user?.role || '').toUpperCase() !== 'ADMIN') {
     return <Navigate to="/" replace />;

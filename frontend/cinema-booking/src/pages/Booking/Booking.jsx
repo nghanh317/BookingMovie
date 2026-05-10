@@ -78,8 +78,10 @@ export default function Booking() {
           cinemaService.getAll()
         ]);
         setMovie(movieRes);
-        // Ensure slots are properly loaded from the pageable content
-        const slotsContent = slotsRes.content || slotsRes || [];
+        // Ensure slots are properly loaded from the pageable content or array
+        const slotsContent = slotsRes?.content 
+          ? (Array.isArray(slotsRes.content) ? slotsRes.content : [])
+          : (Array.isArray(slotsRes) ? slotsRes : []);
         setSlotsData(slotsContent);
         setCinemasData(cinemasRes);
       } catch (err) {
@@ -93,6 +95,7 @@ export default function Booking() {
 
   // Transform backend Slots to UI Showtimes
   const showtimes = useMemo(() => {
+    if (!Array.isArray(slotsData)) return [];
     return slotsData.map(s => {
       // s.showTime format: "yyyy-MM-dd HH:mm:ss"
       const [datePart, timePart] = (s.showTime || '').split(' ');

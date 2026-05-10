@@ -14,13 +14,16 @@ export default function Login() {
   // 🛡️ Tự động chuyển hướng nếu đã đăng nhập
   useEffect(() => {
     if (isLoggedIn) {
-      if ((user?.role || '').toUpperCase() === 'ADMIN') {
+      const from = location.state?.from?.pathname;
+      if (from) {
+        navigate(from, { replace: true });
+      } else if ((user?.role || '').toUpperCase() === 'ADMIN') {
         navigate('/admin', { replace: true });
       } else {
         navigate('/', { replace: true });
       }
     }
-  }, [isLoggedIn, user, navigate]);
+  }, [isLoggedIn, user, navigate, location]);
 
   const [form, setForm] = useState({ userName: '', passwordHash: '' });
 
@@ -52,13 +55,10 @@ export default function Login() {
     }
     
     addToast('Chào mừng bạn quay trở lại!', 'success');
-    // Chuyển hướng theo role đã được xử lý ở useEffect, 
-    // nhưng vẫn để ở đây để chuyển hướng ngay lập tức sau login thành công
-    if (result.role === 'admin') {
-      navigate('/admin');
-    } else {
-      navigate('/');
-    }
+    
+    // Nếu có trang trước đó đang chờ (ví dụ trang booking), quay lại đó
+    const from = location.state?.from?.pathname || (result.role === 'admin' ? '/admin' : '/');
+    navigate(from, { replace: true });
   };
 
   return (
