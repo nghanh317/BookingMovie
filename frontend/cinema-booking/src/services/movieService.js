@@ -10,8 +10,10 @@ import { MOVIES } from '../constants/mockData';
  * Chuẩn hóa response từ backend về cấu trúc mà frontend đang dùng.
  * Điều chỉnh mapping này khi biết chính xác cấu trúc JSON của backend.
  */
-const normalize = (movie) => ({
-  id: movie.id,
+const normalize = (movie) => {
+  if (!movie) return null;
+  return {
+    id: movie.id,
   title: movie.title || movie.movieName || movie.name || '',
   originalTitle: movie.originalTitle || movie.englishName || '',
   poster: movie.poster || movie.posterUrl || movie.imageUrl || '',
@@ -46,7 +48,8 @@ const normalize = (movie) => ({
   })(),
   status: movie.status ? movie.status.toString().toLowerCase() : 'now_showing',
   ageRating: movie.ageRating || movie.age_rating || 'T13',
-});
+  };
+};
 
 const movieService = {
   /** Lấy tất cả phim — GET /api/v1/movies */

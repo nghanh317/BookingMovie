@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { movieService, slotService, cinemaService } from '../../services';
+import { movieService, slotService, cinemaService, provinceService } from '../../services';
 import useLocationStore from '../../store/locationStore';
 
 // Generate 7 days from today
@@ -63,6 +63,7 @@ export default function Booking() {
   const [slotsData, setSlotsData] = useState([]);
   const [cinemasData, setCinemasData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [allProvinces, setAllProvinces] = useState([]);
 
   const [province, setLocalProvince] = useState(selectedProvince || '');
   const [selectedDate, setSelectedDate] = useState(selectedProvince ? DATES[0].value : null);
@@ -72,10 +73,11 @@ export default function Booking() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [movieRes, slotsRes, cinemasRes] = await Promise.all([
+        const [movieRes, slotsRes, cinemasRes, provincesRes] = await Promise.all([
           movieService.getById(movieId),
           slotService.getAll({ movieId, size: 1000 }),
-          cinemaService.getAll()
+          cinemaService.getAll(),
+          provinceService.getAll({ size: 100 })
         ]);
         setMovie(movieRes);
         // Ensure slots are properly loaded from the pageable content or array
@@ -84,6 +86,18 @@ export default function Booking() {
           : (Array.isArray(slotsRes) ? slotsRes : []);
         setSlotsData(slotsContent);
         setCinemasData(cinemasRes);
+        
+        // Handle various possible response formats for provinces
+        let provincesContent = [];
+        if (provincesRes?.content && Array.isArray(provincesRes.content)) {
+          provincesContent = provincesRes.content;
+        } else if (Array.isArray(provincesRes)) {
+          provincesContent = provincesRes;
+        } else if (provincesRes?.data && Array.isArray(provincesRes.data)) {
+          provincesContent = provincesRes.data;
+        }
+        
+        setAllProvinces(provincesContent.filter(p => p && (typeof p === 'object' || typeof p === 'string')));
       } catch (err) {
         console.error("Failed to fetch booking data", err);
       } finally {
@@ -230,12 +244,16 @@ export default function Booking() {
                   className="input-field py-2.5 text-sm font-medium w-full max-w-xs cursor-pointer bg-cinema-surface"
                 >
                   <option value="">Chọn thành phố</option>
-                  {availableProvinces.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
+                  {allProvinces.map((p, idx) => {
+                    const id = p.id || idx;
+                    const name = p.provinceName || p;
+                    return (
+                      <option key={id} value={name}>{name}</option>
+                    );
+                  })}
                 </select>
-                {availableProvinces.length === 0 && (
-                  <p className="text-cinema-muted text-sm mt-2 w-full">Chưa có suất chiếu nào cho phim này.</p>
+                {allProvinces.length === 0 && (
+                  <p className="text-cinema-muted text-sm mt-2 w-full">Đang tải danh sách thành phố...</p>
                 )}
               </div>
             </section>
