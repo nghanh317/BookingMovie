@@ -4,26 +4,6 @@ import { motion } from 'framer-motion';
 import { movieService, slotService, cinemaService, provinceService } from '../../services';
 import useLocationStore from '../../store/locationStore';
 
-// Generate 7 days from today
-const DATES = Array.from({ length: 7 }, (_, i) => {
-  const d = new Date();
-  d.setDate(d.getDate() + i);
-  
-  // Localized YYYY-MM-DD
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const dayNum = String(d.getDate()).padStart(2, '0');
-  const dateValue = `${year}-${month}-${dayNum}`;
-
-  return {
-    value: dateValue,
-    day: d.toLocaleDateString('vi-VN', { weekday: 'short' }),
-    date: d.getDate(),
-    month: d.getMonth() + 1,
-    isToday: i === 0,
-  };
-});
-
 const FORMAT_STYLE = {
   '2D':   'border-cinema-border text-cinema-muted hover:border-primary hover:text-primary',
   '3D':   'border-blue-500/40 text-blue-400 hover:border-blue-400',
@@ -73,7 +53,7 @@ export default function Booking() {
   const [allProvinces, setAllProvinces] = useState([]);
 
   const [province, setLocalProvince] = useState(selectedProvince || '');
-  const [selectedDate, setSelectedDate] = useState(selectedProvince ? DATES[0].value : null);
+  const [selectedDate, setSelectedDate] = useState(null);
   const [selectedShowtime, setSelectedShowtime] = useState(null);
 
   useEffect(() => {
@@ -87,29 +67,16 @@ export default function Booking() {
           provinceService.getAll({ size: 100 })
         ]);
         setMovie(movieRes);
-        // Ensure slots are properly loaded from the pageable content or array
-        const slotsContent = slotsRes?.content 
-          ? (Array.isArray(slotsRes.content) ? slotsRes.content : [])
-          : (Array.isArray(slotsRes) ? slotsRes : []);
+        const slotsContent = slotsRes?.data || slotsRes?.content || (Array.isArray(slotsRes) ? slotsRes : []);
         setSlotsData(slotsContent);
         setCinemasData(cinemasRes);
         
-        // Handle various possible response formats for provinces
-        let provincesContent = [];
-        if (provincesRes?.content && Array.isArray(provincesRes.content)) {
-          provincesContent = provincesRes.content;
-        } else if (Array.isArray(provincesRes)) {
-          provincesContent = provincesRes;
-        } else if (provincesRes?.data && Array.isArray(provincesRes.data)) {
-          provincesContent = provincesRes.data;
-        }
+        const provincesContent = provincesRes?.data || provincesRes?.content || (Array.isArray(provincesRes) ? provincesRes : []);
         
         setAllProvinces(provincesContent.filter(p => p && (typeof p === 'object' || typeof p === 'string')));
 
         console.log('[Booking] Movie ID:', movieId);
-        console.log('[Booking] Movie Data:', movieRes);
         console.log('[Booking] Slots Data:', slotsContent);
-        console.log('[Booking] All Provinces:', provincesContent);
       } catch (err) {
         console.error("Failed to fetch booking data", err);
       } finally {
@@ -119,17 +86,23 @@ export default function Booking() {
     fetchData();
   }, [movieId]);
 
-  // Transform backend Slots to UI Showtimes
   const showtimes = useMemo(() => {
     if (!Array.isArray(slotsData)) return [];
     return slotsData.map(s => {
-      // Robustly extract date and time
       const showTimeStr = s.showTime || '';
-      const datePart = showTimeStr.slice(0, 10);
+      let datePart = showTimeStr.split(' ')[0] || ''; 
       const timePart = showTimeStr.includes(' ') 
         ? showTimeStr.split(' ')[1] 
         : (showTimeStr.includes('T') ? showTimeStr.split('T')[1] : '');
       const time = timePart ? timePart.slice(0, 5) : '';
+      
+      if (datePart.includes('-')) {
+        const parts = datePart.split('-');
+        if (parts[0].length === 2) {
+          datePart = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+      }
+
       const type = s.roomName?.includes('IMAX') ? 'IMAX' : (s.roomName?.includes('3D') ? '3D' : '2D');
       return {
         id: s.id,
@@ -147,7 +120,46 @@ export default function Booking() {
     });
   }, [slotsData]);
 
-  // Unique provinces derived from the fetched slots
+  const dates = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const defaultDates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() + i);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const dayNum = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${dayNum}`;
+    });
+
+    const showtimeDates = [...new Set(showtimes.map(s => s.date))].filter(Boolean);
+    const allUniqueDates = [...new Set([...defaultDates, ...showtimeDates])].sort();
+
+    return allUniqueDates.map(dateStr => {
+      const d = new Date(dateStr);
+      const isToday = dateStr === defaultDates[0];
+      return {
+        value: dateStr,
+        day: d.toLocaleDateString('vi-VN', { weekday: 'short' }),
+        date: d.getDate(),
+        month: d.getMonth() + 1,
+        isToday
+      };
+    });
+  }, [showtimes]);
+
+  useEffect(() => {
+    if (!selectedDate && dates.length > 0 && province) {
+      const firstAvailableDate = dates.find(d => showtimes.some(s => s.date === d.value && s.provinceName === province));
+      if (firstAvailableDate) {
+        setSelectedDate(firstAvailableDate.value);
+      } else {
+        setSelectedDate(dates[0].value);
+      }
+    }
+  }, [dates, province, selectedDate, showtimes]);
+
   const availableProvinces = useMemo(() => {
     const provs = showtimes.map(s => s.provinceName).filter(Boolean);
     return [...new Set(provs)];
@@ -190,8 +202,8 @@ export default function Booking() {
     setSelectedShowtime(null);
     if (!p) {
       setSelectedDate(null);
-    } else if (!selectedDate) {
-      setSelectedDate(DATES[0].value);
+    } else if (!selectedDate && dates.length > 0) {
+      setSelectedDate(dates[0].value);
     }
   };
 
@@ -294,7 +306,7 @@ export default function Booking() {
                 </div>
               ) : (
                 <div className="flex gap-2 overflow-x-auto pb-2">
-                  {DATES.map(d => {
+                  {dates.map(d => {
                     const hasShowtime = datesWithShowtimes.includes(d.value);
                     return (
                       <button key={d.value} onClick={() => { setSelectedDate(d.value); setSelectedShowtime(null); }}
