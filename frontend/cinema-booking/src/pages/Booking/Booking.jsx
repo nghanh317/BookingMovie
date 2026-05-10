@@ -8,8 +8,15 @@ import useLocationStore from '../../store/locationStore';
 const DATES = Array.from({ length: 7 }, (_, i) => {
   const d = new Date();
   d.setDate(d.getDate() + i);
+  
+  // Localized YYYY-MM-DD
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const dayNum = String(d.getDate()).padStart(2, '0');
+  const dateValue = `${year}-${month}-${dayNum}`;
+
   return {
-    value: d.toISOString().split('T')[0],
+    value: dateValue,
     day: d.toLocaleDateString('vi-VN', { weekday: 'short' }),
     date: d.getDate(),
     month: d.getMonth() + 1,
@@ -98,6 +105,11 @@ export default function Booking() {
         }
         
         setAllProvinces(provincesContent.filter(p => p && (typeof p === 'object' || typeof p === 'string')));
+
+        console.log('[Booking] Movie ID:', movieId);
+        console.log('[Booking] Movie Data:', movieRes);
+        console.log('[Booking] Slots Data:', slotsContent);
+        console.log('[Booking] All Provinces:', provincesContent);
       } catch (err) {
         console.error("Failed to fetch booking data", err);
       } finally {
@@ -111,8 +123,12 @@ export default function Booking() {
   const showtimes = useMemo(() => {
     if (!Array.isArray(slotsData)) return [];
     return slotsData.map(s => {
-      // s.showTime format: "yyyy-MM-dd HH:mm:ss"
-      const [datePart, timePart] = (s.showTime || '').split(' ');
+      // Robustly extract date and time
+      const showTimeStr = s.showTime || '';
+      const datePart = showTimeStr.slice(0, 10);
+      const timePart = showTimeStr.includes(' ') 
+        ? showTimeStr.split(' ')[1] 
+        : (showTimeStr.includes('T') ? showTimeStr.split('T')[1] : '');
       const time = timePart ? timePart.slice(0, 5) : '';
       const type = s.roomName?.includes('IMAX') ? 'IMAX' : (s.roomName?.includes('3D') ? '3D' : '2D');
       return {
@@ -141,17 +157,25 @@ export default function Booking() {
   const datesWithShowtimes = useMemo(() => {
     let relevant = showtimes;
     if (province) {
-      relevant = relevant.filter(s => s.provinceName === province);
+      relevant = relevant.filter(s => {
+        const sProv = (s.provinceName || '').trim().toLowerCase();
+        const selProv = (province || '').trim().toLowerCase();
+        return sProv.includes(selProv) || selProv.includes(sProv);
+      });
     }
     return [...new Set(relevant.map(s => s.date))];
   }, [showtimes, province]);
 
   // Showtimes grouped by cinemaName for selected date & province
   const groupedShowtimes = useMemo(() => {
-    const sts = showtimes.filter(s =>
-      s.provinceName === province &&
-      s.date === selectedDate
-    );
+    if (!province || !selectedDate) return {};
+    
+    const sts = showtimes.filter(s => {
+      const sProv = (s.provinceName || '').trim().toLowerCase();
+      const selProv = (province || '').trim().toLowerCase();
+      const provMatch = sProv.includes(selProv) || selProv.includes(sProv);
+      return provMatch && s.date === selectedDate;
+    });
     const grouped = {};
     sts.forEach(s => {
       if (!grouped[s.cinemaName]) grouped[s.cinemaName] = [];

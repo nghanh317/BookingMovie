@@ -13,12 +13,17 @@ export default function Login() {
 
   // 🛡️ Tự động chuyển hướng nếu đã đăng nhập
   useEffect(() => {
-    if (isLoggedIn) {
+    if (isLoggedIn && user) {
+      console.log('[Login] Auto-redirect check. Role:', user.role);
       const from = location.state?.from?.pathname;
-      if (from) {
-        navigate(from, { replace: true });
-      } else if ((user?.role || '').toUpperCase() === 'ADMIN') {
+      const isAdmin = (user.role || '').toUpperCase().includes('ADMIN');
+
+      if (isAdmin) {
+        console.log('[Login] Admin detected, forcing redirect to /admin');
         navigate('/admin', { replace: true });
+      } else if (from) {
+        console.log('[Login] Redirecting to intended destination:', from);
+        navigate(from, { replace: true });
       } else {
         navigate('/', { replace: true });
       }
@@ -53,12 +58,21 @@ export default function Login() {
       addToast(result.message, 'error');
       return;
     }
-    
+    console.log('[Login] Login success. Result role:', result.role);
     addToast('Chào mừng bạn quay trở lại!', 'success');
     
-    // Nếu có trang trước đó đang chờ (ví dụ trang booking), quay lại đó
-    const from = location.state?.from?.pathname || (result.role === 'admin' ? '/admin' : '/');
-    navigate(from, { replace: true });
+    // Ưu tiên Admin về dashboard, sau đó mới đến trang cũ hoặc Home
+    const from = location.state?.from?.pathname;
+    const isAdmin = (result.role || '').toUpperCase().includes('ADMIN');
+
+    if (isAdmin) {
+      console.log('[Login] Admin detected in handleSubmit, going to /admin');
+      navigate('/admin', { replace: true });
+    } else if (from) {
+      navigate(from, { replace: true });
+    } else {
+      navigate('/', { replace: true });
+    }
   };
 
   return (

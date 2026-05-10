@@ -1,18 +1,23 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CINEMAS, CINEMA_ROOMS, PROVINCES } from '../../constants/mockData';
+import { cinemaService, provinceService } from '../../services';
 import useNotificationStore from '../../store/notificationStore';
+import { useEffect } from 'react';
 
 // ── Cinema Modal (Add / Edit) ─────────────────────────────
-function CinemaModal({ initialData, onClose, onSave }) {
+function CinemaModal({ initialData, onClose, onSave, provinces = [] }) {
   const isEdit = !!initialData;
   const [form, setForm] = useState(
-    initialData || { name: '', address: '', city: '', province: '', image: '', rating: 0 }
+    initialData || { cinemaName: '', address: '', provinceName: '', image: '', rating: 0, provinceId: '' }
   );
 
   const handleSave = () => {
-    if (!form.name || !form.province || !form.address) return;
-    onSave({ ...form, id: isEdit ? form.id : Date.now(), city: form.province, rating: Number(form.rating) || 0 });
+    if (!form.cinemaName || !form.provinceName || !form.address) return;
+    onSave({ 
+      ...form, 
+      id: isEdit ? form.id : undefined,
+      provinceId: provinces.find(p => p.provinceName === form.provinceName)?.id || form.provinceId
+    });
     onClose();
   };
 
@@ -28,13 +33,13 @@ function CinemaModal({ initialData, onClose, onSave }) {
         <div className="space-y-4">
           <div>
             <label className="text-cinema-muted text-xs mb-1 block">Tên Rạp *</label>
-            <input className="input-field" placeholder="VD: CGV Vincom Center" value={form.name} onChange={e => f('name', e.target.value)} />
+            <input className="input-field" placeholder="VD: CGV Vincom Center" value={form.cinemaName} onChange={e => f('cinemaName', e.target.value)} />
           </div>
           <div>
             <label className="text-cinema-muted text-xs mb-1 block">Tỉnh / Thành Phố *</label>
-            <select className="input-field cursor-pointer" value={form.province} onChange={e => f('province', e.target.value)}>
+            <select className="input-field cursor-pointer" value={form.provinceName} onChange={e => f('provinceName', e.target.value)}>
               <option value="">Chọn tỉnh thành...</option>
-              {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+              {Array.isArray(provinces) && provinces.map(p => <option key={p.id} value={p.provinceName}>{p.provinceName}</option>)}
             </select>
           </div>
           <div>
@@ -57,16 +62,41 @@ function CinemaModal({ initialData, onClose, onSave }) {
 
 // ── Main Component ─────────────────────────────────────────
 export default function AdminCinemas() {
-  const [cinemas, setCinemas] = useState(CINEMAS);
-  const [rooms, setRooms] = useState(CINEMA_ROOMS);
+  const [cinemas, setCinemas] = useState([]);
+  const [allProvinces, setAllProvinces] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   const [search, setSearch] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('all');
 
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [cinemasRes, provincesRes] = await Promise.all([
+          cinemaService.getAll(),
+          provinceService.getAll({ size: 100 })
+        ]);
+        setCinemas(cinemasRes);
+        const provs = provincesRes?.content || (Array.isArray(provincesRes) ? provincesRes : []);
+        setAllProvinces(provs);
+      } catch (err) {
+        console.error('Failed to fetch admin cinemas data', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
   const filteredCinemas = useMemo(() => {
     return cinemas.filter(c => {
-      const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.address.toLowerCase().includes(search.toLowerCase());
-      const matchProvince = provinceFilter === 'all' || c.province === provinceFilter;
+      const name = c.cinemaName || c.name || '';
+      const address = c.address || '';
+      const prov = c.provinceName || c.province || '';
+      
+      const matchSearch = name.toLowerCase().includes(search.toLowerCase()) || address.toLowerCase().includes(search.toLowerCase());
+      const matchProvince = provinceFilter === 'all' || prov === provinceFilter;
       return matchSearch && matchProvince;
     });
   }, [cinemas, search, provinceFilter]);
@@ -74,8 +104,9 @@ export default function AdminCinemas() {
   const groupedCinemas = useMemo(() => {
     const map = {};
     filteredCinemas.forEach(c => {
-      if (!map[c.province]) map[c.province] = [];
-      map[c.province].push(c);
+      const prov = c.provinceName || c.province || 'Khác';
+      if (!map[prov]) map[prov] = [];
+      map[prov].push(c);
     });
     return map;
   }, [filteredCinemas]);
@@ -103,33 +134,16 @@ export default function AdminCinemas() {
     }
   };
 
-  const handleAddRoom = (cinemaId) => {
-    if (!roomForm.name || !roomForm.format) return;
-    const std = parseInt(roomForm.seatsStandard) || 0;
-    const vip = parseInt(roomForm.seatsVIP) || 0;
-    const couple = parseInt(roomForm.seatsCouple) || 0;
-    const newRoom = {
-      id: Date.now(),
-      cinemaId,
-      name: roomForm.name,
-      format: roomForm.format,
-      roomType: roomForm.roomType,
-      seatsStandard: std,
-      seatsVIP: vip,
-      seatsCouple: couple,
-      totalSeats: std + vip + couple
-    };
-    setRooms(prev => [...prev, newRoom]);
-    setRoomForm({ name: '', format: '2D', roomType: 'Standard', seatsStandard: 50, seatsVIP: 30, seatsCouple: 20 });
-    setShowRoomForm(null);
-    const cinema = cinemas.find(c => c.id === cinemaId);
-    addNotification({ title: 'Thành công', message: `Đã thêm phòng chiếu "${roomForm.name}" cho rạp ${cinema?.name}`, type: 'success', isAdmin: true });
+  const handleAddRoom = async (cinemaId) => {
+    // Note: In a real app, we would call a roomService to save to backend
+    // For now, we update local state if needed or show a notification
+    addNotification({ title: 'Thông tin', message: 'Tính năng quản lý phòng đang được đồng bộ với backend...', type: 'info', isAdmin: true });
   };
 
   const startEditRoom = (room) => {
     setEditingRoomId(room.id);
     setEditRoomForm({ 
-      format: room.format, 
+      format: room.format || '2D', 
       roomType: room.roomType || 'Standard', 
       seatsStandard: room.seatsStandard || 0, 
       seatsVIP: room.seatsVIP || 0, 
@@ -138,22 +152,8 @@ export default function AdminCinemas() {
   };
 
   const saveEditRoom = () => {
-    const std = parseInt(editRoomForm.seatsStandard) || 0;
-    const vip = parseInt(editRoomForm.seatsVIP) || 0;
-    const couple = parseInt(editRoomForm.seatsCouple) || 0;
-    setRooms(prev => prev.map(r => r.id === editingRoomId ? { 
-      ...r, 
-      format: editRoomForm.format, 
-      roomType: editRoomForm.roomType,
-      seatsStandard: std,
-      seatsVIP: vip,
-      seatsCouple: couple,
-      totalSeats: std + vip + couple 
-    } : r));
     setEditingRoomId(null);
-    const room = rooms.find(r => r.id === editingRoomId);
-    const cinema = cinemas.find(c => c.id === room?.cinemaId);
-    addNotification({ title: 'Thành công', message: `Đã cập nhật phòng chiếu "${room?.name}" tại ${cinema?.name}`, type: 'success', isAdmin: true });
+    addNotification({ title: 'Thông tin', message: 'Tính năng sửa phòng đang được đồng bộ với backend...', type: 'info', isAdmin: true });
   };
 
   const openAddModal = () => { setEditingCinema(null); setShowModal(true); };
@@ -199,14 +199,19 @@ export default function AdminCinemas() {
           className="input-field max-w-[200px] cursor-pointer bg-cinema-surface"
         >
           <option value="all">Tất cả khu vực</option>
-          {PROVINCES.map(p => (
-            <option key={p} value={p}>{p}</option>
+          {Array.isArray(allProvinces) && allProvinces.map(p => (
+            <option key={p.id} value={p.provinceName}>{p.provinceName}</option>
           ))}
         </select>
       </div>
 
       <div className="space-y-4">
-        {Object.keys(groupedCinemas).length > 0 ? Object.entries(groupedCinemas).map(([province, groupCinemas]) => (
+        {loading ? (
+          <div className="text-center py-20">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-primary mx-auto mb-4"></div>
+            <p className="text-cinema-muted">Đang tải danh sách rạp phim...</p>
+          </div>
+        ) : Object.keys(groupedCinemas).length > 0 ? Object.entries(groupedCinemas).map(([province, groupCinemas]) => (
           <div key={province} className="mb-8">
             <h3 className="font-heading font-bold text-white text-xl mb-4 pl-2 border-l-4 border-primary">{province}</h3>
             <div className="space-y-4">
@@ -238,7 +243,7 @@ export default function AdminCinemas() {
                   </button>
                 </div>
                 <div className="flex items-center gap-2 text-cinema-muted ml-2 border-l border-cinema-border pl-4">
-                  <span className="text-sm">{rooms.filter(r => r.cinemaId === cinema.id).length} phòng chiếu</span>
+                  <span className="text-sm">{(cinema.rooms || []).length} phòng chiếu</span>
                   <svg className={`w-5 h-5 transition-transform ${expandedCinemaId === cinema.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -301,11 +306,11 @@ export default function AdminCinemas() {
                     )}
 
                     <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {rooms.filter(r => r.cinemaId === cinema.id).map(room => (
+                      {(cinema.rooms || []).map(room => (
                         <div key={room.id} className="bg-cinema-card p-3 rounded-lg border border-cinema-border">
                           {editingRoomId === room.id ? (
                             <div className="space-y-2">
-                              <p className="text-white font-semibold text-sm">{room.name}</p>
+                              <p className="text-white font-semibold text-sm">{room.roomName || room.name}</p>
                               <div className="flex gap-2">
                                 <select value={editRoomForm.format} onChange={e => setEditRoomForm({...editRoomForm, format: e.target.value})} className="input-field py-1 text-xs w-20">
                                   {['2D', '3D', 'IMAX', '4DX'].map(f => <option key={f} value={f}>{f}</option>)}
@@ -330,12 +335,12 @@ export default function AdminCinemas() {
                           ) : (
                             <div className="flex justify-between items-start">
                               <div>
-                                <h5 className="text-white font-semibold text-sm">{room.name}</h5>
-                                <p className="text-cinema-muted text-xs mt-1">Định dạng: <span className="text-white">{room.format}</span> - <span className="text-primary">{room.roomType || 'Standard'}</span></p>
+                                <h5 className="text-white font-semibold text-sm">{room.roomName || room.name}</h5>
+                                <p className="text-cinema-muted text-xs mt-1">Định dạng: <span className="text-white">{room.format || '2D'}</span> - <span className="text-primary">{room.roomType || 'Standard'}</span></p>
                                 <p className="text-cinema-muted text-xs mt-1">
                                   Ghế: {room.seatsStandard || 0} Thường, {room.seatsVIP || 0} VIP, {room.seatsCouple || 0} Đôi
                                 </p>
-                                <p className="text-cinema-muted text-xs mt-0.5">Tổng ghế: <span className="text-white font-medium">{room.totalSeats}</span></p>
+                                <p className="text-cinema-muted text-xs mt-0.5">Tổng ghế: <span className="text-white font-medium">{room.totalSeats || (Number(room.seatsStandard || 0) + Number(room.seatsVIP || 0) + Number(room.seatsCouple || 0))}</span></p>
                               </div>
                               <button onClick={() => startEditRoom(room)} className="text-cinema-muted hover:text-primary text-xs">
                                 ✏️
@@ -361,7 +366,12 @@ export default function AdminCinemas() {
       </div>
 
       {showModal && (
-        <CinemaModal initialData={editingCinema} onClose={() => setShowModal(false)} onSave={handleSaveCinema} />
+        <CinemaModal 
+          initialData={editingCinema} 
+          onClose={() => setShowModal(false)} 
+          onSave={handleSaveCinema}
+          provinces={allProvinces}
+        />
       )}
     </div>
   );
