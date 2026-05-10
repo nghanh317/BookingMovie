@@ -36,7 +36,7 @@ public class PromotionService implements IPromotionService{
 		
 		List<PromotionDTO> dtos = modelMapper.map(
 				promotionPage.getContent(),
-				new TypeToken <List<Promotions>>() {}.getType());
+				new TypeToken <List<PromotionDTO>>() {}.getType());
 		Page<PromotionDTO> dtoPage = new PageImpl<>(dtos, pageable, promotionPage.getTotalElements());
 		return dtoPage;
 	}

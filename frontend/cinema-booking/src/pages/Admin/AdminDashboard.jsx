@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { CINEMAS, SHOWTIMES } from '../../constants/mockData';
-import { movieService } from '../../services';
+import { movieService, cinemaService } from '../../services';
 
 const RECENT_BOOKINGS = [
   { id: 'CB2F4A9K', user: 'Nguyễn Văn An', movie: 'Avengers: Secret Wars', seats: 2, total: 260000, time: '2 phút trước', status: 'confirmed' },
@@ -36,14 +35,16 @@ function StatCard({ stat, index }) {
 
 export default function AdminDashboard() {
   const [movies, setMovies] = useState([]);
+  const [cinemas, setCinemas] = useState([]);
 
   useEffect(() => {
     movieService.getAll().then(setMovies);
+    cinemaService.getAll().then(setCinemas);
   }, []);
 
   const STATS = [
     { label: 'Tổng phim', value: movies.length, icon: '🎬', change: '+2 tháng này', color: 'border-blue-500/30 bg-blue-500/5' },
-    { label: 'Rạp chiếu phim', value: CINEMAS.length, icon: '🏟️', change: 'Đang hoạt động', color: 'border-green-500/30 bg-green-500/5' },
+    { label: 'Rạp chiếu phim', value: cinemas.length, icon: '🏟️', change: 'Đang hoạt động', color: 'border-green-500/30 bg-green-500/5' },
     { label: 'Vé đã bán hôm nay', value: 247, icon: '🎟️', change: '+18% so hôm qua', color: 'border-primary/30 bg-primary/5' },
     { label: 'Doanh thu hôm nay', value: '24.7M', icon: '💰', change: '+12% so hôm qua', color: 'border-accent/30 bg-accent/5' },
   ];

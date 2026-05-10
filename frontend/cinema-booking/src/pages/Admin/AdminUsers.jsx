@@ -38,15 +38,14 @@ export default function AdminUsers() {
   useEffect(() => {
     setLoading(true);
     accountService.getAll()
-      .then((data) => {
-        // Nếu data từ backend không rỗng thì dùng, ngược lại fallback
-        if (Array.isArray(data) && data.length > 0) {
-          // Normalize: backend có thể dùng fullName thay vì name
+      .then((res) => {
+        const data = res?.content || (Array.isArray(res) ? res : []);
+        if (data.length > 0) {
           const normalized = data.map(u => ({
             ...u,
-            name: u.name || u.fullName || u.userName || '',
+            name: u.name || u.fullName || u.userName || 'Ẩn danh',
             joinDate: u.joinDate || u.createDate || '',
-            bookings: u.bookings || (u.tickets?.length ?? 0),
+            bookings: u.bookings || 0,
             spent: u.spent || 0,
             level: u.level || 'Bronze',
             points: u.points || 0,
@@ -57,7 +56,11 @@ export default function AdminUsers() {
           setUsers(MOCK_USERS);
         }
       })
-      .catch(() => setUsers(MOCK_USERS))
+      .catch((err) => {
+        console.error("Failed to fetch accounts:", err);
+        addToast('Không thể kết nối API người dùng, đang hiển thị dữ liệu mẫu.', 'warn');
+        setUsers(MOCK_USERS);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -67,7 +70,7 @@ export default function AdminUsers() {
     return matchSearch && matchLevel;
   });
 
-  const { addNotification } = useNotificationStore();
+  const { addNotification, addToast } = useNotificationStore();
 
   const toggleStatus = (id) => {
     const user = users.find(u => u.id === id);

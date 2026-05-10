@@ -102,13 +102,21 @@ export default function AdminCinemas() {
   }, [cinemas, search, provinceFilter]);
 
   const groupedCinemas = useMemo(() => {
-    const map = {};
-    filteredCinemas.forEach(c => {
-      const prov = c.provinceName || c.province || 'Khác';
-      if (!map[prov]) map[prov] = [];
-      map[prov].push(c);
-    });
-    return map;
+    try {
+      const map = {};
+      if (!Array.isArray(filteredCinemas)) return map;
+      
+      filteredCinemas.forEach(c => {
+        if (!c) return;
+        const prov = c.provinceName || c.province || 'Khác';
+        if (!map[prov]) map[prov] = [];
+        map[prov].push(c);
+      });
+      return map;
+    } catch (e) {
+      console.error("Error grouping cinemas:", e);
+      return {};
+    }
   }, [filteredCinemas]);
 
   const [expandedCinemaId, setExpandedCinemaId] = useState(null);

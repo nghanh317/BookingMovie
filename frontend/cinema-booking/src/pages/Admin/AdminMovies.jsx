@@ -172,8 +172,10 @@ export default function AdminMovies() {
 
   const { addNotification, addToast } = useNotificationStore();
 
-  const filtered = movies.filter(m => {
-    const matchSearch = m.title.toLowerCase().includes(search.toLowerCase());
+  const filtered = (Array.isArray(movies) ? movies : []).filter(m => {
+    if (!m) return false;
+    const title = m.title || '';
+    const matchSearch = title.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === 'all' || m.status === filterStatus;
     return matchSearch && matchStatus;
   });

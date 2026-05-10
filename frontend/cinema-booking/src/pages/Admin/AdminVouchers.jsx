@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { VOUCHERS } from '../../constants/mockData';
+import { VOUCHERS as MOCK_VOUCHERS } from '../../constants/mockData';
 import useNotificationStore from '../../store/notificationStore';
 import DatePickerInput from '../../components/ui/DatePickerInput';
+import promotionService from '../../services/promotionService';
 
 const TYPE_LABEL = { percent: 'Phần trăm', fixed: 'Số tiền cố định' };
 
@@ -11,8 +12,16 @@ function fmt(n) {
 }
 function fmtDate(d) {
   if (!d) return '—';
-  const [y, m, day] = d.split('-');
-  return `${day}/${m}/${y}`;
+  const datePart = String(d).split(' ')[0].split('T')[0];
+  const parts = datePart.split(/[-/]/);
+  if (parts.length < 3) return d;
+  
+  // Nếu là yyyy-mm-dd
+  if (parts[0].length === 4) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  // Nếu là dd-mm-yyyy hoặc dd/mm/yyyy
+  return `${parts[0]}/${parts[1]}/${parts[2]}`;
 }
 
 // ── Add Modal ──────────────────────────────────────────────
@@ -293,11 +302,69 @@ function EditVoucherModal({ voucher, onClose, onSave }) {
 
 // ── Main Component ─────────────────────────────────────────
 export default function AdminVouchers() {
-  const [vouchers, setVouchers] = useState(VOUCHERS);
+  const [vouchers, setVouchers] = useState(MOCK_VOUCHERS);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState(null);
+
+  const { addNotification, addToast } = useNotificationStore();
+
+  useEffect(() => {
+    setLoading(true);
+    promotionService.getAll()
+      .then((res) => {
+        console.log("Raw promotions response:", res);
+        // Cấu trúc thực tế: { data: [...] }
+        const data = res?.data || res?.content || (Array.isArray(res) ? res : []);
+        
+        if (data.length > 0) {
+          const normalized = data.map(v => ({
+            ...v,
+            id: v.id,
+            code: v.promotionCode || v.code || 'NO_CODE',
+            name: v.promotionName || v.name || v.description || '',
+            type: String(v.discountType || v.type || '').toLowerCase().includes('percent') ? 'percent' : 'fixed',
+            value: v.discountValue || v.value || 0,
+            maxDiscount: v.maxDiscountAmount || v.maxDiscount || 0,
+            minOrder: v.minOrderAmount || v.minOrder || 0,
+            desc: v.description || v.desc || '',
+            // Định dạng từ BE: dd-MM-yyyy HH:mm:ss -> cần đổi sang yyyy-MM-dd để dùng DatePicker
+            startDate: formatBEToISO(v.startDate),
+            expiry: formatBEToISO(v.endDate || v.expiry),
+            stock: v.usageLimit || v.stock || 0,
+            usedCount: v.usageCount || v.usedCount || 0,
+            usesPerUser: v.usagePerUser || v.usesPerUser || 1,
+            active: String(v.status || '').toLowerCase() === 'active',
+            pointCost: v.pointCost || 0,
+          }));
+          setVouchers(normalized);
+        } else {
+          setVouchers([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch vouchers:", err);
+        addToast('Lỗi kết nối API Voucher.', 'error');
+        setVouchers(MOCK_VOUCHERS);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Helper để đổi dd-MM-yyyy sang yyyy-MM-dd
+  const formatBEToISO = (str) => {
+    if (!str || typeof str !== 'string') return '';
+    const datePart = str.split(' ')[0]; // dd-MM-yyyy
+    const parts = datePart.split('-');
+    if (parts.length === 3) {
+      // Nếu là dd-MM-yyyy
+      if (parts[0].length === 2) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      // Nếu đã là yyyy-MM-dd
+      return datePart;
+    }
+    return '';
+  };
 
   const filtered = vouchers.filter(v => {
     const matchSearch = v.code.toLowerCase().includes(search.toLowerCase()) ||
@@ -307,7 +374,7 @@ export default function AdminVouchers() {
     return matchSearch && matchStatus;
   });
 
-  const { addNotification } = useNotificationStore();
+
 
   const toggleActive = (id) => {
     const v = vouchers.find(x => x.id === id);
@@ -341,6 +408,14 @@ export default function AdminVouchers() {
     expired: vouchers.filter(v => new Date(v.expiry) < new Date()).length,
     pointBased: vouchers.filter(v => v.pointCost > 0).length,
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

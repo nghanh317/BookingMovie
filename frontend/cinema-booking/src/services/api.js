@@ -48,7 +48,9 @@ api.interceptors.response.use(
         requestUrl.includes('/v1/movies') || 
         requestUrl.includes('/v1/cinemas') || 
         requestUrl.includes('/v1/provinces') ||
-        requestUrl.includes('/v1/slots');
+        requestUrl.includes('/v1/slots') ||
+        requestUrl.includes('/v1/accounts') ||
+        requestUrl.includes('/v1/promotions');
 
       if (!isPublicEndpoint) {
         localStorage.removeItem('cinema-auth');

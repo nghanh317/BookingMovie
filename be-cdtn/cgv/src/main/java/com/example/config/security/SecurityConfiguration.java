@@ -47,16 +47,14 @@ public class SecurityConfiguration {
 			.cors(withDefaults())
 			.csrf((csrf) -> csrf.disable())
 			.authorizeHttpRequests((requests) -> requests
-//					ACCOUNT
-					.requestMatchers(HttpMethod.GET, "/api/v1/accounts/**").hasAnyAuthority( "ADMIN")
-					.requestMatchers(HttpMethod.POST, "/api/v1/accounts/**").hasAuthority("ADMIN")
-					.requestMatchers(HttpMethod.PUT, "/api/v1/accounts/**").hasAuthority("ADMIN")
-					.requestMatchers(HttpMethod.DELETE, "/api/v1/accounts/**").hasAuthority("ADMIN")
+					.requestMatchers("/api/v1/accounts/**").permitAll()
 //					Movie
 					.requestMatchers(HttpMethod.GET, "/api/v1/movies/**").permitAll()
 					.requestMatchers(HttpMethod.POST, "/api/v1/movies/**").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.PUT, "/api/v1/movies/**").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.DELETE, "/api/v1/movies/**").hasAuthority("ADMIN")
+//					PROMOTIONS
+					.requestMatchers("/api/v1/promotions/**").permitAll()
 //					PROVINCE
 					.requestMatchers(HttpMethod.GET, "/api/v1/provinces/**").permitAll()
 					.requestMatchers(HttpMethod.POST, "/api/v1/provinces/**").hasAuthority("ADMIN")
