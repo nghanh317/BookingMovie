@@ -47,6 +47,8 @@ public class SecurityConfiguration {
 			.cors(withDefaults())
 			.csrf((csrf) -> csrf.disable())
 			.authorizeHttpRequests((requests) -> requests
+					//Chatbot AI - ưu tiên cao nhất
+					.requestMatchers("/api/v1/ai/**").permitAll()
 					.requestMatchers("/api/v1/accounts/**").permitAll()
 //					Movie
 					.requestMatchers(HttpMethod.GET, "/api/v1/movies/**").permitAll()

@@ -35,6 +35,7 @@ import AdminCinemas from './pages/Admin/AdminCinemas';
 import AdminUsers from './pages/Admin/AdminUsers';
 import AdminRevenue from './pages/Admin/AdminRevenue';
 import AdminVouchers from './pages/Admin/AdminVouchers';
+import AdminProducts from './pages/Admin/AdminProducts';
 
 function App() {
   return (
@@ -96,6 +97,9 @@ function App() {
         } />
         <Route path="/admin/vouchers" element={
           <RequireAdmin><AdminLayout><AdminVouchers /></AdminLayout></RequireAdmin>
+        } />
+        <Route path="/admin/products" element={
+          <RequireAdmin><AdminLayout><AdminProducts /></AdminLayout></RequireAdmin>
         } />
       </Routes>
     </BrowserRouter>

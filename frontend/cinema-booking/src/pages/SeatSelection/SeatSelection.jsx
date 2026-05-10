@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { roomService } from '../../services';
 
 function StepIndicator({ current }) {
-  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
+  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế', 'Chọn bỏng nước', 'Thanh toán'];
   return (
     <div className="flex items-center justify-center gap-0 mb-8 flex-wrap gap-y-2">
       {steps.map((step, i) => (
@@ -259,7 +259,7 @@ export default function SeatSelection() {
                     </div>
                   </div>
                   <button onClick={handleProceed} className="w-full btn-primary text-sm py-2.5">
-                    Thanh Toán →
+                    Tiếp tục →
                   </button>
                 </>
               ) : (

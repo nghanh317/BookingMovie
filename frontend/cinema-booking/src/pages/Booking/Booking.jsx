@@ -16,7 +16,7 @@ const FORMAT_ACTIVE = {
 };
 
 function StepIndicator({ current }) {
-  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
+  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế', 'Chọn bỏng nước', 'Thanh toán'];
   return (
     <div className="flex items-center justify-center gap-0 mb-10">
       {steps.map((step, i) => (

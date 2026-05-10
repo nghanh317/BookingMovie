@@ -7,7 +7,7 @@ import { sendBookingConfirmEmail } from '../../services/emailService';
 import { ticketService, paymentService } from '../../services';
 
 function StepIndicator({ current }) {
-  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
+  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế', 'Chọn bỏng nước', 'Thanh toán'];
   return (
     <div className="flex items-center justify-center gap-0 mb-8 flex-wrap gap-y-2">
       {steps.map((step, i) => (
@@ -230,7 +230,7 @@ export default function Checkout() {
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
-        <StepIndicator current={5} />
+        <StepIndicator current={6} />
 
         <div className="grid md:grid-cols-5 gap-6">
           {/* Left: Form */}

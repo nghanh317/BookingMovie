@@ -3,7 +3,7 @@ import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { productService } from '../../services';
 
-const STEPS = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
+const STEPS = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế', 'Chọn bỏng nước', 'Thanh toán'];
 
 function StepIndicator({ current }) {
   return (
@@ -57,14 +57,20 @@ export default function SnackSelection() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
+        console.log('[SnackSelection] Fetching products...');
         const res = await productService.getAll({ size: 100 });
-        const items = res.content || res || [];
+        console.log('[SnackSelection] API Response:', res);
+        
+        // Handle both Spring Page object and plain array
+        const items = res?.content || (Array.isArray(res) ? res : []);
+        console.log('[SnackSelection] Parsed Items:', items);
+        
         setProducts(items);
         const initQty = {};
         items.forEach(p => initQty[p.id] = 0);
         setQuantities(initQty);
       } catch (err) {
-        console.error("Failed to fetch products", err);
+        console.error("[SnackSelection] Failed to fetch products", err);
       } finally {
         setLoading(false);
       }
@@ -86,8 +92,9 @@ export default function SnackSelection() {
   const setQty = (id, val) => setQuantities(prev => ({ ...prev, [id]: val }));
 
   const getCategoryIcon = (cat) => {
-    if (cat === 'FOOD') return '🍿';
-    if (cat === 'DRINK') return '🥤';
+    const c = (cat || '').toUpperCase();
+    if (c === 'FOOD') return '🍿';
+    if (c === 'DRINK') return '🥤';
     return '🎉';
   };
 
@@ -135,7 +142,7 @@ export default function SnackSelection() {
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
-        <StepIndicator current={4} />
+        <StepIndicator current={5} />
 
         <div className="text-center mb-8">
           <h1 className="font-heading font-extrabold text-3xl text-white mb-2">Chọn Bỏng & Nước 🍿</h1>
@@ -146,7 +153,7 @@ export default function SnackSelection() {
           {/* Left – Items */}
           <div className="lg:col-span-2 space-y-6">
             {CATEGORIES.map(cat => {
-              const items = products.filter(s => s.category === cat.key);
+              const items = products.filter(s => (s.category || '').toUpperCase() === cat.key);
               if (items.length === 0) return null;
               return (
                 <div key={cat.key}>
