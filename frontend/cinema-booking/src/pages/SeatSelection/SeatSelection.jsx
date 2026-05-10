@@ -38,13 +38,19 @@ export default function SeatSelection() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!showtime || !showtime.raw?.roomId) {
+    // Robustly extract roomId from showtime.raw
+    const rId = showtime?.raw?.roomId || showtime?.raw?.room_id || showtime?.roomId;
+    
+    if (!showtime || !rId) {
       setLoading(false);
       return;
     }
     const fetchRoom = async () => {
       try {
-        const data = await roomService.getById(showtime.raw.roomId);
+        const res = await roomService.getById(rId);
+        // Robustly handle response structure
+        const data = res?.data || res;
+        console.log('[SeatSelection] Fetched Room Data:', data);
         setRoomData(data);
       } catch (err) {
         console.error("Failed to fetch room seats", err);
@@ -71,18 +77,26 @@ export default function SeatSelection() {
     if (!roomData || !roomData.seats) return {};
     const grouped = {};
     roomData.seats.forEach(seat => {
-      if (!grouped[seat.seatRow]) grouped[seat.seatRow] = [];
-      grouped[seat.seatRow].push(seat);
+      const row = seat.seatRow || seat.seatsRow || 'A';
+      if (!grouped[row]) grouped[row] = [];
+      grouped[row].push(seat);
     });
     // Sort seats by seatNumber in each row
     Object.keys(grouped).forEach(row => {
-      grouped[row].sort((a, b) => a.seatNumber - b.seatNumber);
+      grouped[row].sort((a, b) => {
+        const numA = a.seatNumber || a.seatsNumber || 0;
+        const numB = b.seatNumber || b.seatsNumber || 0;
+        return numA - numB;
+      });
     });
     return grouped;
   }, [roomData]);
 
   const toggleSeat = (seat) => {
-    if (seat.status !== 'AVAILABLE') return; // backend status is either AVAILABLE or something else
+    // Backend status is often 'active' for available, 'booked' for taken
+    const status = (seat.status || '').toLowerCase();
+    if (status !== 'available' && status !== 'active') return; 
+    
     setSelectedSeats(prev => {
       const isSelected = prev.find(s => s.id === seat.id);
       if (isSelected) return prev.filter(s => s.id !== seat.id);
@@ -93,9 +107,9 @@ export default function SeatSelection() {
   // Determine pricing based on slot price and seat type (Thường/VIP/Ghế đôi)
   const getSeatPrice = (seat) => {
     const basePrice = showtime.price || 75000;
-    const typeName = seat.seatTypesName || '';
-    if (typeName.toLowerCase().includes('vip')) return basePrice + 35000;
-    if (typeName.toLowerCase().includes('đôi') || typeName.toLowerCase().includes('couple')) return basePrice * 2 + 50000;
+    const typeName = (seat.seatTypesName || seat.seatTypeName || seat.typeName || '').toLowerCase();
+    if (typeName.includes('vip')) return basePrice + 35000;
+    if (typeName.includes('đôi') || typeName.includes('couple')) return basePrice * 2 + 50000;
     return basePrice;
   };
 
@@ -106,7 +120,7 @@ export default function SeatSelection() {
     navigate(`/booking/${movieId}/snacks`, {
       state: {
         movie, showtime, cinema,
-        seats: selectedSeats, // Pass array of seat objects { id, seatRow, seatNumber, seatTypesName... }
+        seats: selectedSeats, 
         totalPrice,
       }
     });
@@ -159,10 +173,12 @@ export default function SeatSelection() {
                   <span className="text-cinema-muted text-xs w-5 text-right font-mono">{row}</span>
                   <div className="flex gap-1.5">
                     {seatsByRow[row].map(seat => {
-                      const isUnavailable = seat.status !== 'AVAILABLE';
+                      const status = (seat.status || '').toLowerCase();
+                      const isUnavailable = status !== 'available' && status !== 'active';
                       const isSelected = !!selectedSeats.find(s => s.id === seat.id);
-                      const isVIP = seat.seatTypesName?.toLowerCase().includes('vip');
-                      const isCouple = seat.seatTypesName?.toLowerCase().includes('đôi') || seat.seatTypesName?.toLowerCase().includes('couple');
+                      const typeName = (seat.seatTypesName || seat.seatTypeName || seat.typeName || '').toLowerCase();
+                      const isVIP = typeName.includes('vip');
+                      const isCouple = typeName.includes('đôi') || typeName.includes('couple');
 
                       let seatClass = '';
                       if (isUnavailable) {
@@ -183,10 +199,10 @@ export default function SeatSelection() {
                           whileTap={!isUnavailable ? { scale: 0.9 } : {}}
                           onClick={() => toggleSeat(seat)}
                           disabled={isUnavailable}
-                          title={`${seat.seatRow}${seat.seatNumber} - ${seat.seatTypesName} - ${getSeatPrice(seat).toLocaleString('vi-VN')}đ`}
+                          title={`${seat.seatRow || seat.seatsRow}${seat.seatNumber || seat.seatsNumber} - ${seat.seatTypesName} - ${getSeatPrice(seat).toLocaleString('vi-VN')}đ`}
                           className={`${isCouple ? 'w-9' : 'w-7'} h-7 rounded-t-lg border text-[10px] font-mono transition-all duration-150 flex items-center justify-center ${seatClass}`}
                         >
-                          {isUnavailable ? '✕' : isSelected ? '✓' : seat.seatNumber}
+                          {isUnavailable ? '✕' : isSelected ? '✓' : (seat.seatNumber || seat.seatsNumber)}
                         </motion.button>
                       );
                     })}
@@ -226,7 +242,7 @@ export default function SeatSelection() {
                   <div className="flex flex-wrap gap-1 mb-3">
                     {selectedSeats.map(seat => (
                       <span key={seat.id} className="badge bg-primary text-cinema-black font-bold text-xs">
-                        {seat.seatRow}{seat.seatNumber}
+                        {seat.seatRow || seat.seatsRow}{seat.seatNumber || seat.seatsNumber}
                       </span>
                     ))}
                   </div>
