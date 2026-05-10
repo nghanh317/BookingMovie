@@ -73,6 +73,7 @@ public class SecurityConfiguration {
 					.requestMatchers(HttpMethod.PUT, "/api/v1/rooms/**").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.DELETE, "/api/v1/rooms/**").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.GET, "/api/v1/slots/**").permitAll()
+					.requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
 					
 					//them api dki
 					.requestMatchers("/api/v1/auth/**").permitAll()

@@ -61,13 +61,20 @@ export default function SnackSelection() {
         const res = await productService.getAll({ size: 100 });
         console.log('[SnackSelection] API Response:', res);
         
-        // Handle both Spring Page object and plain array
-        const items = res?.content || (Array.isArray(res) ? res : []);
+        // Handle various response structures: res.content, res.data.content, res.data, or res itself
+        let items = [];
+        if (res?.content) items = res.content;
+        else if (res?.data?.content) items = res.data.content;
+        else if (res?.data && Array.isArray(res.data)) items = res.data;
+        else if (Array.isArray(res)) items = res;
+        
         console.log('[SnackSelection] Parsed Items:', items);
         
         setProducts(items);
         const initQty = {};
-        items.forEach(p => initQty[p.id] = 0);
+        items.forEach(p => {
+          if (p.id) initQty[p.id] = 0;
+        });
         setQuantities(initQty);
       } catch (err) {
         console.error("[SnackSelection] Failed to fetch products", err);
@@ -92,7 +99,8 @@ export default function SnackSelection() {
   const setQty = (id, val) => setQuantities(prev => ({ ...prev, [id]: val }));
 
   const getCategoryIcon = (cat) => {
-    const c = (cat || '').toUpperCase();
+    // Handle both string and object enum formats
+    const c = (typeof cat === 'string' ? cat : (cat?.value || cat?.name || '')).toUpperCase();
     if (c === 'FOOD') return '🍿';
     if (c === 'DRINK') return '🥤';
     return '🎉';
@@ -139,6 +147,8 @@ export default function SnackSelection() {
     );
   }
 
+  const hasAnyProducts = products.length > 0;
+
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
@@ -152,8 +162,20 @@ export default function SnackSelection() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left – Items */}
           <div className="lg:col-span-2 space-y-6">
+            {!hasAnyProducts && (
+              <div className="bg-cinema-surface border border-cinema-border rounded-2xl p-12 text-center">
+                <div className="text-5xl mb-4">🍿</div>
+                <h3 className="text-white text-xl font-bold mb-2">Không tìm thấy sản phẩm nào</h3>
+                <p className="text-cinema-muted mb-6">Hiện tại rạp chưa cập nhật danh sách bỏng nước. Bạn có thể tiếp tục đặt vé!</p>
+                <button onClick={handleSkip} className="btn-secondary">Tiếp tục thanh toán</button>
+              </div>
+            )}
+
             {CATEGORIES.map(cat => {
-              const items = products.filter(s => (s.category || '').toUpperCase() === cat.key);
+              const items = products.filter(s => {
+                const c = (typeof s.category === 'string' ? s.category : (s.category?.value || s.category?.name || '')).toUpperCase();
+                return c === cat.key;
+              });
               if (items.length === 0) return null;
               return (
                 <div key={cat.key}>

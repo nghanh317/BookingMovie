@@ -120,7 +120,13 @@ export default function AdminProducts() {
       console.log('[AdminProducts] Fetching products...');
       const res = await productService.getAll({ size: 1000 });
       console.log('[AdminProducts] API Response:', res);
-      const items = res?.content || (Array.isArray(res) ? res : []);
+      
+      let items = [];
+      if (res?.content) items = res.content;
+      else if (res?.data?.content) items = res.data.content;
+      else if (res?.data && Array.isArray(res.data)) items = res.data;
+      else if (Array.isArray(res)) items = res;
+      
       setProducts(items);
     } catch (err) {
       console.error('[AdminProducts] Failed to fetch products', err);
@@ -165,12 +171,12 @@ export default function AdminProducts() {
   );
 
   const getCategoryBadge = (cat) => {
-    const c = (cat || '').toUpperCase();
+    const c = (typeof cat === 'string' ? cat : (cat?.value || cat?.name || '')).toUpperCase();
     switch(c) {
       case 'FOOD': return <span className="badge bg-orange-500/10 border-orange-500/30 text-orange-400">🍿 Đồ ăn</span>;
       case 'DRINK': return <span className="badge bg-blue-500/10 border-blue-500/30 text-blue-400">🥤 Đồ uống</span>;
       case 'COMBO': return <span className="badge bg-primary/10 border-primary/30 text-primary">🎉 Combo</span>;
-      default: return <span className="badge bg-cinema-border/30 text-cinema-muted">{cat}</span>;
+      default: return <span className="badge bg-cinema-border/30 text-cinema-muted">{c || 'KHÁC'}</span>;
     }
   };
 
