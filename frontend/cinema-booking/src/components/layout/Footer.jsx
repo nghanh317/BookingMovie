@@ -61,7 +61,7 @@ export default function Footer() {
               <FooterLink to="/movies?status=now_showing">Phim Đang Chiếu</FooterLink>
               <FooterLink to="/movies?status=coming_soon">Phim Sắp Chiếu</FooterLink>
               <FooterLink to="/movies">Tất Cả Phim</FooterLink>
-              <FooterLink to="/">Rạp Chiếu Phim</FooterLink>
+              <FooterLink to="/cinemas">Rạp Chiếu Phim</FooterLink>
             </div>
           </div>
 

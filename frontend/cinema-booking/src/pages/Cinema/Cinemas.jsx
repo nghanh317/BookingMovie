@@ -224,15 +224,29 @@ export default function Cinemas() {
   const [cinemasData, setCinemasData] = useState([]);
   const provincesContainerRef = useRef(null);
 
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    movieService.getAll().then(setMoviesData);
-    cinemaService.getAll().then(setCinemasData);
+    setLoading(true);
+    Promise.all([
+      movieService.getAll(),
+      cinemaService.getAll(),
+    ])
+      .then(([movies, cinemas]) => {
+        setMoviesData(movies);
+        setCinemasData(cinemas);
+      })
+      .catch((err) => {
+        console.error('[Cinemas] Failed to load data:', err);
+      })
+      .finally(() => setLoading(false));
   }, []);
+
 
   const availableProvinces = useMemo(() => {
     if (!cinemasData.length) return [];
     const cities = [...new Set(cinemasData.map(c => c.province))].filter(Boolean);
-    return cities.map(name => ({ id: name, name }));
+    return cities; // Trả về mảng string tỉnh thành
   }, [cinemasData]);
 
   useEffect(() => {
@@ -270,6 +284,17 @@ export default function Cinemas() {
     setLocalProvince(p);
     if (p) setProvince(p); else clearProvince();
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-cinema-muted">Đang tải danh sách rạp phim...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen animate-fade-in">
@@ -333,17 +358,17 @@ export default function Cinemas() {
                 >
                   Tất cả
                 </button>
-                {availableProvinces.map(p => (
+                {availableProvinces.map(province => (
                   <button
-                    key={p}
-                    onClick={() => handleProvinceChange(p)}
+                    key={province}
+                    onClick={() => handleProvinceChange(province)}
                     className={`px-4 py-2 rounded-xl border text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                      (localProvince || selectedProvince) === p
+                      (localProvince || selectedProvince) === province
                         ? 'bg-primary border-primary text-cinema-black'
                         : 'border-cinema-border text-cinema-muted hover:border-primary hover:text-primary'
                     }`}
                   >
-                    {p}
+                    {province}
                   </button>
                 ))}
               </div>
