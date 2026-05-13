@@ -75,9 +75,9 @@ public class SecurityConfiguration {
 					.requestMatchers(HttpMethod.GET, "/api/v1/slots/**").permitAll()
 					.requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
 					
-					//them api dki
 					.requestMatchers("/api/v1/auth/**").permitAll()
 					.requestMatchers("/api/v1/tickets/**").permitAll()
+					.requestMatchers("/api/v1/payments/**").permitAll()
 					.requestMatchers("/error").permitAll()
 					.requestMatchers("/api/v1/**").hasAuthority("ADMIN")
 					.anyRequest().authenticated())

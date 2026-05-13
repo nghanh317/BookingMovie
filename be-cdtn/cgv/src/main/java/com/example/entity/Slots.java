@@ -76,7 +76,7 @@ public class Slots implements Serializable{
 	private List<Tickets> tickets;
 	
 	@PrePersist
-	public void prePersists() {
+	public void prePersist() {
 		if (isDeleted == null) {
 			isDeleted = false;
 		}

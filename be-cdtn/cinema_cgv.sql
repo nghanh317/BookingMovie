@@ -17,8 +17,6 @@
 
 --
 -- Table structure for table `accounts`
---
-
 DROP TABLE IF EXISTS `accounts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -98,6 +96,7 @@ CREATE TABLE `cinemas` (
   `status` enum('active','inactive') COLLATE utf8mb4_unicode_ci DEFAULT 'active',
   `phone` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `email` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `image_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `create_at` datetime DEFAULT NULL,
   `is_deleted` tinyint(1) DEFAULT '0',
   PRIMARY KEY (`id`),
