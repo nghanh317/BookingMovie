@@ -23,7 +23,7 @@ import jakarta.validation.Valid;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @RestController
-@RequestMapping(value = "api/v1/auth")
+@RequestMapping(value = "/api/v1/auth")
 @Validated
 public class AuthController {
 

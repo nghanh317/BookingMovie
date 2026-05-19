@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { productService } from '../../services';
+import { SNACK_ITEMS } from '../../constants/mockData';
 
-const STEPS = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế', 'Chọn bỏng nước', 'Thanh toán'];
+const STEPS = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
 
 function StepIndicator({ current }) {
   return (
@@ -50,40 +50,10 @@ export default function SnackSelection() {
   const navigate = useNavigate();
   const { movie, showtime, cinema, seats, totalPrice } = location.state || {};
 
-  const [products, setProducts] = useState([]);
-  const [quantities, setQuantities] = useState({});
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        console.log('[SnackSelection] Fetching products...');
-        const res = await productService.getAll({ size: 100 });
-        console.log('[SnackSelection] API Response:', res);
-        
-        // Handle various response structures: res.content, res.data.content, res.data, or res itself
-        let items = [];
-        if (res?.content) items = res.content;
-        else if (res?.data?.content) items = res.data.content;
-        else if (res?.data && Array.isArray(res.data)) items = res.data;
-        else if (Array.isArray(res)) items = res;
-        
-        console.log('[SnackSelection] Parsed Items:', items);
-        
-        setProducts(items);
-        const initQty = {};
-        items.forEach(p => {
-          if (p.id) initQty[p.id] = 0;
-        });
-        setQuantities(initQty);
-      } catch (err) {
-        console.error("[SnackSelection] Failed to fetch products", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
-  }, []);
+  // quantities: { [snackId]: number }
+  const [quantities, setQuantities] = useState(() =>
+    Object.fromEntries(SNACK_ITEMS.map(s => [s.id, 0]))
+  );
 
   if (!movie || !seats) {
     return (
@@ -98,23 +68,9 @@ export default function SnackSelection() {
 
   const setQty = (id, val) => setQuantities(prev => ({ ...prev, [id]: val }));
 
-  const getCategoryIcon = (cat) => {
-    // Handle both string and object enum formats
-    const c = (typeof cat === 'string' ? cat : (cat?.value || cat?.name || '')).toUpperCase();
-    if (c === 'FOOD') return '🍿';
-    if (c === 'DRINK') return '🥤';
-    return '🎉';
-  };
-
-  const selectedSnacks = products
+  const selectedSnacks = SNACK_ITEMS
     .filter(s => quantities[s.id] > 0)
-    .map(s => ({
-      ...s,
-      icon: getCategoryIcon(s.category),
-      name: s.productName,
-      quantity: quantities[s.id],
-      subtotal: s.price * quantities[s.id]
-    }));
+    .map(s => ({ ...s, quantity: quantities[s.id], subtotal: s.price * quantities[s.id] }));
 
   const snackTotal = selectedSnacks.reduce((sum, s) => sum + s.subtotal, 0);
 
@@ -131,28 +87,15 @@ export default function SnackSelection() {
   };
 
   const CATEGORIES = [
-    { key: 'FOOD', label: '🍿 Bỏng Rang', color: 'from-yellow-500/10 to-orange-500/10 border-yellow-700/30' },
-    { key: 'DRINK', label: '🥤 Nước Uống', color: 'from-blue-500/10 to-cyan-500/10 border-blue-700/30' },
-    { key: 'COMBO', label: '🎉 Combo Tiết Kiệm', color: 'from-primary/10 to-accent/10 border-primary/30' },
+    { key: 'snack', label: '🍿 Bỏng Rang', color: 'from-yellow-500/10 to-orange-500/10 border-yellow-700/30' },
+    { key: 'drink', label: '🥤 Nước Uống', color: 'from-blue-500/10 to-cyan-500/10 border-blue-700/30' },
+    { key: 'combo', label: '🎉 Combo Tiết Kiệm', color: 'from-primary/10 to-accent/10 border-primary/30' },
   ];
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-cinema-muted">Đang tải thông tin bỏng nước...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const hasAnyProducts = products.length > 0;
 
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
-        <StepIndicator current={5} />
+        <StepIndicator current={4} />
 
         <div className="text-center mb-8">
           <h1 className="font-heading font-extrabold text-3xl text-white mb-2">Chọn Bỏng & Nước 🍿</h1>
@@ -162,21 +105,8 @@ export default function SnackSelection() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left – Items */}
           <div className="lg:col-span-2 space-y-6">
-            {!hasAnyProducts && (
-              <div className="bg-cinema-surface border border-cinema-border rounded-2xl p-12 text-center">
-                <div className="text-5xl mb-4">🍿</div>
-                <h3 className="text-white text-xl font-bold mb-2">Không tìm thấy sản phẩm nào</h3>
-                <p className="text-cinema-muted mb-6">Hiện tại rạp chưa cập nhật danh sách bỏng nước. Bạn có thể tiếp tục đặt vé!</p>
-                <button onClick={handleSkip} className="btn-secondary">Tiếp tục thanh toán</button>
-              </div>
-            )}
-
             {CATEGORIES.map(cat => {
-              const items = products.filter(s => {
-                const c = (typeof s.category === 'string' ? s.category : (s.category?.value || s.category?.name || '')).toUpperCase();
-                return c === cat.key;
-              });
-              if (items.length === 0) return null;
+              const items = SNACK_ITEMS.filter(s => s.category === cat.key);
               return (
                 <div key={cat.key}>
                   <h2 className="font-heading font-bold text-white mb-3 text-lg">{cat.label}</h2>
@@ -188,16 +118,14 @@ export default function SnackSelection() {
                         animate={{ opacity: 1, x: 0 }}
                         className={`bg-gradient-to-r ${cat.color} border rounded-xl p-4 flex items-center gap-4 hover:shadow-lg transition-all`}
                       >
-                        <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center bg-cinema-surface rounded-lg text-3xl border border-cinema-border/50">
-                          {item.imageUrl ? <img src={item.imageUrl} alt={item.productName} className="w-full h-full object-cover rounded-lg" /> : getCategoryIcon(item.category)}
-                        </div>
+                        <div className="text-4xl flex-shrink-0">{item.icon}</div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-white font-semibold">{item.productName}</p>
-                          <p className="text-cinema-muted text-xs mt-0.5 line-clamp-1">{item.description}</p>
+                          <p className="text-white font-semibold">{item.name}</p>
+                          <p className="text-cinema-muted text-xs mt-0.5 line-clamp-1">{item.desc}</p>
                           <p className="text-primary font-bold mt-1">{item.price.toLocaleString('vi-VN')}đ</p>
                         </div>
                         <QuantityControl
-                          value={quantities[item.id] || 0}
+                          value={quantities[item.id]}
                           onChange={val => setQty(item.id, val)}
                         />
                       </motion.div>
@@ -216,15 +144,15 @@ export default function SnackSelection() {
               {/* Movie info */}
               <div className="flex gap-3 mb-4 pb-4 border-b border-cinema-border">
                 <img
-                  src={movie.poster || movie.image}
-                  alt={movie.title || movie.name}
+                  src={movie.poster}
+                  alt={movie.title}
                   className="w-12 h-16 object-cover rounded-lg flex-shrink-0"
                   onError={e => { e.target.src = 'https://placehold.co/80x120/1E1E2C/A0A0B4'; }}
                 />
                 <div>
-                  <p className="text-white font-semibold text-sm leading-snug">{movie.title || movie.name}</p>
+                  <p className="text-white font-semibold text-sm leading-snug">{movie.title}</p>
                   {showtime && <p className="text-cinema-muted text-xs mt-1">{showtime.time} · {showtime.type}</p>}
-                  <p className="text-cinema-muted text-xs">Ghế: {seats.map(s => `${s.seatRow}${s.seatNumber}`).join(', ')}</p>
+                  <p className="text-cinema-muted text-xs">Ghế: {seats.join(', ')}</p>
                 </div>
               </div>
 

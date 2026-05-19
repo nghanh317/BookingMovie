@@ -1,40 +1,18 @@
 /**
  * cinemaService.js
  * Quản lý API liên quan đến rạp chiếu phim
- *
- * GET    /api/v1/cinemas          — Danh sách rạp
- * GET    /api/v1/cinemas/{id}     — Chi tiết rạp
- * POST   /api/v1/cinemas          — Thêm rạp mới (Admin)
- * PUT    /api/v1/cinemas/{id}     — Cập nhật rạp (Admin)
- * DELETE /api/v1/cinemas/{id}     — Xoá rạp (Admin)
- *
- * CinemaDTO (backend): {
- *   id, provinceId, provincesName,
- *   cinemaName, address, latitude, longitude, status,
- *   phone, email, createDate,
- *   rooms: [{ id, roomName, roomType, slots: [{ id, showTime, endTime, price }] }]
- * }
  */
 import api from './api';
 import { CINEMAS } from '../constants/mockData';
 
-/**
- * Chuẩn hóa CinemaDTO backend → shape frontend đang dùng
- */
 const normalize = (cinema) => ({
   id: cinema.id,
-  name: cinema.cinemaName || cinema.name || '',
+  name: cinema.name || cinema.cinemaName || '',
   address: cinema.address || cinema.location || '',
-  city: cinema.provincesName || cinema.city || '',
-  province: cinema.provincesName || cinema.province || '',
-  provinceId: cinema.provinceId || null,
+  city: cinema.city || '',
   image: cinema.image || cinema.imageUrl || '',
-  screens: cinema.rooms?.length || parseInt(cinema.screens || cinema.numberOfScreens) || 0,
+  screens: parseInt(cinema.screens || cinema.numberOfScreens) || 0,
   rating: parseFloat(cinema.rating) || 0,
-  phone: cinema.phone || '',
-  email: cinema.email || '',
-  status: cinema.status || 'ACTIVE',
-  rooms: cinema.rooms || [],
 });
 
 const cinemaService = {
@@ -61,19 +39,13 @@ const cinemaService = {
     }
   },
 
-  /**
-   * Thêm rạp (Admin) — POST /api/v1/cinemas
-   * Body: { cinemaName, address, phone, email }
-   */
+  /** Thêm rạp (Admin) — POST /api/v1/cinemas */
   create: async (payload) => {
     const res = await api.post('/v1/cinemas', payload);
     return normalize(res.data);
   },
 
-  /**
-   * Cập nhật rạp (Admin) — PUT /api/v1/cinemas/{id}
-   * Body: { cinemaName, address, phone, email }
-   */
+  /** Cập nhật rạp (Admin) — PUT /api/v1/cinemas/{id} */
   update: async (id, payload) => {
     const res = await api.put(`/v1/cinemas/${id}`, payload);
     return normalize(res.data);

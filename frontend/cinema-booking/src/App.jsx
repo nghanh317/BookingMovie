@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import ScrollToTop from './components/layout/ScrollToTop';
 import { RequireAuth, RequireAdmin } from './components/auth/ProtectedRoute';
-import ToastContainer from './components/ui/ToastContainer';
 
 import Home from './pages/Home/Home';
 import Movies from './pages/Movies/Movies';
@@ -19,6 +18,8 @@ import Offers from './pages/Offers/Offers';
 import CinemaDetail from './pages/Cinema/CinemaDetail';
 import Cinemas from './pages/Cinema/Cinemas';
 import TopMovies from './pages/TopMovies/TopMovies';
+import News from './pages/News/News';
+import NewsDetail from './pages/News/NewsDetail';
 
 // Support pages
 import FAQ from './pages/Support/FAQ';
@@ -35,13 +36,14 @@ import AdminCinemas from './pages/Admin/AdminCinemas';
 import AdminUsers from './pages/Admin/AdminUsers';
 import AdminRevenue from './pages/Admin/AdminRevenue';
 import AdminVouchers from './pages/Admin/AdminVouchers';
-import AdminProducts from './pages/Admin/AdminProducts';
+import AdminTickets from './pages/Admin/AdminTickets';
+import AdminReviews from './pages/Admin/AdminReviews';
+import AdminNews from './pages/Admin/AdminNews';
 
 function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
-      <ToastContainer />
       <Routes>
         {/* ── Public routes ───────────────────────────── */}
         <Route path="/" element={<Layout><Home /></Layout>} />
@@ -51,6 +53,8 @@ function App() {
         <Route path="/cinemas" element={<Layout><Cinemas /></Layout>} />
         <Route path="/cinemas/:id" element={<Layout><CinemaDetail /></Layout>} />
         <Route path="/top-movies" element={<Layout><TopMovies /></Layout>} />
+        <Route path="/news" element={<Layout><News /></Layout>} />
+        <Route path="/news/:id" element={<Layout><NewsDetail /></Layout>} />
         <Route path="/login" element={<Layout><Login /></Layout>} />
         <Route path="/register" element={<Layout><Register /></Layout>} />
         <Route path="/forgot-password" element={<Layout><ForgotPassword /></Layout>} />
@@ -98,8 +102,14 @@ function App() {
         <Route path="/admin/vouchers" element={
           <RequireAdmin><AdminLayout><AdminVouchers /></AdminLayout></RequireAdmin>
         } />
-        <Route path="/admin/products" element={
-          <RequireAdmin><AdminLayout><AdminProducts /></AdminLayout></RequireAdmin>
+        <Route path="/admin/tickets" element={
+          <RequireAdmin><AdminLayout><AdminTickets /></AdminLayout></RequireAdmin>
+        } />
+        <Route path="/admin/reviews" element={
+          <RequireAdmin><AdminLayout><AdminReviews /></AdminLayout></RequireAdmin>
+        } />
+        <Route path="/admin/news" element={
+          <RequireAdmin><AdminLayout><AdminNews /></AdminLayout></RequireAdmin>
         } />
       </Routes>
     </BrowserRouter>

@@ -100,34 +100,6 @@ const useAuthStore = create(
         }
       },
 
-      /**
-       * Đăng ký — gọi POST /api/v1/auth/register
-       * @param {object} params - { userName, passwordHash, email, phone, fullName }
-       * @returns {{ success: boolean, message?: string }}
-       */
-      register: async ({ userName, passwordHash, email, phone, fullName }) => {
-        try {
-          const data = await authService.register({ userName, passwordHash, email, phone, fullName });
-          return { success: true, message: data || 'Đăng ký thành công' };
-        } catch (err) {
-          const isNetworkError =
-            !err.response || err.code === 'ERR_NETWORK' || err.code === 'ECONNREFUSED';
-
-          if (isNetworkError) {
-            return {
-              success: false,
-              message: 'Không thể kết nối với server. Vui lòng thử lại sau.',
-            };
-          }
-
-          const message =
-            err.response?.data?.message ||
-            err.response?.data ||
-            'Đăng ký thất bại. Vui lòng thử lại.';
-          return { success: false, message: String(message) };
-        }
-      },
-
       /** Đăng xuất */
       logout: () => set({ user: null, token: null, isLoggedIn: false }),
 
@@ -135,6 +107,30 @@ const useAuthStore = create(
       isAdmin: () => {
         const { user } = get();
         return (user?.role || '').toUpperCase() === 'ADMIN';
+      },
+
+      /**
+       * Trừ điểm thưởng của user (khi đổi voucher bằng điểm)
+       * @param {number} amount - số điểm cần trừ
+       */
+      spendPoints: (amount) => {
+        const { user } = get();
+        if (!user) return;
+        const currentPoints = user.points || 0;
+        if (currentPoints < amount) return;
+        set({ user: { ...user, points: currentPoints - amount } });
+      },
+
+      /**
+       * Thêm voucher vào danh sách voucher của user (persist qua localStorage)
+       * @param {string} voucherId
+       */
+      addVoucher: (voucherId) => {
+        const { user } = get();
+        if (!user) return;
+        const current = user.myVouchers || [];
+        if (current.includes(voucherId)) return; // tránh trùng
+        set({ user: { ...user, myVouchers: [...current, voucherId] } });
       },
     }),
     {

@@ -52,7 +52,7 @@ public class JWTTokenService implements IJWTTokenService {
         try {
             String userName = Jwts.parser()
                     .setSigningKey(SECRET)
-                    .parseClaimsJws(token.replace(TOKEN_PREFIX, ""))
+                    .parseClaimsJws(token.replace(TOKEN_PREFIX, "").trim())
                     .getBody()
                     .getSubject();
 

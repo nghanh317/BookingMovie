@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { movieService, cinemaService, provinceService, slotService } from '../../services';
+import { useState, useMemo } from 'react';
+import { MOVIES, CINEMAS, SHOWTIMES, CINEMA_ROOMS } from '../../constants/mockData';
 import useNotificationStore from '../../store/notificationStore';
 import DatePickerInput from '../../components/ui/DatePickerInput';
 
@@ -10,98 +10,43 @@ function fmtDate(iso) {
   return `${d}/${m}/${y}`;
 }
 
-// ── Main Component ─────────────────────────────────────────
+function fmtPrice(n) {
+  if (!n && n !== 0) return '';
+  return new Intl.NumberFormat('vi-VN').format(n) + 'đ';
+}
+
+const MOCK_SHOWTIMES = [
+  ...SHOWTIMES,
+  { id: 11, movieId: 1, cinemaId: 2, date: '2026-03-19', time: '14:00', hall: 'Hall B', type: '3D', availableSeats: 55 },
+  { id: 12, movieId: 3, cinemaId: 3, date: '2026-03-20', time: '20:00', hall: 'Screen 1', type: '2D', availableSeats: 90 },
+];
+
+const DEFAULT_SEAT_PRICES = { standard: 75000, vip: 110000, couple: 200000 };
 
 export default function AdminShowtimes() {
-  const [movies, setMovies] = useState([]);
-  const [allCinemas, setAllCinemas] = useState([]);
-  const [allProvinces, setAllProvinces] = useState([]);
-  const [showtimes, setShowtimes] = useState([]);
-  const [loading, setLoading] = useState(true);
-
+  const [showtimes, setShowtimes] = useState(MOCK_SHOWTIMES);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
-    movieId: '', cinemaId: '', roomId: '', date: '', time: '', hall: '', type: '2D', availableSeats: 0
+    movieId: '', cinemaId: '', roomId: '', date: '', time: '', hall: '', type: '2D', availableSeats: 0,
+    seatPrices: { standard: 75000, vip: 110000, couple: 200000 },
   });
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [moviesRes, cinemasRes, provincesRes, slotsRes] = await Promise.all([
-          movieService.getAll(),
-          cinemaService.getAll(),
-          provinceService.getAll({ size: 100 }),
-          slotService.getAll({ size: 1000 })
-        ]);
-        setMovies(moviesRes);
-        setAllCinemas(cinemasRes);
-        const provs = provincesRes?.content || (Array.isArray(provincesRes) ? provincesRes : []);
-        setAllProvinces(provs);
-        
-        const slotsContent = slotsRes?.content || (Array.isArray(slotsRes) ? slotsRes : []);
-        const normalizedSlots = slotsContent.map(s => {
-          const [date, time] = (s.showTime || '').split(' ');
-          return {
-            id: s.id,
-            movieId: s.movieId,
-            cinemaId: s.cinemaId,
-            date: date,
-            time: time ? time.slice(0, 5) : '',
-            hall: s.roomName,
-            type: s.roomName?.includes('IMAX') ? 'IMAX' : (s.roomName?.includes('3D') ? '3D' : '2D'),
-            availableSeats: 100, // Placeholder as backend doesn't provide it yet
-            cinemaName: s.cinemaName,
-            provinceName: s.provinceName
-          };
-        });
-        setShowtimes(normalizedSlots);
-      } catch (err) {
-        console.error('Failed to fetch admin showtimes data', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
 
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [formatFilter, setFormatFilter] = useState('all');
 
-  const normalizedSlots = useMemo(() => {
-    try {
-      if (!Array.isArray(showtimes)) return [];
-      return showtimes.map(st => {
-        const movie = movies?.find(m => m.id === st.movieId);
-        const cinema = allCinemas?.find(c => c.id === st.cinemaId);
-        return {
-          ...st,
-          movieTitle: movie?.title || 'Phim không xác định',
-          cinemaName: st.cinemaName || cinema?.name || cinema?.cinemaName || 'Rạp không xác định'
-        };
-      });
-    } catch (e) {
-      console.error("Error normalizing slots:", e);
-      return [];
-    }
-  }, [showtimes, movies, allCinemas]);
-
   const filteredShowtimes = useMemo(() => {
-    try {
-      return normalizedSlots.filter(st => {
-        const matchSearch = (st.movieTitle || '').toLowerCase().includes(search.toLowerCase()) || 
-                            (st.cinemaName || '').toLowerCase().includes(search.toLowerCase());
-        const matchDate = !dateFilter || st.date === dateFilter;
-        const matchFormat = formatFilter === 'all' || st.type === formatFilter;
-        return matchSearch && matchDate && matchFormat;
-      });
-    } catch (e) {
-      console.error("Error filtering showtimes:", e);
-      return [];
-    }
-  }, [normalizedSlots, search, dateFilter, formatFilter]);
+    return showtimes.filter(st => {
+      const movie = MOVIES.find(m => m.id === st.movieId);
+      const cinema = CINEMAS.find(c => c.id === st.cinemaId);
+      const matchSearch = (movie?.title || '').toLowerCase().includes(search.toLowerCase()) || 
+                          (cinema?.name || '').toLowerCase().includes(search.toLowerCase());
+      const matchDate = !dateFilter || st.date === dateFilter;
+      const matchFormat = formatFilter === 'all' || st.type === formatFilter;
+      return matchSearch && matchDate && matchFormat;
+    });
+  }, [showtimes, search, dateFilter, formatFilter]);
 
   const { addNotification } = useNotificationStore();
 
@@ -110,22 +55,21 @@ export default function AdminShowtimes() {
     
     if (editingId) {
       setShowtimes(prev => prev.map(s => s.id === editingId ? { ...s, ...form, movieId: +form.movieId, cinemaId: +form.cinemaId, availableSeats: +form.availableSeats } : s));
-      const movie = movies.find(m => m.id === +form.movieId);
+      const movie = MOVIES.find(m => m.id === +form.movieId);
       addNotification({ title: 'Thành công', message: `Đã cập nhật suất chiếu phim "${movie?.title}" lúc ${form.time}`, type: 'success', isAdmin: true });
     } else {
       setShowtimes(prev => [...prev, { ...form, id: Date.now(), movieId: +form.movieId, cinemaId: +form.cinemaId, availableSeats: +form.availableSeats }]);
-      const movie = movies.find(m => m.id === +form.movieId);
+      const movie = MOVIES.find(m => m.id === +form.movieId);
       addNotification({ title: 'Thành công', message: `Đã tạo suất chiếu phim "${movie?.title}" lúc ${form.time}`, type: 'success', isAdmin: true });
     }
 
-    setForm({ movieId: '', cinemaId: '', roomId: '', date: '', time: '', hall: '', type: '2D', availableSeats: 0 });
+    setForm({ movieId: '', cinemaId: '', roomId: '', date: '', time: '', hall: '', type: '2D', availableSeats: 0, seatPrices: { ...DEFAULT_SEAT_PRICES } });
     setShowForm(false);
     setEditingId(null);
   };
 
   const handleEdit = (st) => {
-    const cinema = allCinemas.find(c => c.id === st.cinemaId);
-    const room = (cinema?.rooms || []).find(r => r.roomName === st.hall);
+    const room = CINEMA_ROOMS.find(r => r.cinemaId === st.cinemaId && r.name === st.hall);
     setForm({
       movieId: st.movieId,
       cinemaId: st.cinemaId,
@@ -134,7 +78,8 @@ export default function AdminShowtimes() {
       time: st.time,
       hall: st.hall,
       type: st.type,
-      availableSeats: st.availableSeats
+      availableSeats: st.availableSeats,
+      seatPrices: st.seatPrices || room?.seatPrices || { ...DEFAULT_SEAT_PRICES },
     });
     setEditingId(st.id);
     setShowForm(true);
@@ -143,7 +88,7 @@ export default function AdminShowtimes() {
 
   const handleDelete = (id) => {
     const st = showtimes.find(s => s.id === id);
-    const movie = movies.find(m => m.id === st?.movieId);
+    const movie = MOVIES.find(m => m.id === st?.movieId);
     setShowtimes(prev => prev.filter(s => s.id !== id));
     addNotification({ title: 'Thành công', message: `Đã xoá hiển thị suất chiếu phim "${movie?.title}" lúc ${st?.time}`, type: 'success', isAdmin: true });
   };
@@ -151,36 +96,52 @@ export default function AdminShowtimes() {
   const cancelEdit = () => {
     setShowForm(false);
     setEditingId(null);
-    setForm({ movieId: '', cinemaId: '', roomId: '', date: '', time: '', hall: '', type: '2D', availableSeats: 0 });
+    setForm({ movieId: '', cinemaId: '', roomId: '', date: '', time: '', hall: '', type: '2D', availableSeats: 0, seatPrices: { ...DEFAULT_SEAT_PRICES } });
+  };
+
+  // Khi chọn phòng, tự động điền giá vé mặc định từ phòng đó
+  const handleRoomChange = (e) => {
+    const room = CINEMA_ROOMS.find(r => r.id === +e.target.value);
+    setForm(prev => ({
+      ...prev,
+      roomId: e.target.value,
+      hall: room?.name || '',
+      type: room?.format || '',
+      availableSeats: room?.totalSeats || 0,
+      seatPrices: room?.seatPrices ? { ...room.seatPrices } : { ...DEFAULT_SEAT_PRICES },
+    }));
   };
 
   // Group by Province -> Cinema -> Room
   const groupedData = useMemo(() => {
-    try {
-      const tree = {};
-      if (!Array.isArray(allCinemas)) return tree;
-      
-      allCinemas.forEach(cinema => {
-        if (!cinema) return;
-        const p = cinema.provinceName || cinema.province || 'Khác';
-        if (!tree[p]) tree[p] = {};
-        if (cinema.id) {
-          tree[p][cinema.id] = { cinema, rooms: cinema.rooms || [] };
-        }
-      });
+    const tree = {};
+    CINEMAS.forEach(cinema => {
+      const p = cinema.province;
+      if (!tree[p]) tree[p] = {};
+      if (!tree[p][cinema.id]) tree[p][cinema.id] = { cinema, rooms: [] };
+    });
 
-      return tree;
-    } catch (e) {
-      console.error("Error grouping showtimes data:", e);
-      return {};
-    }
-  }, [allCinemas]);
+    CINEMA_ROOMS.forEach(room => {
+      const c = CINEMAS.find(c => c.id === room.cinemaId);
+      if (c && tree[c.province] && tree[c.province][c.id]) {
+        tree[c.province][c.id].rooms.push(room);
+      }
+    });
+
+    return tree;
+  }, []);
+
+  const SEAT_LABELS = {
+    standard: { label: 'Ghế thường', icon: '🪑', color: 'text-white' },
+    vip:      { label: 'Ghế VIP',    icon: '⭐', color: 'text-yellow-400' },
+    couple:   { label: 'Ghế đôi',   icon: '💑', color: 'text-pink-400' },
+  };
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="font-heading font-extrabold text-2xl text-white">Quản lý Suất Chiếu</h2>
-        <button onClick={() => { setShowForm(!showForm); setEditingId(null); setForm({ movieId: '', cinemaId: '', roomId: '', date: '', time: '', hall: '', type: '2D', availableSeats: 0 }); }} className="btn-primary text-sm px-4 py-2">
+        <button onClick={() => { setShowForm(!showForm); setEditingId(null); setForm({ movieId: '', cinemaId: '', roomId: '', date: '', time: '', hall: '', type: '2D', availableSeats: 0, seatPrices: { ...DEFAULT_SEAT_PRICES } }); }} className="btn-primary text-sm px-4 py-2">
           {showForm && !editingId ? 'Huỷ thêm' : '➕ Thêm suất chiếu'}
         </button>
       </div>
@@ -222,31 +183,27 @@ export default function AdminShowtimes() {
               <label className="block text-cinema-muted text-xs mb-1.5">Phim *</label>
               <select value={form.movieId} onChange={e => setForm({...form, movieId: e.target.value})} className="input-field cursor-pointer">
                 <option value="">Chọn phim...</option>
-                {movies.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+                {MOVIES.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-cinema-muted text-xs mb-1.5">Rạp *</label>
-              <select value={form.cinemaId} onChange={e => setForm({...form, cinemaId: e.target.value, roomId: '', hall: '', type: '', availableSeats: 0})} className="input-field cursor-pointer">
+              <select value={form.cinemaId} onChange={e => setForm({...form, cinemaId: e.target.value, roomId: '', hall: '', type: '', availableSeats: 0, seatPrices: { ...DEFAULT_SEAT_PRICES }})} className="input-field cursor-pointer">
                 <option value="">Chọn rạp...</option>
-                {allCinemas.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {CINEMAS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-cinema-muted text-xs mb-1.5">Phòng chiếu *</label>
               <select 
                 value={form.roomId} 
-                onChange={e => {
-                  const cinema = allCinemas.find(c => c.id === +form.cinemaId);
-                  const room = (cinema?.rooms || []).find(r => r.id === +e.target.value);
-                  setForm({...form, roomId: e.target.value, hall: room?.roomName || room?.name || '', type: (room?.roomName || '').includes('IMAX') ? 'IMAX' : '2D', availableSeats: 100});
-                }} 
+                onChange={handleRoomChange}
                 className="input-field cursor-pointer"
                 disabled={!form.cinemaId}
               >
                 <option value="">Chọn phòng chiếu...</option>
-                {allCinemas.find(c => c.id === +form.cinemaId)?.rooms?.map(r => (
-                  <option key={r.id} value={r.id}>{r.roomName || r.name} - {r.roomType || 'Standard'}</option>
+                {CINEMA_ROOMS.filter(r => r.cinemaId === +form.cinemaId).map(r => (
+                  <option key={r.id} value={r.id}>{r.name} - {r.format} ({r.totalSeats} ghế)</option>
                 ))}
               </select>
             </div>
@@ -263,13 +220,45 @@ export default function AdminShowtimes() {
               <input type="time" value={form.time} onChange={e => setForm({...form, time: e.target.value})} className="input-field" />
             </div>
             <div>
-              <label className="block text-cinema-muted text-xs mb-1.5">Định dạng & Ghế</label>
+              <label className="block text-cinema-muted text-xs mb-1.5">Định dạng &amp; Ghế</label>
               <div className="flex gap-2">
                 <input value={form.type || '2D'} disabled className="input-field w-1/3 opacity-50 bg-cinema-dark cursor-not-allowed" />
                 <input value={form.availableSeats || 0} disabled className="input-field w-2/3 opacity-50 bg-cinema-dark cursor-not-allowed" title="Số ghế" />
               </div>
             </div>
           </div>
+
+          {/* ── Bảng giá vé theo hạng ghế ─────────────────── */}
+          <div className="mt-5 border-t border-cinema-border pt-4">
+            <p className="text-white text-sm font-semibold mb-3">🎟️ Giá vé theo hạng ghế</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {Object.entries(SEAT_LABELS).map(([key, meta]) => (
+                <div key={key} className="bg-cinema-card rounded-lg border border-cinema-border p-3">
+                  <label className={`block text-xs font-medium mb-1.5 ${meta.color}`}>
+                    {meta.icon} {meta.label}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      step={5000}
+                      value={form.seatPrices?.[key] ?? 0}
+                      onChange={e => setForm(prev => ({
+                        ...prev,
+                        seatPrices: { ...prev.seatPrices, [key]: Number(e.target.value) }
+                      }))}
+                      className="input-field pr-8 text-sm"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-cinema-muted text-xs pointer-events-none">đ</span>
+                  </div>
+                  {form.seatPrices?.[key] > 0 && (
+                    <p className="text-cinema-muted text-[10px] mt-1">{fmtPrice(form.seatPrices[key])}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="flex gap-3 mt-5">
             <button onClick={cancelEdit} className="btn-outline text-sm px-5 py-2">Huỷ</button>
             <button onClick={handleAdd} className="btn-primary text-sm px-5 py-2">{editingId ? 'Lưu thay đổi' : 'Tạo suất chiếu'}</button>
@@ -279,43 +268,44 @@ export default function AdminShowtimes() {
 
       {/* List */}
       <div className="space-y-8">
-        {loading ? (
-          <div className="text-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-primary mx-auto mb-4"></div>
-            <p className="text-cinema-muted">Đang tải danh sách suất chiếu...</p>
-          </div>
-        ) : Object.keys(groupedData).length > 0 ? (
+        {Object.keys(groupedData).length > 0 ? (
           Object.entries(groupedData).map(([province, cinemasMap]) => (
             <div key={province} className="mb-8">
               <h3 className="font-heading font-bold text-white text-xl mb-4 pl-2 border-l-4 border-primary">{province}</h3>
               <div className="space-y-6">
                 {Object.values(cinemasMap).map(({ cinema, rooms }) => (
                   <div key={cinema.id} className="bg-cinema-surface border border-cinema-border rounded-xl p-4">
-                    <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-2">🍿 {cinema.name}</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-2">🍿 {cinema.name}
+                      <span className="text-cinema-muted text-xs font-normal ml-1">({rooms.length} phòng chiếu)</span>
+                    </h4>
+                    {/* Cuộn ngang nếu hơn 3 phòng, grid nếu ≤ 3 */}
+                    <div className={rooms.length > 3
+                      ? 'flex gap-4 overflow-x-auto pb-2'
+                      : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
+                    }>
                       {rooms.map(room => {
-                        const roomName = room.roomName || room.name;
-                        const roomShowtimes = filteredShowtimes.filter(s => s.cinemaId === cinema.id && s.hall === roomName);
+                        const roomShowtimes = filteredShowtimes.filter(s => s.cinemaId === cinema.id && s.hall === room.name);
                         
-                        // Nếu có bất kỳ bộ lọc nào đang bật và phòng này không có suất chiếu thoả mãn, thì ẩn phòng đi
                         if ((search || dateFilter || formatFilter !== 'all') && roomShowtimes.length === 0) return null;
 
                         return (
-                          <div key={room.id} className="bg-cinema-card rounded-lg border border-cinema-border p-4 shadow-sm">
-                            <h5 className="font-semibold text-white mb-2 text-sm border-b border-cinema-border pb-2">Phòng: {room.roomName || room.name}</h5>
+                          <div key={room.id}
+                            className={`bg-cinema-card rounded-lg border border-cinema-border p-4 shadow-sm${rooms.length > 3 ? ' flex-shrink-0 w-64' : ''}`}
+                          >
+                            <h5 className="font-semibold text-white mb-2 text-sm border-b border-cinema-border pb-2">
+                              Phòng: {room.name}
+                              <span className="text-cinema-muted text-xs font-normal ml-1">({room.totalSeats} ghế · {room.format})</span>
+                            </h5>
                             {roomShowtimes.length === 0 ? (
                               <p className="text-cinema-muted text-xs italic py-2">Chưa có suất chiếu</p>
                             ) : (
                               <div className="space-y-3">
-                                {[...roomShowtimes].sort((a,b) => {
-                                  const timeA = a.time || '00:00';
-                                  const timeB = b.time || '00:00';
-                                  return new Date(`${a.date}T${timeA}`) - new Date(`${b.date}T${timeB}`);
-                                }).map(st => {
-                                  const movie = movies.find(m => m.id === st.movieId);
-                                  const totalSeats = 100;
-                                  const booked = totalSeats - st.availableSeats;
+                                {roomShowtimes.sort((a,b) => new Date(a.date+'T'+a.time) - new Date(b.date+'T'+b.time)).map(st => {
+                                  const movie = MOVIES.find(m => m.id === st.movieId);
+                                  const booked = room.totalSeats - st.availableSeats;
                                   const canEdit = booked === 0;
+                                  // Giá vé của suất chiếu này (ưu tiên suất chiếu > phòng > mặc định)
+                                  const prices = st.seatPrices || room.seatPrices || DEFAULT_SEAT_PRICES;
                                   return (
                                     <div key={st.id} className="bg-cinema-dark rounded border border-cinema-border p-3 hover:border-primary/50 transition-colors group">
                                       <p className="text-white text-sm font-medium leading-tight mb-1 truncate" title={movie?.title}>{movie?.title}</p>
@@ -323,7 +313,13 @@ export default function AdminShowtimes() {
                                         <p className="text-primary text-sm font-bold">{st.time} <span className="text-cinema-muted text-xs font-normal">({fmtDate(st.date)})</span></p>
                                         <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-cinema-surface text-cinema-muted border border-cinema-border">{st.type}</span>
                                       </div>
-                                      <p className="text-cinema-muted text-xs mb-3">Vé đã đặt: <span className={booked > 0 ? "text-yellow-400 font-medium" : "text-green-400 font-medium"}>{booked}</span> / {totalSeats}</p>
+                                      <p className="text-cinema-muted text-xs mb-2">Vé đã đặt: <span className={booked > 0 ? "text-yellow-400 font-medium" : "text-green-400 font-medium"}>{booked}</span> / {room.totalSeats}</p>
+                                      {/* Giá vé theo hạng */}
+                                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 mb-2 py-1 bg-cinema-surface/50 rounded px-2">
+                                        <span className="text-[10px] text-white/70">🪑 {fmtPrice(prices.standard)}</span>
+                                        <span className="text-[10px] text-yellow-400/80">⭐ {fmtPrice(prices.vip)}</span>
+                                        <span className="text-[10px] text-pink-400/80">💑 {fmtPrice(prices.couple)}</span>
+                                      </div>
                                       
                                       <div className="flex gap-2">
                                         <button 

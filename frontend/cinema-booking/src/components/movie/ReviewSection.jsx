@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import reviewService, { formatReviewDate } from '../../services/reviewService';
 import useAuthStore from '../../store/authStore';
+import { checkContent } from '../../utils/contentFilter';
 
 /** Thanh sao đánh giá tương tác */
 function StarInput({ value, onChange }) {
@@ -65,6 +66,7 @@ export default function ReviewSection({ movieId }) {
   const [formComment, setFormComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [contentError, setContentError] = useState('');
 
   const loadReviews = () => {
     const data = reviewService.getByMovieId(movieId);
@@ -85,6 +87,14 @@ export default function ReviewSection({ movieId }) {
     e.preventDefault();
     if (!formComment.trim()) return;
 
+    // Kiểm tra nội dung ngôn từ
+    const filterResult = checkContent(formComment);
+    if (!filterResult.valid) {
+      setContentError(filterResult.message);
+      return;
+    }
+    setContentError('');
+
     setSubmitting(true);
     try {
       const displayName = user?.fullName || user?.userName || 'Người dùng';
@@ -95,16 +105,16 @@ export default function ReviewSection({ movieId }) {
         userId: user?.id || user?.userId || 0,
         userName: displayName,
         userInitials: initials,
-        rating: 0, // Không có đánh giá sao
+        rating: 0,
         comment: formComment,
       });
 
       setSubmitSuccess(true);
       setFormComment('');
       setShowForm(false);
+      setContentError('');
       loadReviews();
 
-      // Cập nhật lại trạng thái canReview
       setCanReviewInfo(reviewService.canReview(user?.id || user?.userId, movieId));
 
       setTimeout(() => setSubmitSuccess(false), 3000);
@@ -178,6 +188,18 @@ export default function ReviewSection({ movieId }) {
 
 
 
+              {/* Content error */}
+              {contentError && (
+                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm flex items-start gap-2">
+                  <span className="text-base flex-shrink-0">🚫</span>
+                  <div>
+                    <p className="font-medium mb-0.5">Nội dung không phù hợp</p>
+                    <p className="text-xs opacity-90">{contentError}</p>
+                    <p className="text-xs mt-1 opacity-70">Theo tiêu chuẩn cộng đồng (Luật An ninh mạng 2018), vui lòng sử dụng ngôn từ văn minh, lịch sự.</p>
+                  </div>
+                </div>
+              )}
+
               {/* Comment */}
               <div className="mb-5">
                 <label className="block text-cinema-muted text-sm mb-2 font-medium">
@@ -185,11 +207,11 @@ export default function ReviewSection({ movieId }) {
                 </label>
                 <textarea
                   value={formComment}
-                  onChange={(e) => setFormComment(e.target.value)}
+                  onChange={(e) => { setFormComment(e.target.value); if (contentError) setContentError(''); }}
                   placeholder="Chia sẻ cảm nhận của bạn về bộ phim này..."
                   rows={4}
                   maxLength={1000}
-                  className="input-field resize-none"
+                  className={`input-field resize-none ${contentError ? 'border-red-500/50' : ''}`}
                   required
                 />
                 <p className="text-cinema-muted text-xs mt-1 text-right">

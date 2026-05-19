@@ -18,7 +18,7 @@ public class SlotSpecification {
 	
 	@SuppressWarnings("removal")
 	public static Specification<Slots> buildWhere(SlotFilterForm filterform) {
-		Specification<Slots> where = Specification.where(null);
+		Specification<Slots> where = Specification.where(new CustomSpecification("isDeleted", false));
 		
 		if (filterform == null)
 			return where;
@@ -83,6 +83,12 @@ public class SlotSpecification {
 				return criteriaBuilder.equal(
 					root.get("rooms").get("cinemas").get("provinces").get("id"), 
 					value
+				);
+			}
+			if (field.equalsIgnoreCase("isDeleted")) {
+				return criteriaBuilder.or(
+					criteriaBuilder.equal(root.get("isDeleted"), value),
+					criteriaBuilder.isNull(root.get("isDeleted"))
 				);
 			}
 			return null;

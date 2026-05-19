@@ -4,10 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PAYMENT_METHODS } from '../../constants/mockData';
 import useAuthStore from '../../store/authStore';
 import { sendBookingConfirmEmail } from '../../services/emailService';
-import { ticketService, paymentService } from '../../services';
 
 function StepIndicator({ current }) {
-  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế', 'Chọn bỏng nước', 'Thanh toán'];
+  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
   return (
     <div className="flex items-center justify-center gap-0 mb-8 flex-wrap gap-y-2">
       {steps.map((step, i) => (
@@ -152,85 +151,44 @@ export default function Checkout() {
       setErrors(errs);
       return;
     }
-    
-    if (!user) {
-      alert("Vui lòng đăng nhập để đặt vé");
-      return;
-    }
-
     setProcessing(true);
+    await new Promise(r => setTimeout(r, 2000)); // Simulate payment processing
+    setProcessing(false);
+
+    const bookingCode = 'CB' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const newBooking = {
+      code: bookingCode,
+      movie: movie.title,
+      seats: seats.join(', '),
+      snacks: snacks.length > 0 ? snacks.map(s => `${s.icon} ${s.name} ×${s.quantity}`).join(', ') : null,
+      total: grandTotal.toLocaleString('vi-VN') + 'đ',
+    };
+    setBooking(newBooking);
+    setSuccess(true);
+
+    // Gửi email xác nhận đặt vé
     try {
-      const ticketPayload = {
-        accountsId: user.id,
-        slotsId: showtime.id,
-        discountAmount: 0,
-        note: `Thanh toán qua ${paymentMethod.toUpperCase()}`,
-        seats: seats.map(s => ({ seatId: s.id })),
-        products: snacks.map(snack => ({ productId: snack.id, quantity: snack.quantity }))
-      };
-      
-      const res = await ticketService.create(ticketPayload);
-      
-      const bookingCode = res?.ticketsCode || 'CB' + Math.random().toString(36).slice(2, 8).toUpperCase();
-      const seatNames = seats.map(s => `${s.seatRow}${s.seatNumber}`).join(', ');
-      
-      const newBooking = {
-        id: res?.id,
-        code: bookingCode,
-        movie: movie.title || movie.name,
-        seats: seatNames,
-        snacks: snacks.length > 0 ? snacks.map(s => `${s.icon} ${s.name} ×${s.quantity}`).join(', ') : null,
-        total: grandTotal.toLocaleString('vi-VN') + 'đ',
-      };
-
-      // Lưu booking vào sessionStorage để dùng ở trang Callback
-      sessionStorage.setItem('pendingBooking', JSON.stringify(newBooking));
-
-      // Nếu là VNPay hoặc MoMo -> Chuyển hướng thanh toán
-      if (paymentMethod === 'vnpay' || paymentMethod === 'momo') {
-        try {
-          const paymentRequest = {
-            amount: grandTotal,
-            orderInfo: bookingCode, // Sử dụng mã vé làm TxnRef
-            returnUrl: `${window.location.origin}/payment-callback`
-          };
-
-          let payRes;
-          if (paymentMethod === 'vnpay') {
-            payRes = await paymentService.createVNPay(paymentRequest);
-          } else {
-            payRes = await paymentService.createMoMo(paymentRequest);
-          }
-
-          if (payRes && payRes.url) {
-            window.location.href = payRes.url;
-            return; // Dừng xử lý tiếp theo
-          } else {
-            throw new Error("Không lấy được URL thanh toán");
-          }
-        } catch (payErr) {
-          console.error("Lỗi khởi tạo thanh toán:", payErr);
-          alert("Lỗi khi kết nối với cổng thanh toán. Vui lòng thử lại.");
-          setProcessing(false);
-          return;
-        }
-      }
-
-      // Nếu là phương thức khác (ví dụ tiền mặt/thẻ tại quầy)
-      setBooking(newBooking);
-      setSuccess(true);
+      await sendBookingConfirmEmail({
+        to_name:      form.name,
+        to_email:     form.email,
+        booking_code: bookingCode,
+        movie_title:  movie.title,
+        cinema_name:  cinema?.name || 'Chưa xác định',
+        showtime:     showtime
+          ? `${new Date(showtime.date).toLocaleDateString('vi-VN')} – ${showtime.time}`
+          : 'Chưa xác định',
+        seats:  seats.join(', '),
+        total:  grandTotal.toLocaleString('vi-VN') + 'đ',
+      });
     } catch (err) {
-      console.error("Lỗi đặt vé:", err);
-      alert("Có lỗi xảy ra khi đặt vé. Vui lòng thử lại.");
-    } finally {
-      setProcessing(false);
+      console.warn('Không thể gửi email xác nhận:', err);
     }
   };
 
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
-        <StepIndicator current={6} />
+        <StepIndicator current={5} />
 
         <div className="grid md:grid-cols-5 gap-6">
           {/* Left: Form */}
@@ -387,13 +345,13 @@ export default function Checkout() {
 
               <div className="flex gap-3 mb-4 pb-4 border-b border-cinema-border">
                 <img
-                  src={movie.poster || movie.image}
-                  alt={movie.title || movie.name}
+                  src={movie.poster}
+                  alt={movie.title}
                   className="w-14 h-20 object-cover rounded-lg flex-shrink-0"
                   onError={e => { e.target.src = 'https://placehold.co/80x120/1E1E2C/A0A0B4'; }}
                 />
                 <div>
-                  <p className="text-white font-semibold text-sm leading-snug">{movie.title || movie.name}</p>
+                  <p className="text-white font-semibold text-sm leading-snug">{movie.title}</p>
                   {cinema && <p className="text-cinema-muted text-xs mt-1">{cinema.name}</p>}
                   {showtime && (
                     <p className="text-cinema-muted text-xs">
@@ -407,7 +365,7 @@ export default function Checkout() {
               <div className="space-y-2 text-sm mb-4 pb-4 border-b border-cinema-border">
                 <div className="flex justify-between">
                   <span className="text-cinema-muted">Ghế ({seats.length})</span>
-                  <span className="text-white">{seats.map(s => `${s.seatRow}${s.seatNumber}`).join(', ')}</span>
+                  <span className="text-white">{seats.join(', ')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-cinema-muted">Tiền vé</span>

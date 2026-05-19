@@ -5,8 +5,24 @@ import { persist } from 'zustand/middleware';
 const useNotificationStore = create(
   persist(
     (set, get) => ({
-      notifications: [], // Lịch sử thông báo
-      toasts: [],        // Thông báo tức thời (hiện rồi biến mất)
+      notifications: [
+        {
+          id: '1',
+          type: 'movie',
+          title: 'Phim mới ra rạp',
+          message: 'Lật Mặt 7: Một Điều Ước đã chính thức khởi chiếu. Đặt vé ngay!',
+          date: new Date().toISOString(),
+          read: false,
+        },
+        {
+          id: '2',
+          type: 'success',
+          title: 'Đặt vé thành công',
+          message: 'Bạn đã đặt thành công 2 vé phim Avengers: Secret Wars.',
+          date: new Date(Date.now() - 86400000).toISOString(),
+          read: true,
+        }
+      ],
       
       addNotification: (notification) => set((state) => ({
         notifications: [
@@ -17,21 +33,7 @@ const useNotificationStore = create(
             ...notification,
           },
           ...state.notifications,
-        ].slice(0, 50),
-      })),
-
-      // 🍞 Thêm Toast mới
-      addToast: (message, type = 'success') => {
-        const id = Date.now().toString();
-        set((state) => ({
-          toasts: [...state.toasts, { id, message, type }]
-        }));
-        // Tự động xóa sau 3 giây
-        setTimeout(() => get().removeToast(id), 3000);
-      },
-
-      removeToast: (id) => set((state) => ({
-        toasts: state.toasts.filter(t => t.id !== id)
+        ].slice(0, 50), // Giữ tối đa 50 thông báo gần nhất
       })),
 
       markAsRead: (id) => set((state) => ({

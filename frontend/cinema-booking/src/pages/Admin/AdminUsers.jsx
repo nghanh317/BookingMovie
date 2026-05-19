@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import accountService from '../../services/accountService';
 import useNotificationStore from '../../store/notificationStore';
+import { RANKS, POINT_EARN_EXAMPLES, getRankByPoints, getRankProgress } from '../../constants/rankingConfig';
 
 // Hiển thị ngày theo định dạng DD/MM/YYYY
 function fmtDate(d) {
@@ -16,17 +17,97 @@ const MOCK_USERS = [
   { id: 1, name: 'Nguyễn Văn An',  email: 'nguyenvanan@email.com', phone: '0912345678', joinDate: '2024-09-01',  bookings: 12, spent: 1450000, level: 'Gold',     points: 1250, status: 'active' },
   { id: 2, name: 'Trần Thị Bình', email: 'tranthib@email.com',    phone: '0987654321', joinDate: '2024-11-15', bookings: 8,  spent: 960000,  level: 'Silver',   points: 380,  status: 'active' },
   { id: 3, name: 'Lê Minh Châu',  email: 'lmchau@email.com',      phone: '0901234567', joinDate: '2025-01-20', bookings: 3,  spent: 375000,  level: 'Bronze',   points: 90,   status: 'active' },
-  { id: 4, name: 'Phạm Thị Dung', email: 'phamdung@email.com',   phone: '0976543210', joinDate: '2024-08-05',  bookings: 25, spent: 3200000, level: 'Platinum', points: 3200, status: 'active' },
+  { id: 4, name: 'Phạm Thị Dung', email: 'phamdung@email.com',   phone: '0976543210', joinDate: '2024-08-05',  bookings: 25, spent: 3200000, level: 'Diamond',  points: 3200, status: 'active' },
   { id: 5, name: 'Hoàng Văn Em',  email: 'hoangemail@email.com',  phone: '0912000111', joinDate: '2025-03-01', bookings: 1,  spent: 79250,   level: 'Bronze',   points: 20,   status: 'inactive' },
   { id: 6, name: 'Vũ Thị Phương', email: 'vuphuong@email.com',  phone: '0933456789', joinDate: '2024-12-10', bookings: 15, spent: 1800000, level: 'Gold',     points: 1680, status: 'active' },
 ];
 
 const LEVEL_STYLE = {
-  Bronze: 'bg-orange-500/20 border-orange-500/30 text-orange-400',
-  Silver: 'bg-gray-400/20 border-gray-400/30 text-gray-300',
-  Gold: 'bg-primary/20 border-primary/30 text-primary',
-  Platinum: 'bg-purple-500/20 border-purple-500/30 text-purple-400',
+  Bronze:  'bg-orange-500/20 border-orange-500/30 text-orange-400',
+  Silver:  'bg-gray-400/20 border-gray-400/30 text-gray-300',
+  Gold:    'bg-yellow-500/20 border-yellow-500/30 text-yellow-400',
+  Diamond: 'bg-cyan-500/20 border-cyan-400/30 text-cyan-400',
 };
+
+const LEVEL_ICON = { Bronze: '🥉', Silver: '🥈', Gold: '🥇', Diamond: '💎' };
+
+// ── Bảng thang điểm hạng thành viên ────────────────────────
+function RankingTable() {
+  const [showEarn, setShowEarn] = useState(false);
+  return (
+    <div className="bg-cinema-surface rounded-xl border border-cinema-border p-5 mb-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-heading font-bold text-white">🏆 Bảng xếp hạng thành viên</h3>
+          <p className="text-cinema-muted text-xs mt-0.5">Thang điểm &amp; quyền lợi theo hạng — 10.000đ = 1 điểm cơ bản</p>
+        </div>
+        <button
+          onClick={() => setShowEarn(v => !v)}
+          className="text-xs text-primary border border-primary/30 px-3 py-1.5 rounded-lg hover:bg-primary/10 transition-all"
+        >
+          {showEarn ? '← Về thang hạng' : '🎟️ Bảng tích điểm'}
+        </button>
+      </div>
+
+      {!showEarn ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {RANKS.map((rank, idx) => (
+            <div key={rank.key} className={`rounded-xl border ${rank.borderColor} ${rank.bgColor} p-4 relative overflow-hidden`}>
+              <div className="absolute top-0 right-0 w-16 h-16 rounded-full opacity-10"
+                style={{ background: `radial-gradient(circle, ${rank.gradientTo}, transparent)`, transform: 'translate(30%, -30%)' }} />
+              <div className="text-2xl mb-1">{rank.icon}</div>
+              <p className={`font-heading font-extrabold text-lg ${rank.color}`}>{rank.label}</p>
+              <p className="text-cinema-muted text-[11px] mt-0.5 mb-3">
+                {rank.maxPoints === Infinity
+                  ? `≥ ${rank.minPoints.toLocaleString('vi-VN')} điểm`
+                  : `${rank.minPoints.toLocaleString('vi-VN')} – ${rank.maxPoints.toLocaleString('vi-VN')} điểm`}
+              </p>
+              <ul className="space-y-1">
+                {rank.perks.map(p => (
+                  <li key={p} className="text-[10px] text-cinema-muted flex items-start gap-1">
+                    <span className="text-green-400 mt-px flex-shrink-0">✓</span>{p}
+                  </li>
+                ))}
+              </ul>
+              {idx < RANKS.length - 1 && (
+                <div className="absolute bottom-2 right-2 text-cinema-muted text-[10px]">
+                  →{RANKS[idx+1].icon}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-cinema-border">
+                <th className="text-left py-2 px-3 text-cinema-muted font-medium">Dịch vụ</th>
+                <th className="text-right py-2 px-3 text-cinema-muted font-medium">Giá</th>
+                <th className="text-right py-2 px-3 text-orange-400 font-medium">🥉 Bronze</th>
+                <th className="text-right py-2 px-3 text-gray-300 font-medium">🥈 Silver</th>
+                <th className="text-right py-2 px-3 text-yellow-400 font-medium">🥇 Gold ×1.2</th>
+                <th className="text-right py-2 px-3 text-cyan-400 font-medium">💎 Diamond ×1.5</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-cinema-border/40">
+              {POINT_EARN_EXAMPLES.map(e => (
+                <tr key={e.label} className="hover:bg-cinema-card/30 transition-colors">
+                  <td className="py-2 px-3 text-white">{e.icon} {e.label}</td>
+                  <td className="py-2 px-3 text-right text-cinema-muted">{e.price.toLocaleString('vi-VN')}đ</td>
+                  <td className="py-2 px-3 text-right text-orange-400 font-semibold">+{e.points}</td>
+                  <td className="py-2 px-3 text-right text-gray-300 font-semibold">+{e.points}</td>
+                  <td className="py-2 px-3 text-right text-yellow-400 font-semibold">+{Math.floor(e.points * 1.2)}</td>
+                  <td className="py-2 px-3 text-right text-cyan-400 font-semibold">+{Math.floor(e.points * 1.5)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -38,14 +119,15 @@ export default function AdminUsers() {
   useEffect(() => {
     setLoading(true);
     accountService.getAll()
-      .then((res) => {
-        const data = res?.content || (Array.isArray(res) ? res : []);
-        if (data.length > 0) {
+      .then((data) => {
+        // Nếu data từ backend không rỗng thì dùng, ngược lại fallback
+        if (Array.isArray(data) && data.length > 0) {
+          // Normalize: backend có thể dùng fullName thay vì name
           const normalized = data.map(u => ({
             ...u,
-            name: u.name || u.fullName || u.userName || 'Ẩn danh',
+            name: u.name || u.fullName || u.userName || '',
             joinDate: u.joinDate || u.createDate || '',
-            bookings: u.bookings || 0,
+            bookings: u.bookings || (u.tickets?.length ?? 0),
             spent: u.spent || 0,
             level: u.level || 'Bronze',
             points: u.points || 0,
@@ -56,11 +138,7 @@ export default function AdminUsers() {
           setUsers(MOCK_USERS);
         }
       })
-      .catch((err) => {
-        console.error("Failed to fetch accounts:", err);
-        addToast('Không thể kết nối API người dùng, đang hiển thị dữ liệu mẫu.', 'warn');
-        setUsers(MOCK_USERS);
-      })
+      .catch(() => setUsers(MOCK_USERS))
       .finally(() => setLoading(false));
   }, []);
 
@@ -70,7 +148,7 @@ export default function AdminUsers() {
     return matchSearch && matchLevel;
   });
 
-  const { addNotification, addToast } = useNotificationStore();
+  const { addNotification } = useNotificationStore();
 
   const toggleStatus = (id) => {
     const user = users.find(u => u.id === id);
@@ -93,11 +171,12 @@ export default function AdminUsers() {
       <h2 className="font-heading font-extrabold text-2xl text-white">Quản lý Người Dùng</h2>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Tổng người dùng', value: totalStats.total, icon: '👥', color: 'border-blue-500/30 bg-blue-500/5' },
-          { label: 'Đang hoạt động', value: totalStats.active, icon: '✅', color: 'border-green-500/30 bg-green-500/5' },
-          { label: 'Thành viên cao cấp', value: totalStats.gold, icon: '⭐', color: 'border-primary/30 bg-primary/5' },
+          { label: 'Tổng người dùng',  value: users.length,                                          icon: '👥', color: 'border-blue-500/30 bg-blue-500/5' },
+          { label: 'Đang hoạt động',   value: users.filter(u => u.status === 'active').length,        icon: '✅', color: 'border-green-500/30 bg-green-500/5' },
+          { label: 'Hạng Gold+',       value: users.filter(u => ['Gold','Diamond'].includes(u.level)).length, icon: '🥇', color: 'border-yellow-500/30 bg-yellow-500/5' },
+          { label: 'Hạng Diamond',     value: users.filter(u => u.level === 'Diamond').length,        icon: '💎', color: 'border-cyan-500/30 bg-cyan-500/5' },
         ].map((stat, i) => (
           <motion.div key={stat.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
             className={`rounded-xl border p-4 ${stat.color}`}>
@@ -108,17 +187,20 @@ export default function AdminUsers() {
         ))}
       </div>
 
+      {/* Bảng thang hạng */}
+      <RankingTable />
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="🔍 Tìm theo tên hoặc email..." className="input-field max-w-xs" />
         <div className="flex gap-1 bg-cinema-surface rounded-lg p-1 border border-cinema-border">
-          {['all', 'Bronze', 'Silver', 'Gold', 'Platinum'].map(level => (
+          {['all', 'Bronze', 'Silver', 'Gold', 'Diamond'].map(level => (
             <button key={level} onClick={() => setFilterLevel(level)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                 filterLevel === level ? 'bg-primary text-cinema-black' : 'text-cinema-muted hover:text-white'
               }`}>
-              {level === 'all' ? 'Tất cả' : level}
+              {level === 'all' ? 'Tất cả' : (LEVEL_ICON[level] || '') + ' ' + level}
             </button>
           ))}
         </div>
@@ -168,8 +250,8 @@ export default function AdminUsers() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`badge text-xs font-semibold border ${LEVEL_STYLE[user.level]}`}>
-                      {user.level === 'Platinum' ? '💎' : user.level === 'Gold' ? '⭐' : user.level === 'Silver' ? '🥈' : '🥉'} {user.level}
+                    <span className={`badge text-xs font-semibold border ${LEVEL_STYLE[user.level] || LEVEL_STYLE.Bronze}`}>
+                      {LEVEL_ICON[user.level] || '🥉'} {user.level}
                     </span>
                   </td>
                   <td className="px-4 py-3">

@@ -1,8 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MOVIE_STATS, AGE_RATINGS } from '../../constants/mockData';
-import { movieService } from '../../services';
+import { MOVIES, MOVIE_STATS, AGE_RATINGS } from '../../constants/mockData';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -48,7 +47,7 @@ function RatingBar({ rating, maxRating = 10 }) {
         />
       </div>
       <span className={`text-sm font-bold flex-shrink-0 ${rating >= 8 ? 'text-green-400' : rating >= 6.5 ? 'text-primary' : 'text-yellow-400'}`}>
-        {rating ? rating.toFixed(1) : '0.0'}
+        {rating.toFixed(1)}
       </span>
     </div>
   );
@@ -91,16 +90,16 @@ function TopMovieRow({ movie, rank, stat, showRevenue = false, showTickets = fal
           )}
         </div>
         <div className="flex flex-wrap gap-1 mb-2">
-          {movie.genre && movie.genre.slice(0, 2).map((g) => (
+          {movie.genre.slice(0, 2).map((g) => (
             <span key={g} className="badge bg-cinema-surface border border-cinema-border text-cinema-muted text-[10px]">{g}</span>
           ))}
-          {movie.genre && movie.genre.length > 2 && (
+          {movie.genre.length > 2 && (
             <span className="badge bg-primary/10 border border-primary/30 text-primary text-[10px]">+{movie.genre.length - 2}</span>
           )}
         </div>
-        <RatingBar rating={movie.rating || 0} />
+        <RatingBar rating={movie.rating} />
         <div className="mt-2.5 text-xs text-cinema-muted space-y-1.5 bg-cinema-surface/50 p-2.5 rounded-lg border border-cinema-border/50">
-          <p><span className="font-semibold text-white/70">Thể loại:</span> {movie.genre ? movie.genre.join(', ') : ''}</p>
+          <p><span className="font-semibold text-white/70">Thể loại:</span> {movie.genre.join(', ')}</p>
           <p><span className="font-semibold text-white/70">Khởi chiếu:</span> {new Date(movie.releaseDate).getFullYear()} • <span className="font-semibold text-white/70">Thời lượng:</span> {movie.duration} phút</p>
           <p className="line-clamp-2"><span className="font-semibold text-white/70">Nội dung:</span> {movie.description}</p>
         </div>
@@ -111,13 +110,13 @@ function TopMovieRow({ movie, rank, stat, showRevenue = false, showTickets = fal
         {showRevenue && stat && (
           <div>
             <p className="text-xs text-cinema-muted">Doanh thu</p>
-            <p className="text-primary font-bold text-sm">{formatRevenue(stat.revenue || 0)}</p>
+            <p className="text-primary font-bold text-sm">{formatRevenue(stat.revenue)}</p>
           </div>
         )}
         {showTickets && stat && (
           <div>
             <p className="text-xs text-cinema-muted">Vé bán</p>
-            <p className="text-accent font-bold text-sm">{formatTickets(stat.ticketsSold || 0)}</p>
+            <p className="text-accent font-bold text-sm">{formatTickets(stat.ticketsSold)}</p>
           </div>
         )}
       </div>
@@ -154,7 +153,7 @@ function TopSection({ title, icon, movies, statsMap, showRevenue, showTickets, a
             key={movie.id}
             movie={movie}
             rank={i + 1}
-            stat={statsMap[movie.id] || { revenue: movie.id * 10000000, ticketsSold: movie.id * 100, allTimeRevenue: movie.id * 50000000 }}
+            stat={statsMap[movie.id]}
             showRevenue={showRevenue}
             showTickets={showTickets}
           />
@@ -179,15 +178,6 @@ const TABS = [
 
 export default function TopMovies() {
   const [activeTab, setActiveTab] = useState('all');
-  const [moviesData, setMoviesData] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    movieService.getAll().then(data => {
-      setMoviesData(data);
-      setLoading(false);
-    });
-  }, []);
 
   // Tạo statsMap để lookup nhanh
   const statsMap = useMemo(() => {
@@ -199,15 +189,11 @@ export default function TopMovies() {
 
   // Danh sách phim có stats
   const moviesWithStats = useMemo(() => {
-    return moviesData.map((m) => ({
+    return MOVIES.map((m) => ({
       ...m,
-      stat: statsMap[m.id] || { 
-        ticketsSold: m.id * 123 + 5000, 
-        revenue: m.id * 23000000 + 1000000000, 
-        allTimeRevenue: m.id * 50000000 + 2000000000 
-      },
+      stat: statsMap[m.id] || { ticketsSold: 0, revenue: 0, allTimeRevenue: 0 },
     }));
-  }, [moviesData, statsMap]);
+  }, [statsMap]);
 
   // Top đang chiếu theo doanh thu
   const topNowShowing = useMemo(() =>
@@ -220,7 +206,7 @@ export default function TopMovies() {
 
   // Top tất cả phim theo rating
   const topAllRating = useMemo(() =>
-    [...moviesWithStats].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 5),
+    [...moviesWithStats].sort((a, b) => b.rating - a.rating).slice(0, 5),
     [moviesWithStats]
   );
 
@@ -233,8 +219,8 @@ export default function TopMovies() {
   // Top tình cảm
   const topRomance = useMemo(() =>
     moviesWithStats
-      .filter((m) => m.genre && m.genre.some((g) => ['Tình cảm', 'Hài', 'Gia đình'].includes(g)))
-      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .filter((m) => m.genre.some((g) => ['Tình cảm', 'Hài', 'Gia đình'].includes(g)))
+      .sort((a, b) => b.rating - a.rating)
       .slice(0, 5),
     [moviesWithStats]
   );
@@ -242,7 +228,7 @@ export default function TopMovies() {
   // Top hành động
   const topAction = useMemo(() =>
     moviesWithStats
-      .filter((m) => m.genre && m.genre.some((g) => ['Hành động', 'Phiêu lưu'].includes(g)))
+      .filter((m) => m.genre.some((g) => ['Hành động', 'Phiêu lưu'].includes(g)))
       .sort((a, b) => b.stat.ticketsSold - a.stat.ticketsSold)
       .slice(0, 5),
     [moviesWithStats]
@@ -251,22 +237,11 @@ export default function TopMovies() {
   // Top hoạt hình
   const topAnimated = useMemo(() =>
     moviesWithStats
-      .filter((m) => m.genre && m.genre.includes('Hoạt hình'))
-      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .filter((m) => m.genre.includes('Hoạt hình'))
+      .sort((a, b) => b.rating - a.rating)
       .slice(0, 5),
     [moviesWithStats]
   );
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-cinema-muted">Đang tải bảng xếp hạng...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Số 1 hiện tại để hiển thị hero
   const heroMovie = topNowShowing[0] || topAllRating[0];
@@ -277,7 +252,7 @@ export default function TopMovies() {
       {heroMovie && (
         <div className="relative h-[50vh] min-h-[320px] overflow-hidden">
           <img
-            src={heroMovie.backdrop || heroMovie.poster}
+            src={heroMovie.backdrop}
             alt={heroMovie.title}
             className="w-full h-full object-cover"
             onError={(e) => {
@@ -362,9 +337,9 @@ export default function TopMovies() {
                       </h3>
                     </Link>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-primary text-xs font-semibold">⭐ {movie.rating || 0}</span>
+                      <span className="text-primary text-xs font-semibold">⭐ {movie.rating}</span>
                       <span className="text-cinema-muted text-xs">
-                        {formatRevenue(movie.stat.revenue || 0)}
+                        {formatRevenue(statsMap[movie.id]?.revenue || 0)}
                       </span>
                     </div>
                   </div>
@@ -425,7 +400,7 @@ export default function TopMovies() {
           <TopSection
             title="Top Phim Hoạt Hình"
             icon="🎨"
-            movies={topAnimated.length > 0 ? topAnimated : topAllRating.filter((m) => (m.rating || 0) >= 7)}
+            movies={topAnimated.length > 0 ? topAnimated : topAllRating.filter((m) => m.rating >= 7)}
             statsMap={statsMap}
             showRevenue
           />

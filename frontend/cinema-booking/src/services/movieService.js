@@ -10,10 +10,8 @@ import { MOVIES } from '../constants/mockData';
  * Chuẩn hóa response từ backend về cấu trúc mà frontend đang dùng.
  * Điều chỉnh mapping này khi biết chính xác cấu trúc JSON của backend.
  */
-const normalize = (movie) => {
-  if (!movie) return null;
-  return {
-    id: movie.id,
+const normalize = (movie) => ({
+  id: movie.id,
   title: movie.title || movie.movieName || movie.name || '',
   originalTitle: movie.originalTitle || movie.englishName || '',
   poster: movie.poster || movie.posterUrl || movie.imageUrl || '',
@@ -26,30 +24,12 @@ const normalize = (movie) => {
   language: movie.language || 'Tiếng Anh',
   releaseDate: movie.releaseDate || movie.release_date || '',
   director: movie.director || '',
-  cast: Array.isArray(movie.cast)
-    ? movie.cast
-    : (movie.cast || '').split(',').map((c) => c.trim()).filter(Boolean),
+  cast: Array.isArray(movie.cast) ? movie.cast : [],
   description: movie.description || movie.content || '',
-  posterUrl: movie.posterUrl || movie.poster || '',
-  trailerUrl: movie.trailerUrl || movie.trailer || '',
-  trailer: (() => {
-    const raw = movie.trailerUrl || movie.trailer || '';
-    if (!raw) return '';
-    // Convert watch?v=... to /embed/...
-    let videoId = '';
-    if (raw.includes('v=')) {
-      videoId = raw.split('v=')[1].split('&')[0];
-    } else if (raw.includes('youtu.be/')) {
-      videoId = raw.split('youtu.be/')[1].split('?')[0];
-    } else if (raw.includes('embed/')) {
-      return raw;
-    }
-    return videoId ? `https://www.youtube.com/embed/${videoId}` : raw;
-  })(),
-  status: movie.status ? movie.status.toString().toLowerCase() : 'now_showing',
+  trailer: movie.trailer || movie.trailerUrl || '',
+  status: movie.status || 'now_showing',
   ageRating: movie.ageRating || movie.age_rating || 'T13',
-  };
-};
+});
 
 const movieService = {
   /** Lấy tất cả phim — GET /api/v1/movies */
@@ -57,10 +37,7 @@ const movieService = {
     try {
       const res = await api.get('/v1/movies');
       const data = Array.isArray(res.data) ? res.data : res.data?.content || res.data?.data || [];
-      // Lọc bỏ những phim đã bị xóa (isDeleted: true) trước khi mapping
-      return data
-        .filter((m) => !m.isDeleted && !m.is_deleted)
-        .map(normalize);
+      return data.map(normalize);
     } catch (err) {
       console.warn('[movieService] getAll failed, using mock data:', err.message);
       return MOVIES; // fallback

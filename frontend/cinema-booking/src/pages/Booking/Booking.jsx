@@ -1,8 +1,21 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { movieService, slotService, cinemaService, provinceService } from '../../services';
+import { MOVIES, SHOWTIMES, CINEMAS, PROVINCES } from '../../constants/mockData';
 import useLocationStore from '../../store/locationStore';
+
+// Generate 7 days from today
+const DATES = Array.from({ length: 7 }, (_, i) => {
+  const d = new Date();
+  d.setDate(d.getDate() + i);
+  return {
+    value: d.toISOString().split('T')[0],
+    day: d.toLocaleDateString('vi-VN', { weekday: 'short' }),
+    date: d.getDate(),
+    month: d.getMonth() + 1,
+    isToday: i === 0,
+  };
+});
 
 const FORMAT_STYLE = {
   '2D':   'border-cinema-border text-cinema-muted hover:border-primary hover:text-primary',
@@ -16,7 +29,7 @@ const FORMAT_ACTIVE = {
 };
 
 function StepIndicator({ current }) {
-  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế', 'Chọn bỏng nước', 'Thanh toán'];
+  const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
   return (
     <div className="flex items-center justify-center gap-0 mb-10">
       {steps.map((step, i) => (
@@ -46,155 +59,45 @@ export default function Booking() {
   const navigate = useNavigate();
   const { selectedProvince, setProvince } = useLocationStore();
 
-  const [movie, setMovie] = useState(null);
-  const [slotsData, setSlotsData] = useState([]);
-  const [cinemasData, setCinemasData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [allProvinces, setAllProvinces] = useState([]);
+  const movie = MOVIES.find(m => m.id === Number(movieId));
 
   const [province, setLocalProvince] = useState(selectedProvince || '');
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(selectedProvince ? DATES[0].value : null);
   const [selectedShowtime, setSelectedShowtime] = useState(null);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [movieRes, slotsRes, cinemasRes, provincesRes] = await Promise.all([
-          movieService.getById(movieId),
-          slotService.getAll({ movieId, size: 1000 }),
-          cinemaService.getAll(),
-          provinceService.getAll({ size: 100 })
-        ]);
-        setMovie(movieRes);
-        const slotsContent = slotsRes?.data || slotsRes?.content || (Array.isArray(slotsRes) ? slotsRes : []);
-        setSlotsData(slotsContent);
-        setCinemasData(cinemasRes);
-        
-        const provincesContent = provincesRes?.data || provincesRes?.content || (Array.isArray(provincesRes) ? provincesRes : []);
-        
-        setAllProvinces(provincesContent.filter(p => p && (typeof p === 'object' || typeof p === 'string')));
-
-        console.log('[Booking] Movie ID:', movieId);
-        console.log('[Booking] Slots Data:', slotsContent);
-      } catch (err) {
-        console.error("Failed to fetch booking data", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [movieId]);
-
-  const showtimes = useMemo(() => {
-    if (!Array.isArray(slotsData)) return [];
-    return slotsData.map(s => {
-      const showTimeStr = s.showTime || '';
-      let datePart = showTimeStr.split(' ')[0] || ''; 
-      const timePart = showTimeStr.includes(' ') 
-        ? showTimeStr.split(' ')[1] 
-        : (showTimeStr.includes('T') ? showTimeStr.split('T')[1] : '');
-      const time = timePart ? timePart.slice(0, 5) : '';
-      
-      if (datePart.includes('-')) {
-        const parts = datePart.split('-');
-        if (parts[0].length === 2) {
-          datePart = `${parts[2]}-${parts[1]}-${parts[0]}`;
-        }
-      }
-
-      const type = s.roomName?.includes('IMAX') ? 'IMAX' : (s.roomName?.includes('3D') ? '3D' : '2D');
-      return {
-        id: s.id,
-        movieId: s.movieId,
-        cinemaName: s.cinemaName,
-        provinceName: s.provinceName,
-        date: datePart,
-        time: time,
-        hall: s.roomName,
-        type: type,
-        availableSeats: s.emptySeats || 0,
-        price: s.price,
-        raw: s
-      };
-    });
-  }, [slotsData]);
-
-  const dates = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const defaultDates = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(today);
-      d.setDate(d.getDate() + i);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const dayNum = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${dayNum}`;
-    });
-
-    const showtimeDates = [...new Set(showtimes.map(s => s.date))].filter(Boolean);
-    const allUniqueDates = [...new Set([...defaultDates, ...showtimeDates])].sort();
-
-    return allUniqueDates.map(dateStr => {
-      const d = new Date(dateStr);
-      const isToday = dateStr === defaultDates[0];
-      return {
-        value: dateStr,
-        day: d.toLocaleDateString('vi-VN', { weekday: 'short' }),
-        date: d.getDate(),
-        month: d.getMonth() + 1,
-        isToday
-      };
-    });
-  }, [showtimes]);
-
-  useEffect(() => {
-    if (!selectedDate && dates.length > 0 && province) {
-      const firstAvailableDate = dates.find(d => showtimes.some(s => s.date === d.value && s.provinceName === province));
-      if (firstAvailableDate) {
-        setSelectedDate(firstAvailableDate.value);
-      } else {
-        setSelectedDate(dates[0].value);
-      }
-    }
-  }, [dates, province, selectedDate, showtimes]);
-
-  const availableProvinces = useMemo(() => {
-    const provs = showtimes.map(s => s.provinceName).filter(Boolean);
-    return [...new Set(provs)];
-  }, [showtimes]);
 
   // Dates that have showtimes for this movie in the selected province
   const datesWithShowtimes = useMemo(() => {
-    let relevant = showtimes;
+    let cinemaIds = CINEMAS.map(c => c.id);
     if (province) {
-      relevant = relevant.filter(s => {
-        const sProv = (s.provinceName || '').trim().toLowerCase();
-        const selProv = (province || '').trim().toLowerCase();
-        return sProv.includes(selProv) || selProv.includes(sProv);
-      });
+      cinemaIds = CINEMAS.filter(c => c.province === province).map(c => c.id);
     }
-    return [...new Set(relevant.map(s => s.date))];
-  }, [showtimes, province]);
+    const relevantShowtimes = SHOWTIMES.filter(s => 
+      s.movieId === Number(movieId) && cinemaIds.includes(s.cinemaId)
+    );
+    return [...new Set(relevantShowtimes.map(s => s.date))];
+  }, [movieId, province]);
 
-  // Showtimes grouped by cinemaName for selected date & province
+  // Cinemas in selected province
+  const cinemasInProvince = useMemo(() => {
+    if (!province) return CINEMAS;
+    return CINEMAS.filter(c => c.province === province);
+  }, [province]);
+
+  // Showtimes grouped by cinema for selected date & province
   const groupedShowtimes = useMemo(() => {
-    if (!province || !selectedDate) return {};
-    
-    const sts = showtimes.filter(s => {
-      const sProv = (s.provinceName || '').trim().toLowerCase();
-      const selProv = (province || '').trim().toLowerCase();
-      const provMatch = sProv.includes(selProv) || selProv.includes(sProv);
-      return provMatch && s.date === selectedDate;
-    });
+    const cinemaIds = cinemasInProvince.map(c => c.id);
+    const sts = SHOWTIMES.filter(s =>
+      s.movieId === Number(movieId) &&
+      s.date === selectedDate &&
+      cinemaIds.includes(s.cinemaId)
+    );
     const grouped = {};
     sts.forEach(s => {
-      if (!grouped[s.cinemaName]) grouped[s.cinemaName] = [];
-      grouped[s.cinemaName].push(s);
+      if (!grouped[s.cinemaId]) grouped[s.cinemaId] = [];
+      grouped[s.cinemaId].push(s);
     });
     return grouped;
-  }, [showtimes, province, selectedDate]);
+  }, [movieId, selectedDate, cinemasInProvince]);
 
   const handleProvinceSelect = (p) => {
     setLocalProvince(p);
@@ -202,34 +105,21 @@ export default function Booking() {
     setSelectedShowtime(null);
     if (!p) {
       setSelectedDate(null);
-    } else if (!selectedDate && dates.length > 0) {
-      setSelectedDate(dates[0].value);
+    } else if (!selectedDate) {
+      setSelectedDate(DATES[0].value);
     }
   };
 
   const handleProceed = () => {
     if (!selectedShowtime) return;
-    // Find cinema from fetched list
-    const cinemaDetails = cinemasData.find(c => c.name === selectedShowtime.cinemaName) || { name: selectedShowtime.cinemaName };
     navigate(`/booking/${movieId}/seats`, {
       state: {
         movie,
         showtime: selectedShowtime,
-        cinema: cinemaDetails,
+        cinema: CINEMAS.find(c => c.id === selectedShowtime.cinemaId),
       }
     });
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-cinema-muted">Đang tải thông tin suất chiếu...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (!movie) {
     return (
@@ -249,17 +139,17 @@ export default function Booking() {
 
         {/* Movie Summary */}
         <div className="card p-4 flex gap-4 mb-8">
-          <img src={movie.poster || movie.image} alt={movie.title || movie.name}
+          <img src={movie.poster} alt={movie.title}
             className="w-16 h-24 object-cover rounded-lg flex-shrink-0"
             onError={e => { e.target.src = `https://placehold.co/100x150/1E1E2C/A0A0B4`; }} />
           <div>
-            <h1 className="font-heading font-bold text-white text-xl mb-1">{movie.title || movie.name}</h1>
+            <h1 className="font-heading font-bold text-white text-xl mb-1">{movie.title}</h1>
             <div className="flex flex-wrap gap-3 text-sm text-cinema-muted">
-              <span>⭐ {movie.rating || 'N/A'}</span>
+              <span>⭐ {movie.rating}</span>
               <span>•</span>
               <span>⏱ {movie.duration} phút</span>
               <span>•</span>
-              <span>{Array.isArray(movie.genre) ? movie.genre.join(', ') : movie.genre || 'Phim rạp'}</span>
+              <span>{Array.isArray(movie.genre) ? movie.genre.join(', ') : movie.genre}</span>
             </div>
           </div>
         </div>
@@ -280,17 +170,10 @@ export default function Booking() {
                   className="input-field py-2.5 text-sm font-medium w-full max-w-xs cursor-pointer bg-cinema-surface"
                 >
                   <option value="">Chọn thành phố</option>
-                  {allProvinces.map((p, idx) => {
-                    const id = p.id || idx;
-                    const name = p.provinceName || p;
-                    return (
-                      <option key={id} value={name}>{name}</option>
-                    );
-                  })}
+                  {PROVINCES.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
                 </select>
-                {allProvinces.length === 0 && (
-                  <p className="text-cinema-muted text-sm mt-2 w-full">Đang tải danh sách thành phố...</p>
-                )}
               </div>
             </section>
 
@@ -306,7 +189,7 @@ export default function Booking() {
                 </div>
               ) : (
                 <div className="flex gap-2 overflow-x-auto pb-2">
-                  {dates.map(d => {
+                  {DATES.map(d => {
                     const hasShowtime = datesWithShowtimes.includes(d.value);
                     return (
                       <button key={d.value} onClick={() => { setSelectedDate(d.value); setSelectedShowtime(null); }}
@@ -358,10 +241,11 @@ export default function Booking() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {Object.entries(groupedShowtimes).map(([cinemaName, showtimes]) => {
-                    const cinema = cinemasData.find(c => c.name === cinemaName) || { name: cinemaName, address: cinemaName, rating: 0 };
+                  {Object.entries(groupedShowtimes).map(([cinemaId, showtimes]) => {
+                    const cinema = CINEMAS.find(c => c.id === Number(cinemaId));
+                    if (!cinema) return null;
                     return (
-                      <motion.div key={cinemaName}
+                      <motion.div key={cinemaId}
                         initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                         className="bg-cinema-surface border border-cinema-border rounded-xl p-4 hover:border-cinema-muted transition-colors"
                       >
@@ -422,7 +306,7 @@ export default function Booking() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-cinema-muted">Phim</span>
-                  <span className="text-white font-medium text-right max-w-[150px]">{movie.title || movie.name}</span>
+                  <span className="text-white font-medium text-right max-w-[150px]">{movie.title}</span>
                 </div>
                 {province && (
                   <div className="flex justify-between">
@@ -443,7 +327,7 @@ export default function Booking() {
                     <div className="flex justify-between">
                       <span className="text-cinema-muted">Rạp</span>
                       <span className="text-white font-medium text-right max-w-[150px]">
-                        {selectedShowtime.cinemaName}
+                        {CINEMAS.find(c => c.id === selectedShowtime.cinemaId)?.name}
                       </span>
                     </div>
                     <div className="flex justify-between">

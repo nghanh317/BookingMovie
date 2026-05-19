@@ -1,27 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { VOUCHERS as MOCK_VOUCHERS } from '../../constants/mockData';
+import { VOUCHERS } from '../../constants/mockData';
 import useNotificationStore from '../../store/notificationStore';
 import DatePickerInput from '../../components/ui/DatePickerInput';
-import promotionService from '../../services/promotionService';
 
 const TYPE_LABEL = { percent: 'Phần trăm', fixed: 'Số tiền cố định' };
+
+const RANK_OPTIONS = [
+  { value: '',        label: 'Tất cả (không giới hạn)' },
+  { value: 'silver',  label: 'Hạng Bạc' },
+  { value: 'gold',    label: 'Hạng Vàng' },
+  { value: 'diamond', label: 'Hạng Kim Cương' },
+];
+
+const RANK_BADGE = {
+  '':       { label: 'Tất cả',      cls: 'bg-cinema-card border-cinema-border text-cinema-muted' },
+  silver:   { label: '🥈 Bạc',      cls: 'bg-gray-500/20 border-gray-400/30 text-gray-300' },
+  gold:     { label: '🥇 Vàng',     cls: 'bg-yellow-500/20 border-yellow-400/30 text-yellow-400' },
+  diamond:  { label: '💎 Kim Cương', cls: 'bg-cyan-500/20 border-cyan-400/30 text-cyan-400' },
+};
 
 function fmt(n) {
   return new Intl.NumberFormat('vi-VN').format(n);
 }
 function fmtDate(d) {
   if (!d) return '—';
-  const datePart = String(d).split(' ')[0].split('T')[0];
-  const parts = datePart.split(/[-/]/);
-  if (parts.length < 3) return d;
-  
-  // Nếu là yyyy-mm-dd
-  if (parts[0].length === 4) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  // Nếu là dd-mm-yyyy hoặc dd/mm/yyyy
-  return `${parts[0]}/${parts[1]}/${parts[2]}`;
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
 }
 
 // ── Add Modal ──────────────────────────────────────────────
@@ -30,7 +35,7 @@ function AddVoucherModal({ onClose, onAdd }) {
   const [form, setForm] = useState({
     code: '', name: '', type: 'percent', value: '', maxDiscount: '',
     minOrder: '', desc: '', startDate: today, expiry: '', stock: '',
-    usesPerUser: 1, pointCost: 0,
+    usesPerUser: 1, pointCost: 0, requiredRank: '',
   });
 
   const handleAdd = () => {
@@ -52,6 +57,7 @@ function AddVoucherModal({ onClose, onAdd }) {
       active: true,
       isPublic: true,
       pointCost: Number(form.pointCost) || 0,
+      requiredRank: form.requiredRank || '',
     });
     onClose();
   };
@@ -132,6 +138,19 @@ function AddVoucherModal({ onClose, onAdd }) {
           <div>
             <label className="text-cinema-muted text-xs mb-1 block">Mô tả</label>
             <input className="input-field" placeholder="Mô tả ngắn về voucher" value={form.desc} onChange={e => f('desc', e.target.value)} />
+          </div>
+          <div>
+            <label className="text-cinema-muted text-xs mb-1 block">🏅 Hạng thành viên yêu cầu</label>
+            <select className="input-field cursor-pointer" value={form.requiredRank} onChange={e => f('requiredRank', e.target.value)}>
+              {RANK_OPTIONS.map(r => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+            {form.requiredRank && (
+              <p className="text-yellow-400/80 text-[11px] mt-1">
+                ⚠️ Voucher chỉ dành cho thành viên <strong>{RANK_OPTIONS.find(r => r.value === form.requiredRank)?.label}</strong> trở lên
+              </p>
+            )}
           </div>
         </div>
         <div className="flex gap-3 mt-6">
@@ -282,6 +301,19 @@ function EditVoucherModal({ voucher, onClose, onSave }) {
           </div>
           <Field label="Mô tả" fieldKey="desc" />
           <div>
+            <label className="text-cinema-muted text-xs mb-1 block">🏅 Hạng thành viên yêu cầu</label>
+            <select className="input-field cursor-pointer" value={form.requiredRank || ''} onChange={e => f('requiredRank', e.target.value)}>
+              {RANK_OPTIONS.map(r => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+            {form.requiredRank && (
+              <p className="text-yellow-400/80 text-[11px] mt-1">
+                ⚠️ Chỉ dành cho thành viên <strong>{RANK_OPTIONS.find(r => r.value === form.requiredRank)?.label}</strong>
+              </p>
+            )}
+          </div>
+          <div>
             <label className="text-cinema-muted text-xs mb-1 block">Trạng thái</label>
             <select className="input-field cursor-pointer" value={form.active ? 'true' : 'false'}
               onChange={e => f('active', e.target.value === 'true')}>
@@ -302,69 +334,11 @@ function EditVoucherModal({ voucher, onClose, onSave }) {
 
 // ── Main Component ─────────────────────────────────────────
 export default function AdminVouchers() {
-  const [vouchers, setVouchers] = useState(MOCK_VOUCHERS);
-  const [loading, setLoading] = useState(true);
+  const [vouchers, setVouchers] = useState(VOUCHERS);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState(null);
-
-  const { addNotification, addToast } = useNotificationStore();
-
-  useEffect(() => {
-    setLoading(true);
-    promotionService.getAll()
-      .then((res) => {
-        console.log("Raw promotions response:", res);
-        // Cấu trúc thực tế: { data: [...] }
-        const data = res?.data || res?.content || (Array.isArray(res) ? res : []);
-        
-        if (data.length > 0) {
-          const normalized = data.map(v => ({
-            ...v,
-            id: v.id,
-            code: v.promotionCode || v.code || 'NO_CODE',
-            name: v.promotionName || v.name || v.description || '',
-            type: String(v.discountType || v.type || '').toLowerCase().includes('percent') ? 'percent' : 'fixed',
-            value: v.discountValue || v.value || 0,
-            maxDiscount: v.maxDiscountAmount || v.maxDiscount || 0,
-            minOrder: v.minOrderAmount || v.minOrder || 0,
-            desc: v.description || v.desc || '',
-            // Định dạng từ BE: dd-MM-yyyy HH:mm:ss -> cần đổi sang yyyy-MM-dd để dùng DatePicker
-            startDate: formatBEToISO(v.startDate),
-            expiry: formatBEToISO(v.endDate || v.expiry),
-            stock: v.usageLimit || v.stock || 0,
-            usedCount: v.usageCount || v.usedCount || 0,
-            usesPerUser: v.usagePerUser || v.usesPerUser || 1,
-            active: String(v.status || '').toLowerCase() === 'active',
-            pointCost: v.pointCost || 0,
-          }));
-          setVouchers(normalized);
-        } else {
-          setVouchers([]);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to fetch vouchers:", err);
-        addToast('Lỗi kết nối API Voucher.', 'error');
-        setVouchers(MOCK_VOUCHERS);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  // Helper để đổi dd-MM-yyyy sang yyyy-MM-dd
-  const formatBEToISO = (str) => {
-    if (!str || typeof str !== 'string') return '';
-    const datePart = str.split(' ')[0]; // dd-MM-yyyy
-    const parts = datePart.split('-');
-    if (parts.length === 3) {
-      // Nếu là dd-MM-yyyy
-      if (parts[0].length === 2) return `${parts[2]}-${parts[1]}-${parts[0]}`;
-      // Nếu đã là yyyy-MM-dd
-      return datePart;
-    }
-    return '';
-  };
 
   const filtered = vouchers.filter(v => {
     const matchSearch = v.code.toLowerCase().includes(search.toLowerCase()) ||
@@ -374,7 +348,7 @@ export default function AdminVouchers() {
     return matchSearch && matchStatus;
   });
 
-
+  const { addNotification } = useNotificationStore();
 
   const toggleActive = (id) => {
     const v = vouchers.find(x => x.id === id);
@@ -408,14 +382,6 @@ export default function AdminVouchers() {
     expired: vouchers.filter(v => new Date(v.expiry) < new Date()).length,
     pointBased: vouchers.filter(v => v.pointCost > 0).length,
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-5">
@@ -466,7 +432,7 @@ export default function AdminVouchers() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-cinema-border bg-cinema-dark">
-                {['Mã / Tên', 'Giá trị', 'Tối đa', 'Đơn tối thiểu', 'Số lượng', 'Lần/user', 'Ngày BĐ – KT', 'Điểm', 'Trạng thái', 'Thao tác'].map(h => (
+                {['Mã / Tên', 'Giá trị', 'Tối đa', 'Đơn tối thiểu', 'Số lượng', 'Lần/user', 'Ngày BĐ – KT', 'Điểm', 'Hạng y/c', 'Trạng thái', 'Thao tác'].map(h => (
                   <th key={h} className="text-left px-3 py-3 text-cinema-muted text-xs font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -505,6 +471,12 @@ export default function AdminVouchers() {
                     </td>
                     <td className="px-3 py-3 text-sm">
                       {v.pointCost > 0 ? <span className="flex items-center gap-1 text-yellow-400">⭐ {v.pointCost}</span> : <span className="text-cinema-muted">—</span>}
+                    </td>
+                    <td className="px-3 py-3">
+                      {(() => {
+                        const badge = RANK_BADGE[v.requiredRank || ''] || RANK_BADGE[''];
+                        return <span className={`badge text-xs border whitespace-nowrap ${badge.cls}`}>{badge.label}</span>;
+                      })()}
                     </td>
                     <td className="px-3 py-3">
                       <span className={`badge text-xs border ${!v.active ? 'bg-red-500/20 border-red-500/30 text-red-400' : isExpired ? 'bg-orange-500/20 border-orange-500/30 text-orange-400' : 'bg-green-500/20 border-green-500/30 text-green-400'}`}>

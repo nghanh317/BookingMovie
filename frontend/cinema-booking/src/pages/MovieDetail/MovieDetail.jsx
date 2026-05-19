@@ -1,8 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { AGE_RATINGS } from '../../constants/mockData';
-import { movieService } from '../../services';
+import { MOVIES, CINEMAS, SHOWTIMES, AGE_RATINGS } from '../../constants/mockData';
 import MovieCard from '../../components/movie/MovieCard';
 import ReviewSection from '../../components/movie/ReviewSection';
 import useFavoriteStore from '../../store/favoriteStore';
@@ -14,7 +13,7 @@ function StarRating({ rating }) {
       <svg className="w-6 h-6 text-primary" fill="currentColor" viewBox="0 0 24 24">
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
       </svg>
-      <span className="text-white font-bold ml-1 text-lg">{rating ? rating.toFixed(1) : '0'}</span>
+      <span className="text-white font-bold ml-1 text-lg">{rating}</span>
       <span className="text-cinema-muted text-sm mt-0.5">/10</span>
     </div>
   );
@@ -22,47 +21,11 @@ function StarRating({ rating }) {
 
 export default function MovieDetail() {
   const { id } = useParams();
-  const [movie, setMovie] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [relatedMovies, setRelatedMovies] = useState([]);
+  const movie = MOVIES.find(m => m.id === Number(id));
   const { isFavorite, toggleFavorite } = useFavoriteStore();
   const { addNotification } = useNotificationStore();
   const favorite = movie ? isFavorite(movie.id) : false;
   const [isReminded, setIsReminded] = useState(false);
-
-  useEffect(() => {
-    const loadMovie = async () => {
-      setLoading(true);
-      try {
-        const m = await movieService.getById(id);
-        setMovie(m);
-        // Load related movies
-        const allMovies = await movieService.getAll();
-        if (m && m.genre && Array.isArray(m.genre)) {
-          const related = allMovies
-            .filter(item => item.id !== m.id && Array.isArray(item.genre) && item.genre.some(g => m.genre.includes(g)))
-            .slice(0, 6);
-          setRelatedMovies(related);
-        }
-      } catch (error) {
-        console.error("Failed to load movie details:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadMovie();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-cinema-muted">Đang tải thông tin phim...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (!movie) {
     return (
@@ -77,13 +40,14 @@ export default function MovieDetail() {
   }
 
   const ageInfo = AGE_RATINGS[movie.ageRating];
+  const relatedMovies = MOVIES.filter(m => m.id !== movie.id && m.genre.some(g => movie.genre.includes(g))).slice(0, 6);
 
   return (
     <div className="min-h-screen animate-fade-in">
       {/* Backdrop Hero */}
       <div className="relative h-[70vh] min-h-[450px] overflow-hidden">
         <img
-          src={movie.backdrop || movie.poster}
+          src={movie.backdrop}
           alt={movie.title}
           className="w-full h-full object-cover"
           onError={e => { e.target.src = `https://placehold.co/1920x1080/1A1A24/A0A0B4?text=${encodeURIComponent(movie.title)}`; }}
@@ -152,7 +116,7 @@ export default function MovieDetail() {
 
             {/* Genre tags */}
             <div className="flex flex-wrap gap-2 mb-4">
-              {movie.genre && movie.genre.map(g => (
+              {movie.genre.map(g => (
                 <span key={g} className="badge bg-primary/10 border border-primary/30 text-primary text-xs">{g}</span>
               ))}
             </div>
@@ -163,19 +127,19 @@ export default function MovieDetail() {
             {/* Cast */}
             <div className="mb-6">
               <p className="text-cinema-muted text-xs mb-1.5">Diễn viên</p>
-              <p className="text-white text-sm">{movie.cast && movie.cast.join(' • ')}</p>
+              <p className="text-white text-sm">{movie.cast.join(' • ')}</p>
             </div>
 
             {/* CTA */}
             <div className="flex flex-wrap gap-3 items-center">
               {movie.status === 'now_showing' ? (
                 <>
-                  <Link to={`/booking/${movie.id}`} className="btn-accent px-8 py-3 text-base">
+                  <Link to={`/booking/${movie.id}`} className="btn-accent px-8 py-3">
                     🎟️ Đặt Vé Ngay
                   </Link>
                   <button
                     onClick={() => document.getElementById('trailer-section')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="btn-outline px-6 py-3 text-base flex items-center gap-2"
+                    className="btn-outline px-6 py-3 flex items-center gap-2"
                   >
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z"/>
@@ -196,7 +160,7 @@ export default function MovieDetail() {
                       });
                     }}
                     disabled={isReminded}
-                    className={`px-6 py-3 text-base flex items-center gap-2 transition-all ${
+                    className={`px-6 py-3 flex items-center gap-2 transition-all ${
                       isReminded 
                         ? 'bg-green-500/20 text-green-400 border border-green-500/50 cursor-default rounded-xl' 
                         : 'btn-outline'
@@ -206,7 +170,7 @@ export default function MovieDetail() {
                   </button>
                   <button
                     onClick={() => document.getElementById('trailer-section')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="btn-outline px-6 py-3 text-base flex items-center gap-2"
+                    className="btn-outline px-6 py-3 flex items-center gap-2"
                   >
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z"/>
@@ -239,23 +203,21 @@ export default function MovieDetail() {
         </div>
 
         {/* Trailer Section */}
-        {movie.trailer && (
-          <section id="trailer-section" className="mt-16">
-            <h2 className="section-title mb-6">Trailer</h2>
-            <div className="rounded-2xl overflow-hidden border border-cinema-border aspect-video max-w-3xl">
-              <iframe
-                width="100%"
-                height="100%"
-                src={movie.trailer}
-                title={`Trailer ${movie.title}`}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full"
-              />
-            </div>
-          </section>
-        )}
+        <section id="trailer-section" className="mt-16">
+          <h2 className="section-title mb-6">Trailer</h2>
+          <div className="rounded-2xl overflow-hidden border border-cinema-border aspect-video max-w-3xl">
+            <iframe
+              width="100%"
+              height="100%"
+              src={movie.trailer}
+              title={`Trailer ${movie.title}`}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="w-full h-full"
+            />
+          </div>
+        </section>
 
         {/* Reviews Section */}
         <div className="container-section">

@@ -41,23 +41,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      const requestUrl = error.config?.url || '';
-      // Danh sách các API không được phép redirect về login khi gặp 401
-      const isPublicEndpoint = 
-        requestUrl.includes('/v1/auth/') || 
-        requestUrl.includes('/v1/movies') || 
-        requestUrl.includes('/v1/cinemas') || 
-        requestUrl.includes('/v1/provinces') ||
-        requestUrl.includes('/v1/slots') ||
-        requestUrl.includes('/v1/accounts') ||
-        requestUrl.includes('/v1/promotions') ||
-        requestUrl.includes('/v1/products') ||
-        requestUrl.includes('/v1/tickets');
-
-      if (!isPublicEndpoint) {
-        localStorage.removeItem('cinema-auth');
-        window.location.href = '/login';
-      }
+      // Xoá dữ liệu auth và redirect về login
+      localStorage.removeItem('cinema-auth');
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }

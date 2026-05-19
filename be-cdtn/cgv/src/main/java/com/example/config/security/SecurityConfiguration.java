@@ -72,7 +72,10 @@ public class SecurityConfiguration {
 					.requestMatchers(HttpMethod.POST, "/api/v1/rooms/**").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.PUT, "/api/v1/rooms/**").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.DELETE, "/api/v1/rooms/**").hasAuthority("ADMIN")
-					.requestMatchers(HttpMethod.GET, "/api/v1/slots/**").permitAll()
+					.requestMatchers(HttpMethod.GET, "/api/v1/slots/**", "/api/v1/slots").permitAll()
+					.requestMatchers(HttpMethod.POST, "/api/v1/slots/**", "/api/v1/slots").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.PUT, "/api/v1/slots/**", "/api/v1/slots").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.DELETE, "/api/v1/slots/**", "/api/v1/slots").hasAuthority("ADMIN")
 					.requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
 					
 					.requestMatchers("/api/v1/auth/**").permitAll()
@@ -80,6 +83,7 @@ public class SecurityConfiguration {
 					.requestMatchers("/api/v1/payments/**").permitAll()
 					.requestMatchers("/error").permitAll()
 					.requestMatchers("/api/v1/**").hasAuthority("ADMIN")
+					.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 					.anyRequest().authenticated())
 			.httpBasic(withDefaults())
 			.addFilterBefore(jwtAuthorizationFilter, UsernamePasswordAuthenticationFilter.class)
@@ -92,7 +96,7 @@ public class SecurityConfiguration {
 	@Bean
 	public CorsConfigurationSource corsConfigurationSource() {
 		final CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE"));
+		configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 		configuration.applyPermitDefaultValues();
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);

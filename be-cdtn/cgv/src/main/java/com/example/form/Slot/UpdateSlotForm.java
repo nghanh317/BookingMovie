@@ -16,11 +16,11 @@ public class UpdateSlotForm {
     private Integer roomId;
     
     // THÊM VÀO ĐÂY
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss", timezone = "Asia/Ho_Chi_Minh")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Ho_Chi_Minh")
     private Date showTime;
     
     // THÊM VÀO ĐÂY
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss", timezone = "Asia/Ho_Chi_Minh")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Ho_Chi_Minh")
     private Date endTime;
     
     private BigDecimal price;

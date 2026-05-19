@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import useAuthStore from '../../store/authStore';
+import { sendWelcomeEmail } from '../../services/emailService';
+import { registerApi } from '../../api/authApi';
 
 // ✅ Khai báo NGOÀI component để tránh bị tạo lại mỗi lần render (gây mất focus)
 function Field({ name, label, type = 'text', placeholder, autoComplete, form, setForm, errors, setErrors, showPassword }) {
@@ -26,58 +27,54 @@ function Field({ name, label, type = 'text', placeholder, autoComplete, form, se
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register } = useAuthStore();
-  const [form, setForm] = useState({ userName: '', fullName: '', email: '', phone: '', passwordHash: '', confirm: '' });
+  const [form, setForm] = useState({ userName: '', fullName: '', email: '', phone: '', password: '', confirm: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [agreed, setAgreed] = useState(false);
-  const [apiError, setApiError] = useState('');
 
   const validate = () => {
     const errs = {};
     if (!form.userName.trim()) errs.userName = 'Vui lòng nhập tên đăng nhập';
     if (!form.fullName.trim()) errs.fullName = 'Vui lòng nhập họ tên';
     if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email không hợp lệ';
-    if (!form.phone || !/^(0|\+84)[0-9]{8,10}$/.test(form.phone)) errs.phone = 'Số điện thoại không hợp lệ';
-    if (!form.passwordHash || form.passwordHash.length < 6) errs.passwordHash = 'Mật khẩu tối thiểu 6 ký tự';
-    if (form.passwordHash !== form.confirm) errs.confirm = 'Mật khẩu không khớp';
+    if (!form.phone || !/^(0|\+84)[0-9]{9}$/.test(form.phone)) errs.phone = 'Số điện thoại không hợp lệ';
+    if (!form.password || form.password.length < 8) errs.password = 'Mật khẩu tối thiểu 8 ký tự';
+    if (form.password !== form.confirm) errs.confirm = 'Mật khẩu không khớp';
     if (!agreed) errs.agreed = 'Bạn cần đồng ý với điều khoản';
     return errs;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setApiError('');
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setLoading(true);
+    setErrors({}); // Xoá lỗi cũ
 
-    // Gọi API đăng ký thật qua authStore
-    const result = await register({
-      userName: form.userName,
-      passwordHash: form.passwordHash,
-      email: form.email,
-      phone: form.phone,
-      fullName: form.fullName,
-    });
-
-    setLoading(false);
-
-    if (!result.success) {
-      setApiError(result.message);
-      return;
+    try {
+      await registerApi(form.userName, form.password, form.email, form.phone, form.fullName);
+      
+      // Gửi email chào mừng (không block UI nếu lỗi)
+      try {
+        await sendWelcomeEmail(form.fullName, form.email);
+      } catch (err) {
+        console.warn('Không thể gửi email chào mừng:', err);
+      }
+      
+      setLoading(false);
+      navigate('/login');
+    } catch (error) {
+      setLoading(false);
+      setErrors({ apiError: error.message });
     }
-
-    // Đăng ký thành công → chuyển sang trang login
-    navigate('/login', { state: { registered: true } });
   };
 
   const passwordStrength = (() => {
-    const p = form.passwordHash;
+    const p = form.password;
     if (!p) return 0;
     let score = 0;
-    if (p.length >= 6) score++;
+    if (p.length >= 8) score++;
     if (/[A-Z]/.test(p)) score++;
     if (/[0-9]/.test(p)) score++;
     if (/[^A-Za-z0-9]/.test(p)) score++;
@@ -115,17 +112,10 @@ export default function Register() {
         </div>
 
         <div className="card p-8">
-          {apiError && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm mb-4 flex items-center gap-2">
-              <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              {apiError}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Field {...fieldProps} name="userName" label="Tên đăng nhập *" placeholder="username123" autoComplete="username" />
+            {errors.apiError && <div className="p-3 bg-red-500/20 border border-red-500 text-red-100 rounded-lg text-sm mb-4">{errors.apiError}</div>}
+            
+            <Field {...fieldProps} name="userName" label="Tên đăng nhập *" placeholder="test123" autoComplete="username" />
             <Field {...fieldProps} name="fullName" label="Họ và tên *" placeholder="Nguyễn Văn A" autoComplete="name" />
             <Field {...fieldProps} name="email" label="Email *" type="email" placeholder="email@example.com" autoComplete="email" />
             <Field {...fieldProps} name="phone" label="Số điện thoại *" type="tel" placeholder="0912345678" autoComplete="tel" />
@@ -140,17 +130,17 @@ export default function Register() {
               </div>
               <input
                 type={showPassword ? 'text' : 'password'}
-                value={form.passwordHash}
+                value={form.password}
                 onChange={e => {
-                  setForm(prev => ({ ...prev, passwordHash: e.target.value }));
-                  setErrors(prev => ({ ...prev, passwordHash: '' }));
+                  setForm(prev => ({ ...prev, password: e.target.value }));
+                  setErrors(prev => ({ ...prev, password: '' }));
                 }}
-                placeholder="Ít nhất 6 ký tự"
+                placeholder="Ít nhất 8 ký tự"
                 autoComplete="new-password"
-                className={`input-field ${errors.passwordHash ? 'border-red-500' : ''}`}
+                className={`input-field ${errors.password ? 'border-red-500' : ''}`}
               />
-              {errors.passwordHash && <p className="text-red-400 text-xs mt-1">{errors.passwordHash}</p>}
-              {form.passwordHash && (
+              {errors.password && <p className="text-red-400 text-xs mt-1">{errors.password}</p>}
+              {form.password && (
                 <div className="mt-2">
                   <div className="flex gap-1">
                     {[1, 2, 3, 4].map(i => (

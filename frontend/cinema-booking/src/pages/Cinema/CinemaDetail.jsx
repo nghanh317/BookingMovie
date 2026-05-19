@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CINEMAS, SHOWTIMES, CINEMA_DETAILS } from '../../constants/mockData';
+import { CINEMAS, MOVIES, SHOWTIMES, CINEMA_DETAILS } from '../../constants/mockData';
 import cinemaService from '../../services/cinemaService';
-import { movieService } from '../../services';
 import useAuthStore from '../../store/authStore';
 
 const TYPE_COLORS = {
@@ -212,7 +211,6 @@ export default function CinemaDetail() {
   const cinemaId = Number(id);
 
   const [cinema, setCinema] = useState(null);
-  const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(getNextDays(1)[0].value);
 
@@ -221,12 +219,8 @@ export default function CinemaDetail() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      cinemaService.getById(cinemaId),
-      movieService.getAll()
-    ]).then(([cinemaData, moviesData]) => {
-      setCinema(cinemaData);
-      setMovies(moviesData);
+    cinemaService.getById(cinemaId).then((data) => {
+      setCinema(data);
       setLoading(false);
     });
   }, [cinemaId]);
@@ -269,7 +263,7 @@ export default function CinemaDetail() {
   }, {});
 
   const moviesShowing = Object.entries(groupedByMovie).map(([movieId, showtimes]) => ({
-    movie: movies.find((m) => m.id === Number(movieId)),
+    movie: MOVIES.find((m) => m.id === Number(movieId)),
     showtimes,
   })).filter((item) => item.movie);
 

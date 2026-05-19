@@ -19,7 +19,7 @@ import com.example.form.Slot.UpdateSlotForm;
 import com.example.service.Slot.ISlotService;
 
 @RestController
-@RequestMapping ("api/v1/slots")
+@RequestMapping ("/api/v1/slots")
 public class SlotController {
 	
 	@Autowired

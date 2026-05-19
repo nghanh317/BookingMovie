@@ -7,6 +7,10 @@ import useAuthStore from '../../store/authStore';
 export default function Layout({ children }) {
   const { isLoggedIn, user } = useAuthStore();
   
+  if (isLoggedIn && (user?.role || '').toUpperCase() === 'ADMIN') {
+    return <Navigate to="/admin" replace />;
+  }
+
   return (
     <div className="min-h-screen bg-cinema-black flex flex-col">
       <Navbar />

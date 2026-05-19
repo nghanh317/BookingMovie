@@ -1,24 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { movieService } from '../../services';
+import { MOVIES, PROVINCES, CINEMAS } from '../../constants/mockData';
 import MovieCard from '../../components/movie/MovieCard';
+import useLocationStore from '../../store/locationStore';
 
 // --- Hero Carousel ---
-function HeroBanner({ movies }) {
-  const featured = movies.filter(m => m.status === 'now_showing').slice(0, 3);
+function HeroBanner() {
+  const featured = MOVIES.filter(m => m.status === 'now_showing').slice(0, 3);
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      if (featured.length > 0) {
-        setCurrent((prev) => (prev + 1) % featured.length);
-      }
+      setCurrent((prev) => (prev + 1) % featured.length);
     }, 5000);
     return () => clearInterval(timer);
   }, [featured.length]);
-
-  if (featured.length === 0) return null;
 
   const movie = featured[current];
 
@@ -27,7 +24,7 @@ function HeroBanner({ movies }) {
       <AnimatePresence mode="wait">
         <motion.div key={movie.id} initial={{ opacity: 0, scale: 1.05 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="absolute inset-0">
-          <img src={movie.backdrop || movie.poster} alt={movie.title} className="w-full h-full object-cover"
+          <img src={movie.backdrop} alt={movie.title} className="w-full h-full object-cover"
             onError={(e) => { e.target.src = `https://placehold.co/1920x1080/1A1A24/A0A0B4?text=${encodeURIComponent(movie.title)}`; }} />
           <div className="absolute inset-0 bg-gradient-to-r from-cinema-black via-cinema-black/70 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-transparent to-transparent" />
@@ -153,40 +150,13 @@ function PromoBanner() {
 
 // --- Main Home Page ---
 export default function Home() {
-  const [movies, setMovies] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchMovies = async () => {
-      try {
-        const data = await movieService.getAll();
-        setMovies(data);
-      } catch (error) {
-        console.error("Failed to load movies:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMovies();
-  }, []);
-
-  const nowShowing = movies.filter(m => m.status === 'now_showing');
-  const comingSoon = movies.filter(m => m.status === 'coming_soon');
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-cinema-muted">Đang tải danh sách phim...</p>
-        </div>
-      </div>
-    );
-  }
+  const nowShowing = MOVIES.filter(m => m.status === 'now_showing');
+  const comingSoon = MOVIES.filter(m => m.status === 'coming_soon');
 
   return (
     <div className="animate-fade-in">
-      <HeroBanner movies={movies} />
+      <HeroBanner />
       <StatsBar />
 
       <div className="container mx-auto px-4 max-w-7xl py-12 space-y-16">
@@ -195,11 +165,7 @@ export default function Home() {
           <SectionHeader title="Đang Chiếu" subtitle="Những bộ phim đang hot nhất hiện tại"
             linkTo="/movies?status=now_showing" linkText="Xem tất cả" />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {nowShowing.length > 0 ? (
-              nowShowing.map((movie, i) => <MovieCard key={movie.id} movie={movie} index={i} />)
-            ) : (
-              <p className="col-span-full text-cinema-muted text-center py-8">Chưa có phim đang chiếu.</p>
-            )}
+            {nowShowing.map((movie, i) => <MovieCard key={movie.id} movie={movie} index={i} />)}
           </div>
         </section>
 
@@ -210,11 +176,7 @@ export default function Home() {
           <SectionHeader title="Sắp Chiếu" subtitle="Những bom tấn sắp ra mắt – Đặt vé sớm để không lỡ!"
             linkTo="/movies?status=coming_soon" linkText="Xem tất cả" />
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {comingSoon.length > 0 ? (
-              comingSoon.map((movie, i) => <MovieCard key={movie.id} movie={movie} index={i} />)
-            ) : (
-              <p className="col-span-full text-cinema-muted text-center py-8">Chưa có phim sắp chiếu.</p>
-            )}
+            {comingSoon.map((movie, i) => <MovieCard key={movie.id} movie={movie} index={i} />)}
           </div>
         </section>
 

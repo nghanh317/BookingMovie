@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { movieService } from '../../services';
+import { MOVIES } from '../../constants/mockData';
 
 const MONTHLY_REVENUE = [
   { month: 'T9/2025', value: 320 }, { month: 'T10/2025', value: 480 },
@@ -10,20 +9,14 @@ const MONTHLY_REVENUE = [
 ];
 const maxMonth = Math.max(...MONTHLY_REVENUE.map(r => r.value));
 
+const MOVIE_REVENUE = MOVIES.slice(0, 5).map((m, i) => ({
+  ...m,
+  tickets: [1240, 980, 856, 723, 612][i],
+  revenue: [186000000, 147000000, 128400000, 108450000, 45720000][i],
+  pct: [100, 79, 69, 58, 37][i],
+}));
+
 export default function AdminRevenue() {
-  const [movies, setMovies] = useState([]);
-
-  useEffect(() => {
-    movieService.getAll().then(setMovies);
-  }, []);
-
-  const MOVIE_REVENUE = movies.slice(0, 5).map((m, i) => ({
-    ...m,
-    tickets: [1240, 980, 856, 723, 612][i] || 500,
-    revenue: [186000000, 147000000, 128400000, 108450000, 45720000][i] || 20000000,
-    pct: [100, 79, 69, 58, 37][i] || 20,
-  }));
-
   const totalRevenue = MONTHLY_REVENUE.reduce((s, r) => s + r.value, 0);
   const totalTickets = MOVIE_REVENUE.reduce((s, r) => s + r.tickets, 0);
 

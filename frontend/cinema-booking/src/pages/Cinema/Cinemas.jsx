@@ -1,8 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PROVINCES } from '../../constants/mockData';
-import { movieService, cinemaService } from '../../services';
+import { CINEMAS, MOVIES, SHOWTIMES, PROVINCES } from '../../constants/mockData';
 import useLocationStore from '../../store/locationStore';
 
 const FORMAT_COLORS = {
@@ -12,49 +11,22 @@ const FORMAT_COLORS = {
   '2D':  'bg-cinema-surface text-cinema-muted border-cinema-border',
 };
 
-function getMoviesAtCinema(cinema, moviesData) {
-  if (!cinema.rooms) return [];
-  
-  const allSlots = cinema.rooms.flatMap(room => 
-    (room.slots || []).map(slot => ({
-      ...slot,
-      roomName: room.roomName,
-      roomType: room.roomType
-    }))
-  );
-
-  if (allSlots.length === 0) return [];
-
-  // Group by movie
-  const movieGroups = allSlots.reduce((acc, slot) => {
-    const movieId = slot.moviesId;
-    if (!movieId) return acc;
-    if (!acc[movieId]) acc[movieId] = [];
-    acc[movieId].push(slot);
-    return acc;
-  }, {});
-
-  return Object.entries(movieGroups).map(([id, slots]) => {
-    const movie = moviesData.find(m => m.id === Number(id));
-    return {
-      movie,
-      showtimes: slots.map(s => {
-        // Parse showTime (dd-MM-yyyy HH:mm:ss) to HH:mm
-        const timeMatch = s.showTime?.match(/\d{2}:\d{2}/);
-        return {
-          id: s.id,
-          time: timeMatch ? timeMatch[0] : '00:00',
-          type: s.roomType || '2D',
-          price: s.price
-        };
-      })
-    };
-  }).filter(x => x.movie);
+function getToday() {
+  return new Date().toISOString().split('T')[0];
 }
 
-function CinemaCard({ cinema, index, moviesData }) {
+function getMoviesAtCinema(cinemaId) {
+  const today = getToday();
+  const todayShowtimes = SHOWTIMES.filter(s => s.cinemaId === cinemaId && s.date === today);
+  const movieIds = [...new Set(todayShowtimes.map(s => s.movieId))];
+  return movieIds
+    .map(id => ({ movie: MOVIES.find(m => m.id === id), showtimes: todayShowtimes.filter(s => s.movieId === id) }))
+    .filter(x => x.movie);
+}
+
+function CinemaCard({ cinema, index }) {
   const [expanded, setExpanded] = useState(false);
-  const moviesNow = useMemo(() => getMoviesAtCinema(cinema, moviesData), [cinema, moviesData]);
+  const moviesNow = useMemo(() => getMoviesAtCinema(cinema.id), [cinema.id]);
 
   return (
     <motion.div
@@ -220,34 +192,11 @@ export default function Cinemas() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAllProvinces, setShowAllProvinces] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
-  const [moviesData, setMoviesData] = useState([]);
-  const [cinemasData, setCinemasData] = useState([]);
   const provincesContainerRef = useRef(null);
 
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      movieService.getAll(),
-      cinemaService.getAll(),
-    ])
-      .then(([movies, cinemas]) => {
-        setMoviesData(movies);
-        setCinemasData(cinemas);
-      })
-      .catch((err) => {
-        console.error('[Cinemas] Failed to load data:', err);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-
   const availableProvinces = useMemo(() => {
-    if (!cinemasData.length) return [];
-    const cities = [...new Set(cinemasData.map(c => c.province))].filter(Boolean);
-    return cities; // Trả về mảng string tỉnh thành
-  }, [cinemasData]);
+    return PROVINCES;
+  }, []);
 
   useEffect(() => {
     const checkOverflow = () => {
@@ -261,7 +210,7 @@ export default function Cinemas() {
   }, [availableProvinces]);
 
   const filtered = useMemo(() => {
-    let result = cinemasData;
+    let result = CINEMAS;
     const province = localProvince || selectedProvince;
     if (province) result = result.filter(c => c.province === province);
     if (searchQuery.trim()) {
@@ -269,7 +218,7 @@ export default function Cinemas() {
       result = result.filter(c => c.name.toLowerCase().includes(q) || c.address.toLowerCase().includes(q));
     }
     return result;
-  }, [cinemasData, localProvince, selectedProvince, searchQuery]);
+  }, [localProvince, selectedProvince, searchQuery]);
 
   const grouped = useMemo(() => {
     const map = {};
@@ -284,17 +233,6 @@ export default function Cinemas() {
     setLocalProvince(p);
     if (p) setProvince(p); else clearProvince();
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-cinema-muted">Đang tải danh sách rạp phim...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen animate-fade-in">
@@ -358,17 +296,17 @@ export default function Cinemas() {
                 >
                   Tất cả
                 </button>
-                {availableProvinces.map(province => (
+                {availableProvinces.map(p => (
                   <button
-                    key={province}
-                    onClick={() => handleProvinceChange(province)}
+                    key={p}
+                    onClick={() => handleProvinceChange(p)}
                     className={`px-4 py-2 rounded-xl border text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                      (localProvince || selectedProvince) === province
+                      (localProvince || selectedProvince) === p
                         ? 'bg-primary border-primary text-cinema-black'
                         : 'border-cinema-border text-cinema-muted hover:border-primary hover:text-primary'
                     }`}
                   >
-                    {province}
+                    {p}
                   </button>
                 ))}
               </div>
@@ -401,10 +339,10 @@ export default function Cinemas() {
         {(!localProvince && !selectedProvince) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
           {[
-            { icon: '🏟️', value: cinemasData.length, label: 'Tổng rạp' },
+            { icon: '🏟️', value: CINEMAS.length, label: 'Tổng rạp' },
             { icon: '📍', value: availableProvinces.length, label: 'Tỉnh thành' },
-            { icon: '🎬', value: cinemasData.reduce((a, c) => a + c.screens, 0), label: 'Phòng chiếu' },
-            { icon: '⭐', value: cinemasData.length ? (cinemasData.reduce((a, c) => a + c.rating, 0) / cinemasData.length).toFixed(1) : 0, label: 'Đánh giá TB' },
+            { icon: '🎬', value: CINEMAS.reduce((a, c) => a + c.screens, 0), label: 'Phòng chiếu' },
+            { icon: '⭐', value: (CINEMAS.reduce((a, c) => a + c.rating, 0) / CINEMAS.length).toFixed(1), label: 'Đánh giá TB' },
           ].map((s, i) => (
             <motion.div
               key={s.label}
@@ -446,7 +384,7 @@ export default function Cinemas() {
               </div>
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {cinemas.map((cinema, i) => (
-                  <CinemaCard key={cinema.id} cinema={cinema} index={i} moviesData={moviesData} />
+                  <CinemaCard key={cinema.id} cinema={cinema} index={i} />
                 ))}
               </div>
             </div>

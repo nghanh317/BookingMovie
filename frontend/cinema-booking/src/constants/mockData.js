@@ -203,11 +203,33 @@ export const CINEMAS = [
 
 // Mock data - Cinema Rooms
 export const CINEMA_ROOMS = [
-  { id: 1, cinemaId: 1, name: 'Cinema 1', format: '2D', totalSeats: 120 },
-  { id: 2, cinemaId: 1, name: 'Cinema 2', format: '3D', totalSeats: 80 },
-  { id: 3, cinemaId: 1, name: 'IMAX', format: 'IMAX', totalSeats: 150 },
-  { id: 4, cinemaId: 2, name: 'Hall A', format: '2D', totalSeats: 100 },
-  { id: 5, cinemaId: 2, name: 'Hall B', format: '3D', totalSeats: 90 },
+  // CGV Vincom Center (cinemaId: 1) – 5 phòng
+  { id: 1,  cinemaId: 1, name: 'Cinema 1', format: '2D',   totalSeats: 120, seatPrices: { standard: 75000, vip: 110000, couple: 200000 } },
+  { id: 2,  cinemaId: 1, name: 'Cinema 2', format: '3D',   totalSeats: 80,  seatPrices: { standard: 90000, vip: 130000, couple: 230000 } },
+  { id: 3,  cinemaId: 1, name: 'IMAX',     format: 'IMAX', totalSeats: 150, seatPrices: { standard: 130000, vip: 180000, couple: 320000 } },
+  { id: 4,  cinemaId: 1, name: 'Cinema 3', format: '2D',   totalSeats: 100, seatPrices: { standard: 75000, vip: 110000, couple: 200000 } },
+  { id: 5,  cinemaId: 1, name: 'Cinema 4', format: '3D',   totalSeats: 90,  seatPrices: { standard: 90000, vip: 130000, couple: 230000 } },
+  // Lotte Cinema Landmark (cinemaId: 2) – 4 phòng
+  { id: 6,  cinemaId: 2, name: 'Hall A',   format: '2D',   totalSeats: 100, seatPrices: { standard: 80000, vip: 120000, couple: 210000 } },
+  { id: 7,  cinemaId: 2, name: 'Hall B',   format: '3D',   totalSeats: 90,  seatPrices: { standard: 95000, vip: 140000, couple: 250000 } },
+  { id: 8,  cinemaId: 2, name: 'Hall C',   format: 'IMAX', totalSeats: 140, seatPrices: { standard: 140000, vip: 190000, couple: 340000 } },
+  { id: 9,  cinemaId: 2, name: 'Hall D',   format: '2D',   totalSeats: 110, seatPrices: { standard: 80000, vip: 120000, couple: 210000 } },
+  // BHD Star Cineplex (cinemaId: 3) – 3 phòng
+  { id: 10, cinemaId: 3, name: 'Screen 1', format: '2D',   totalSeats: 80,  seatPrices: { standard: 75000, vip: 115000, couple: 205000 } },
+  { id: 11, cinemaId: 3, name: 'Screen 2', format: '3D',   totalSeats: 70,  seatPrices: { standard: 90000, vip: 135000, couple: 240000 } },
+  { id: 12, cinemaId: 3, name: 'Screen 3', format: 'IMAX', totalSeats: 120, seatPrices: { standard: 130000, vip: 175000, couple: 310000 } },
+  // CGV Vincom Bà Triệu (cinemaId: 4) – 3 phòng
+  { id: 13, cinemaId: 4, name: 'Room 1',   format: '2D',   totalSeats: 90,  seatPrices: { standard: 80000, vip: 120000, couple: 215000 } },
+  { id: 14, cinemaId: 4, name: 'Room 2',   format: '3D',   totalSeats: 80,  seatPrices: { standard: 95000, vip: 140000, couple: 250000 } },
+  { id: 15, cinemaId: 4, name: 'Room IMAX',format: 'IMAX', totalSeats: 130, seatPrices: { standard: 135000, vip: 180000, couple: 320000 } },
+  // Galaxy Cinema Đà Nẵng (cinemaId: 5) – 3 phòng
+  { id: 16, cinemaId: 5, name: 'Phòng 1',  format: '2D',   totalSeats: 80,  seatPrices: { standard: 70000, vip: 105000, couple: 190000 } },
+  { id: 17, cinemaId: 5, name: 'Phòng 2',  format: '3D',   totalSeats: 70,  seatPrices: { standard: 85000, vip: 125000, couple: 225000 } },
+  { id: 18, cinemaId: 5, name: 'Phòng 3',  format: '2D',   totalSeats: 60,  seatPrices: { standard: 70000, vip: 105000, couple: 190000 } },
+  // Lotte Cinema Cần Thơ (cinemaId: 6) – 3 phòng
+  { id: 19, cinemaId: 6, name: 'Phòng A',  format: '2D',   totalSeats: 80,  seatPrices: { standard: 70000, vip: 105000, couple: 185000 } },
+  { id: 20, cinemaId: 6, name: 'Phòng B',  format: '3D',   totalSeats: 70,  seatPrices: { standard: 85000, vip: 125000, couple: 220000 } },
+  { id: 21, cinemaId: 6, name: 'Phòng VIP',format: '2D',   totalSeats: 50,  seatPrices: { standard: 90000, vip: 140000, couple: 250000 } },
 ];
 
 // Mock data - Showtimes

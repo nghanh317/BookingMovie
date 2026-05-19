@@ -30,23 +30,21 @@ export default function MovieCard({ movie, index = 0 }) {
       <div className="card overflow-hidden flex flex-col h-full">
         {/* Poster */}
         <div className="relative overflow-hidden aspect-[2/3] flex-shrink-0">
-          <Link to={`/movies/${movie.id}`} className="block w-full h-full">
-            <img
-              src={movie.poster}
-              alt={movie.title}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-              loading="lazy"
-              onError={(e) => {
-                e.target.src = `https://placehold.co/300x450/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title)}`;
-              }}
-            />
-          </Link>
+          <img
+            src={movie.poster}
+            alt={movie.title}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            loading="lazy"
+            onError={(e) => {
+              e.target.src = `https://placehold.co/300x450/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title)}`;
+            }}
+          />
 
           {/* Overlay on hover */}
-          <div className="absolute inset-0 bg-gradient-cinema opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4 pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-cinema opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
             <Link
               to={`/booking/${movie.id}`}
-              className="w-full btn-primary text-sm py-2 text-center pointer-events-auto"
+              className="w-full btn-primary text-sm py-2 text-center"
               onClick={(e) => e.stopPropagation()}
             >
               🎟️ Đặt Vé Ngay

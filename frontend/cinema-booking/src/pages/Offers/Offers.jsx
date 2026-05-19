@@ -86,20 +86,21 @@ function VoucherCard({ voucher, owned, userPoints, onRedeem }) {
 
 // --- Main Offers Page ---
 export default function Offers() {
-  const { isLoggedIn, user } = useAuthStore();
+  const { isLoggedIn, user, addVoucher, spendPoints } = useAuthStore();
   const [tab, setTab] = useState('owned');
-  const [redeemedIds, setRedeemedIds] = useState([]);
 
   const myVoucherIds = user?.myVouchers || [];
-  const ownedVouchers = VOUCHERS.filter(v => myVoucherIds.includes(v.id) || redeemedIds.includes(v.id));
+  // Voucher đang sở hữu = từ user state (persist)
+  const ownedVouchers = VOUCHERS.filter(v => myVoucherIds.includes(v.id));
   const redeemableVouchers = VOUCHERS.filter(v =>
-    !myVoucherIds.includes(v.id) && !redeemedIds.includes(v.id) && v.pointCost > 0
+    !myVoucherIds.includes(v.id) && v.pointCost > 0
   );
   const publicVouchers = VOUCHERS.filter(v => v.isPublic && v.active);
 
   const handleRedeem = (voucher) => {
-    if (user && user.points >= voucher.pointCost) {
-      setRedeemedIds(prev => [...prev, voucher.id]);
+    if (user && (user.points || 0) >= voucher.pointCost) {
+      spendPoints(voucher.pointCost);
+      addVoucher(voucher.id);
     }
   };
 

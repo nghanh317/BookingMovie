@@ -245,6 +245,8 @@ export default function Navbar() {
 
             {/* Top Phim */}
             <NavLink to="/top-movies">🏆 Top Phim</NavLink>
+            {/* Tin tức & Khuyến mãi */}
+            <NavLink to="/news">📰 Tin tức & KM</NavLink>
           </nav>
 
           {/* Right actions */}
@@ -538,6 +540,20 @@ export default function Navbar() {
                   }
                 >
                   🏆 Top Phim
+                </RNavLink>
+
+                <RNavLink
+                  to="/news"
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    `px-3 py-2.5 rounded-lg font-medium text-sm transition-colors ${
+                      isActive
+                        ? 'text-primary bg-primary/10'
+                        : 'text-cinema-muted hover:text-primary hover:bg-cinema-surface'
+                    }`
+                  }
+                >
+                  📰 Tin tức & KM
                 </RNavLink>
 
                 <div className="pt-2 border-t border-cinema-border mt-2">
