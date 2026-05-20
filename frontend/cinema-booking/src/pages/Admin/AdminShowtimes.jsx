@@ -1,7 +1,10 @@
-import { useState, useMemo } from 'react';
-import { MOVIES, CINEMAS, SHOWTIMES, CINEMA_ROOMS } from '../../constants/mockData';
+import { useState, useMemo, useEffect } from 'react';
 import useNotificationStore from '../../store/notificationStore';
 import DatePickerInput from '../../components/ui/DatePickerInput';
+import movieService from '../../services/movieService';
+import cinemaService from '../../services/cinemaService';
+import roomService from '../../services/roomService';
+import slotService from '../../services/slotService';
 
 // Hiển thị YYYY-MM-DD thành DD/MM/YYYY
 function fmtDate(iso) {
@@ -15,16 +18,52 @@ function fmtPrice(n) {
   return new Intl.NumberFormat('vi-VN').format(n) + 'đ';
 }
 
-const MOCK_SHOWTIMES = [
-  ...SHOWTIMES,
-  { id: 11, movieId: 1, cinemaId: 2, date: '2026-03-19', time: '14:00', hall: 'Hall B', type: '3D', availableSeats: 55 },
-  { id: 12, movieId: 3, cinemaId: 3, date: '2026-03-20', time: '20:00', hall: 'Screen 1', type: '2D', availableSeats: 90 },
-];
-
 const DEFAULT_SEAT_PRICES = { standard: 75000, vip: 110000, couple: 200000 };
 
 export default function AdminShowtimes() {
-  const [showtimes, setShowtimes] = useState(MOCK_SHOWTIMES);
+  const [movies, setMovies] = useState([]);
+  const [cinemas, setCinemas] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [showtimes, setShowtimes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      movieService.getAll(),
+      cinemaService.getAll(),
+      roomService.getAll(),
+      slotService.getAll({ size: 1000 })
+    ]).then(([moviesData, cinemasData, roomsData, slotsData]) => {
+      setMovies(Array.isArray(moviesData) ? moviesData : (moviesData?.content || moviesData?.data || []));
+      setCinemas(Array.isArray(cinemasData) ? cinemasData : (cinemasData?.content || cinemasData?.data || []));
+      
+      const fetchedRooms = Array.isArray(roomsData) ? roomsData : (roomsData?.content || roomsData?.data || []);
+      setRooms(fetchedRooms);
+      
+      const slotsRaw = Array.isArray(slotsData) ? slotsData : (slotsData?.content || slotsData?.data || []);
+      const slots = slotsRaw.map(s => {
+        const [date, timeWithSec] = (s.showTime || '2024-01-01 00:00:00').split(' ');
+        const time = timeWithSec ? timeWithSec.substring(0, 5) : '';
+        const room = fetchedRooms.find(r => r.id === s.roomId);
+        return {
+          id: s.id,
+          movieId: s.movieId,
+          roomId: s.roomId,
+          cinemaId: room?.cinemaId,
+          date,
+          time,
+          hall: s.roomName || room?.name,
+          type: '2D',
+          availableSeats: s.emptySeats || 0,
+          seatPrices: { standard: s.price, vip: s.price, couple: s.price }
+        };
+      });
+      setShowtimes(slots);
+    }).catch(err => {
+      console.error("Error fetching data in AdminShowtimes.jsx:", err);
+    }).finally(() => setLoading(false));
+  }, []);
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
@@ -38,15 +77,15 @@ export default function AdminShowtimes() {
 
   const filteredShowtimes = useMemo(() => {
     return showtimes.filter(st => {
-      const movie = MOVIES.find(m => m.id === st.movieId);
-      const cinema = CINEMAS.find(c => c.id === st.cinemaId);
+      const movie = movies.find(m => m.id === st.movieId);
+      const cinema = cinemas.find(c => c.id === st.cinemaId);
       const matchSearch = (movie?.title || '').toLowerCase().includes(search.toLowerCase()) || 
                           (cinema?.name || '').toLowerCase().includes(search.toLowerCase());
       const matchDate = !dateFilter || st.date === dateFilter;
       const matchFormat = formatFilter === 'all' || st.type === formatFilter;
       return matchSearch && matchDate && matchFormat;
     });
-  }, [showtimes, search, dateFilter, formatFilter]);
+  }, [showtimes, search, dateFilter, formatFilter, movies, cinemas]);
 
   const { addNotification } = useNotificationStore();
 
@@ -55,11 +94,11 @@ export default function AdminShowtimes() {
     
     if (editingId) {
       setShowtimes(prev => prev.map(s => s.id === editingId ? { ...s, ...form, movieId: +form.movieId, cinemaId: +form.cinemaId, availableSeats: +form.availableSeats } : s));
-      const movie = MOVIES.find(m => m.id === +form.movieId);
+      const movie = movies.find(m => m.id === +form.movieId);
       addNotification({ title: 'Thành công', message: `Đã cập nhật suất chiếu phim "${movie?.title}" lúc ${form.time}`, type: 'success', isAdmin: true });
     } else {
       setShowtimes(prev => [...prev, { ...form, id: Date.now(), movieId: +form.movieId, cinemaId: +form.cinemaId, availableSeats: +form.availableSeats }]);
-      const movie = MOVIES.find(m => m.id === +form.movieId);
+      const movie = movies.find(m => m.id === +form.movieId);
       addNotification({ title: 'Thành công', message: `Đã tạo suất chiếu phim "${movie?.title}" lúc ${form.time}`, type: 'success', isAdmin: true });
     }
 
@@ -69,7 +108,7 @@ export default function AdminShowtimes() {
   };
 
   const handleEdit = (st) => {
-    const room = CINEMA_ROOMS.find(r => r.cinemaId === st.cinemaId && r.name === st.hall);
+    const room = rooms.find(r => r.cinemaId === st.cinemaId && r.name === st.hall);
     setForm({
       movieId: st.movieId,
       cinemaId: st.cinemaId,
@@ -88,7 +127,7 @@ export default function AdminShowtimes() {
 
   const handleDelete = (id) => {
     const st = showtimes.find(s => s.id === id);
-    const movie = MOVIES.find(m => m.id === st?.movieId);
+    const movie = movies.find(m => m.id === st?.movieId);
     setShowtimes(prev => prev.filter(s => s.id !== id));
     addNotification({ title: 'Thành công', message: `Đã xoá hiển thị suất chiếu phim "${movie?.title}" lúc ${st?.time}`, type: 'success', isAdmin: true });
   };
@@ -101,7 +140,7 @@ export default function AdminShowtimes() {
 
   // Khi chọn phòng, tự động điền giá vé mặc định từ phòng đó
   const handleRoomChange = (e) => {
-    const room = CINEMA_ROOMS.find(r => r.id === +e.target.value);
+    const room = rooms.find(r => r.id === +e.target.value);
     setForm(prev => ({
       ...prev,
       roomId: e.target.value,
@@ -112,24 +151,23 @@ export default function AdminShowtimes() {
     }));
   };
 
-  // Group by Province -> Cinema -> Room
   const groupedData = useMemo(() => {
     const tree = {};
-    CINEMAS.forEach(cinema => {
+    cinemas.forEach(cinema => {
       const p = cinema.province;
       if (!tree[p]) tree[p] = {};
       if (!tree[p][cinema.id]) tree[p][cinema.id] = { cinema, rooms: [] };
     });
 
-    CINEMA_ROOMS.forEach(room => {
-      const c = CINEMAS.find(c => c.id === room.cinemaId);
+    rooms.forEach(room => {
+      const c = cinemas.find(c => c.id === room.cinemaId);
       if (c && tree[c.province] && tree[c.province][c.id]) {
         tree[c.province][c.id].rooms.push(room);
       }
     });
 
     return tree;
-  }, []);
+  }, [cinemas, rooms]);
 
   const SEAT_LABELS = {
     standard: { label: 'Ghế thường', icon: '🪑', color: 'text-white' },
@@ -183,14 +221,14 @@ export default function AdminShowtimes() {
               <label className="block text-cinema-muted text-xs mb-1.5">Phim *</label>
               <select value={form.movieId} onChange={e => setForm({...form, movieId: e.target.value})} className="input-field cursor-pointer">
                 <option value="">Chọn phim...</option>
-                {MOVIES.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+                {movies.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-cinema-muted text-xs mb-1.5">Rạp *</label>
               <select value={form.cinemaId} onChange={e => setForm({...form, cinemaId: e.target.value, roomId: '', hall: '', type: '', availableSeats: 0, seatPrices: { ...DEFAULT_SEAT_PRICES }})} className="input-field cursor-pointer">
                 <option value="">Chọn rạp...</option>
-                {CINEMAS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {cinemas.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
@@ -202,7 +240,7 @@ export default function AdminShowtimes() {
                 disabled={!form.cinemaId}
               >
                 <option value="">Chọn phòng chiếu...</option>
-                {CINEMA_ROOMS.filter(r => r.cinemaId === +form.cinemaId).map(r => (
+                {rooms.filter(r => r.cinemaId === +form.cinemaId).map(r => (
                   <option key={r.id} value={r.id}>{r.name} - {r.format} ({r.totalSeats} ghế)</option>
                 ))}
               </select>
@@ -301,7 +339,7 @@ export default function AdminShowtimes() {
                             ) : (
                               <div className="space-y-3">
                                 {roomShowtimes.sort((a,b) => new Date(a.date+'T'+a.time) - new Date(b.date+'T'+b.time)).map(st => {
-                                  const movie = MOVIES.find(m => m.id === st.movieId);
+                                  const movie = movies.find(m => m.id === st.movieId);
                                   const booked = room.totalSeats - st.availableSeats;
                                   const canEdit = booked === 0;
                                   // Giá vé của suất chiếu này (ưu tiên suất chiếu > phòng > mặc định)

@@ -14,15 +14,15 @@ import com.example.form.Movie.UpdateMovieForm;
 public interface IMovieService {
 
 	Page<MovieDTO> getAllMovie(Pageable pageable, MovieFilterForm filterForm);
-	
-	MovieDTO getById (Integer id);
-	
+
+	MovieDTO getById(Integer id);
+
 	List<DateDTO> getShowDatesByMovieId(Integer movieId);
-	
-	void createMovie (CreateMovieForm form);
-	
-	void updateMovie (Integer id, UpdateMovieForm form);
-	
-	void deleteMovie (Integer id);
+
+	void createMovie(CreateMovieForm form);
+
+	void updateMovie(Integer id, UpdateMovieForm form);
+
+	void deleteMovie(Integer id);
 
 }

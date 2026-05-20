@@ -10,7 +10,13 @@ const normalize = (cinema) => ({
   name: cinema.name || cinema.cinemaName || '',
   address: cinema.address || cinema.location || '',
   city: cinema.city || '',
-  image: cinema.image || cinema.imageUrl || '',
+  provinceId: cinema.province?.id || cinema.provinceId || '',
+  province: cinema.province?.provinceName || cinema.provinceName || '',
+  image: cinema.image || cinema.imgUrl || cinema.imageUrl || '',
+  latitude: cinema.latitude ? parseFloat(cinema.latitude) : null,
+  longitude: cinema.longitude ? parseFloat(cinema.longitude) : null,
+  phone: cinema.phone || '',
+  email: cinema.email || '',
   screens: parseInt(cinema.screens || cinema.numberOfScreens) || 0,
   rating: parseFloat(cinema.rating) || 0,
 });
@@ -41,14 +47,32 @@ const cinemaService = {
 
   /** Thêm rạp (Admin) — POST /api/v1/cinemas */
   create: async (payload) => {
-    const res = await api.post('/v1/cinemas', payload);
-    return normalize(res.data);
+    const res = await api.post('/v1/cinemas', {
+      cinemaName: payload.name,
+      address: payload.address,
+      provinceId: payload.provinceId,
+      imageUrl: payload.image,
+      phone: payload.phone || "0924783748",
+      email: payload.email || "lottebn@gmail.com",
+      latitude: payload.latitude || null,
+      longitude: payload.longitude || null
+    });
+    return res.data ? normalize(res.data) : null;
   },
 
   /** Cập nhật rạp (Admin) — PUT /api/v1/cinemas/{id} */
   update: async (id, payload) => {
-    const res = await api.put(`/v1/cinemas/${id}`, payload);
-    return normalize(res.data);
+    const res = await api.put(`/v1/cinemas/${id}`, {
+      cinemaName: payload.name,
+      address: payload.address,
+      provinceId: payload.provinceId,
+      imageUrl: payload.image,
+      phone: payload.phone || "0924783748",
+      email: payload.email || "lottebn@gmail.com",
+      latitude: payload.latitude || null,
+      longitude: payload.longitude || null
+    });
+    return res.data ? normalize(res.data) : null;
   },
 
   /** Xoá rạp (Admin) — DELETE /api/v1/cinemas/{id} */

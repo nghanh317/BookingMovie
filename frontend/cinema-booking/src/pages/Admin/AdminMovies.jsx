@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import movieService from '../../services/movieService';
 import useNotificationStore from '../../store/notificationStore';
+import useAuthStore from '../../store/authStore';
 import DatePickerInput from '../../components/ui/DatePickerInput';
 
 function MovieFormModal({ movie, onClose, onSave }) {
@@ -150,6 +152,11 @@ export default function AdminMovies() {
   const [deleteId, setDeleteId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const navigate = useNavigate();
+  const { token } = useAuthStore();
+
+  // Phát hiện token demo hoặc không hợp lệ
+  const isDemoToken = !token || token === 'demo-admin-token' || token === 'demo-user-token';
 
   // ── Fetch danh sách phìm ──────────────────────────────
   useEffect(() => {
@@ -182,37 +189,67 @@ export default function AdminMovies() {
   });
 
   const handleSave = async (form) => {
+    if (isDemoToken) {
+      setToast({ msg: '❌ Bạn đang dùng tài khoản demo. Hãy đăng xuất và đăng nhập bằng admin thật (admin / 123456).', type: 'error' });
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
     setSaving(true);
     try {
       if (modal && modal !== 'add') {
-        // Cập nhật
-        const updated = await movieService.update(modal.id, form);
-        setMovies(prev => prev.map(m => m.id === modal.id ? { ...m, ...updated } : m));
+        await movieService.update(modal.id, form);
         showToast(`✅ Đã cập nhật phim: ${form.title}`);
+        console.log('✅ Đã cập nhật phim:', form);
+        console.log('ID:', modal);
       } else {
-        // Thêm mới
-        const created = await movieService.create(form);
-        setMovies(prev => [...prev, created]);
+        await movieService.create(form);
         showToast(`✅ Đã thêm phim mới: ${form.title}`);
       }
+      const freshMovies = await movieService.getAll();
+      setMovies(freshMovies);
     } catch (err) {
-      // Fallback: cập nhật local state khi API lỗi
-      if (modal && modal !== 'add') {
-        setMovies(prev => prev.map(m => m.id === modal.id ? { ...m, ...form } : m));
-      } else {
-        setMovies(prev => [...prev, { ...form, id: Date.now(), cast: [], poster: '', backdrop: '', trailer: '' }]);
+      console.error('[AdminMovies] handleSave error:', err.response?.data || err.message);
+      if (err.response?.status === 401) {
+        setToast({ msg: '❌ Phiên đăng nhập hết hạn. Đang chuyển hướng đăng nhập lại...', type: 'error' });
+        addNotification({ title: 'Phiên hết hạn', message: 'Token không hợp lệ. Vui lòng đăng nhập lại.', type: 'error', isAdmin: true });
+        localStorage.removeItem('cinema-auth');
+        setTimeout(() => navigate('/login'), 2500);
+        return;
       }
-      showToast(`⚠️ Đã lưu cục bộ: ${form.title} (API chưa kết nối)`, 'warn');
+      if (err.response?.status === 403) {
+        setToast({ msg: '❌ Tài khoản không có quyền Admin để thực hiện thao tác này.', type: 'error' });
+        return;
+      }
+      const errMsg = err.response?.data?.detailMessage || err.response?.data?.message || err.message || 'Lỗi không xác định';
+      showToast(`❌ Lỗi: ${errMsg}`, 'error');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id) => {
+    if (isDemoToken) {
+      setToast({ msg: '❌ Hãy đăng nhập bằng tài khoản admin thật để xoá phim.', type: 'error' });
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
     const movie = movies.find(m => m.id === id);
-    setMovies(prev => prev.filter(m => m.id !== id));
-    setDeleteId(null);
-    showToast(`✅ Đã xóa hiển thị phim: ${movie?.title}`);
+    try {
+      await movieService.remove(id);
+      setMovies(prev => prev.filter(m => m.id !== id));
+      setDeleteId(null);
+      showToast(`✅ Đã xóa phim: ${movie?.title}`);
+    } catch (err) {
+      console.error('[AdminMovies] handleDelete error:', err.response?.data || err.message);
+      if (err.response?.status === 401) {
+        setToast({ msg: '❌ Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.', type: 'error' });
+        localStorage.removeItem('cinema-auth');
+        setTimeout(() => navigate('/login'), 2500);
+        return;
+      }
+      const errMsg = err.response?.data?.detailMessage || err.response?.data?.message || err.message || 'Không thể xóa phim';
+      showToast(`❌ ${errMsg}`, 'error');
+    }
   };
 
   return (

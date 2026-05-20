@@ -109,11 +109,79 @@ function RankingTable() {
   );
 }
 
+// ── Modal Chỉnh sửa người dùng ─────────────────────────────
+function EditUserModal({ user, onClose, onSave }) {
+  const [formData, setFormData] = useState({
+    userName: user.userName || user.name || '',
+    fullName: user.fullName || user.name || '',
+    email: user.email || '',
+    phone: user.phone || '',
+    role: user.role || 'USER',
+    status: user.status || 'active'
+  });
+
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave(user.id, formData);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-cinema-surface border border-cinema-border rounded-xl p-6 w-full max-w-md shadow-2xl">
+        <h3 className="font-heading font-bold text-xl text-white mb-4">Cập nhật Người Dùng</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs text-cinema-muted mb-1 block">Tên đăng nhập</label>
+            <input name="userName" value={formData.userName} onChange={handleChange} className="input-field" required />
+          </div>
+          <div>
+            <label className="text-xs text-cinema-muted mb-1 block">Họ và tên</label>
+            <input name="fullName" value={formData.fullName} onChange={handleChange} className="input-field" required />
+          </div>
+          <div>
+            <label className="text-xs text-cinema-muted mb-1 block">Email</label>
+            <input name="email" type="email" value={formData.email} onChange={handleChange} className="input-field" required />
+          </div>
+          <div>
+            <label className="text-xs text-cinema-muted mb-1 block">Số điện thoại</label>
+            <input name="phone" value={formData.phone} onChange={handleChange} className="input-field" required />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-cinema-muted mb-1 block">Vai trò</label>
+              <select name="role" value={formData.role} onChange={handleChange} className="input-field bg-cinema-dark text-white">
+                <option value="USER">User</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-cinema-muted mb-1 block">Trạng thái</label>
+              <select name="status" value={formData.status} onChange={handleChange} className="input-field bg-cinema-dark text-white">
+                <option value="active">Hoạt động</option>
+                <option value="inactive">Khoá</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-3 mt-6">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-cinema-border text-cinema-muted hover:text-white transition-colors">Hủy</button>
+            <button type="submit" className="px-4 py-2 rounded-lg bg-primary text-cinema-black font-medium hover:bg-primary/90 transition-colors">Lưu thay đổi</button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterLevel, setFilterLevel] = useState('all');
+  const [editingUser, setEditingUser] = useState(null);
 
   // ── Fetch tài khoản từ API ─────────────────────────────
   useEffect(() => {
@@ -126,12 +194,15 @@ export default function AdminUsers() {
           const normalized = data.map(u => ({
             ...u,
             name: u.name || u.fullName || u.userName || '',
+            userName: u.userName || '',
+            fullName: u.fullName || '',
             joinDate: u.joinDate || u.createDate || '',
             bookings: u.bookings || (u.tickets?.length ?? 0),
             spent: u.spent || 0,
             level: u.level || 'Bronze',
             points: u.points || 0,
             status: u.status || 'active',
+            role: u.role || 'USER',
           }));
           setUsers(normalized);
         } else {
@@ -150,14 +221,104 @@ export default function AdminUsers() {
 
   const { addNotification } = useNotificationStore();
 
-  const toggleStatus = (id) => {
-    const user = users.find(u => u.id === id);
-    if (user) {
-      const newStatus = user.status === 'active' ? 'inactive' : 'active';
-      const msg = newStatus === 'active' ? `Đã mở khoá tài khoản: ${user.name}` : `Đã khoá tài khoản: ${user.name}`;
-      addNotification({ title: 'Cập nhật trạng thái', message: msg, type: newStatus === 'active' ? 'success' : 'warn', isAdmin: true });
+  const handleUpdate = async (id, formData) => {
+    try {
+      await accountService.update(id, {
+        userName: formData.userName,
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role
+      });
+
+      // Đồng bộ lại danh sách tài khoản từ backend
+      const freshData = await accountService.getAll();
+      if (Array.isArray(freshData) && freshData.length > 0) {
+        const normalized = freshData.map(u => ({
+          ...u,
+          name: u.name || u.fullName || u.userName || '',
+          userName: u.userName || '',
+          fullName: u.fullName || '',
+          joinDate: u.joinDate || u.createDate || '',
+          bookings: u.bookings || (u.tickets?.length ?? 0),
+          spent: u.spent || 0,
+          level: u.level || 'Bronze',
+          points: u.points || 0,
+          status: u.status || 'active',
+          role: u.role || 'USER',
+        }));
+        setUsers(normalized);
+      } else {
+        // Fallback local update if backend returns empty
+        setUsers(prev => prev.map(u => u.id === id ? {
+          ...u,
+          name: formData.fullName || formData.userName,
+          userName: formData.userName,
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          role: formData.role,
+          status: formData.status
+        } : u));
+      }
+      
+      addNotification({ title: 'Cập nhật thành công', message: 'Thông tin người dùng đã được lưu', type: 'success', isAdmin: true });
+      setEditingUser(null);
+    } catch (error) {
+      if (error.response?.status === 401) {
+        addNotification({ title: 'Lỗi xác thực', message: 'Phiên đăng nhập hết hạn hoặc không có quyền Admin. Đang chuyển hướng...', type: 'error', isAdmin: true });
+        setTimeout(() => {
+          localStorage.removeItem('cinema-auth');
+          window.location.href = '/login';
+        }, 2500);
+        return;
+      }
+
+      const errMsg = error.response?.data?.detail || error.response?.data?.message || error.response?.data?.detailMessage || error.message || 'Không thể lưu thông tin';
+      addNotification({ title: 'Lỗi cập nhật', message: errMsg, type: 'error', isAdmin: true });
     }
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u));
+  };
+
+  const handleDelete = async (id, name) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xoá tài khoản: ${name}?`)) return;
+    try {
+      await accountService.remove(id);
+      
+      // Đồng bộ lại danh sách tài khoản từ backend
+      const freshData = await accountService.getAll();
+      if (Array.isArray(freshData) && freshData.length > 0) {
+        const normalized = freshData.map(u => ({
+          ...u,
+          name: u.name || u.fullName || u.userName || '',
+          userName: u.userName || '',
+          fullName: u.fullName || '',
+          joinDate: u.joinDate || u.createDate || '',
+          bookings: u.bookings || (u.tickets?.length ?? 0),
+          spent: u.spent || 0,
+          level: u.level || 'Bronze',
+          points: u.points || 0,
+          status: u.status || 'active',
+          role: u.role || 'USER',
+        }));
+        setUsers(normalized);
+      } else {
+        setUsers(prev => prev.filter(u => u.id !== id));
+      }
+
+      addNotification({ title: 'Xoá thành công', message: `Đã xoá tài khoản: ${name}`, type: 'success', isAdmin: true });
+    } catch (error) {
+      if (error.response?.status === 401) {
+        addNotification({ title: 'Lỗi xác thực', message: 'Phiên đăng nhập hết hạn hoặc không có quyền Admin. Đang chuyển hướng...', type: 'error', isAdmin: true });
+        setTimeout(() => {
+          localStorage.removeItem('cinema-auth');
+          window.location.href = '/login';
+        }, 2500);
+        return;
+      }
+
+      const errMsg = error.response?.data?.detail || error.response?.data?.message || error.response?.data?.detailMessage || error.message || 'Có lỗi xảy ra khi xoá tài khoản';
+      addNotification({ title: 'Xoá thất bại', message: errMsg, type: 'error', isAdmin: true });
+    }
   };
 
   const totalStats = {
@@ -264,14 +425,18 @@ export default function AdminUsers() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <button onClick={() => toggleStatus(user.id)}
-                      className={`px-2.5 py-1.5 rounded-lg border text-xs transition-all ${
-                        user.status === 'active'
-                          ? 'border-red-500/30 text-red-400 hover:bg-red-500/10'
-                          : 'border-green-500/30 text-green-400 hover:bg-green-500/10'
-                      }`}>
-                      {user.status === 'active' ? 'Khoá' : 'Mở khoá'}
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingUser(user)}
+                        title="Cập nhật"
+                        className="p-1.5 rounded-lg border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 transition-all">
+                        ✏️
+                      </button>
+                      <button onClick={() => handleDelete(user.id, user.name)}
+                        title="Xoá người dùng"
+                        className="p-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-all">
+                        🗑️
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -279,6 +444,15 @@ export default function AdminUsers() {
           </table>
         </div>
       </div>
+
+      {/* Render Modal Edit */}
+      {editingUser && (
+        <EditUserModal 
+          user={editingUser} 
+          onClose={() => setEditingUser(null)} 
+          onSave={handleUpdate} 
+        />
+      )}
     </div>
   );
 }

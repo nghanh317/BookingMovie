@@ -7,15 +7,20 @@ const axiosClient = axios.create({
   },
 });
 
+// JWT thật luôn bắt đầu bằng "eyJ"
+const isRealJWT = (token) => typeof token === 'string' && token.startsWith('eyJ');
+
 // ── Request interceptor: tự động gắn JWT token ──────────────
 axiosClient.interceptors.request.use(
   (config) => {
-    // Lấy token từ Zustand persist (localStorage)
     try {
       const authData = JSON.parse(localStorage.getItem('cinema-auth'));
       const token = authData?.state?.token;
-      if (token) {
+      if (token && isRealJWT(token)) {
         config.headers.Authorization = `Bearer ${token}`;
+      } else if (token && !isRealJWT(token)) {
+        console.warn('[axiosClient] Demo/invalid token detected and removed:', token);
+        localStorage.removeItem('cinema-auth');
       }
     } catch (e) {
       // ignore parse error

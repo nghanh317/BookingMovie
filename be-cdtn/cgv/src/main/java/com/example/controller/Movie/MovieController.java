@@ -50,8 +50,8 @@ public class MovieController {
 	@PostMapping
 	public void createMovie(@RequestBody CreateMovieForm form) {
 		// In ra xem DTO có nhận được link chưa hay đang null
-    System.out.println("Poster nhận được: " + form.getPosterUrl());
-    System.out.println("Trailer nhận được: " + form.getTrailerUrl());
+		System.out.println("Poster nhận được: " + form.getPosterUrl());
+		System.out.println("Trailer nhận được: " + form.getTrailerUrl());
 		movieService.createMovie(form);
 	}
 

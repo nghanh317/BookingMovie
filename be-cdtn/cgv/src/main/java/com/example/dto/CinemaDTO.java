@@ -25,6 +25,8 @@ public class CinemaDTO {
 	private BigDecimal longitude;
 	
 	private Cinemas.Status status;
+	
+	private String imageUrl;
 
 	private String phone;
 	    

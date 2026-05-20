@@ -16,4 +16,6 @@ public class CinemaFilterForm {
     private String date;
     
     private Integer provinceId;
+
+	private String imageUrl;
 }

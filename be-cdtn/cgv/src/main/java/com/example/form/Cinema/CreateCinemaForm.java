@@ -3,7 +3,10 @@ package com.example.form.Cinema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import lombok.NoArgsConstructor;
+
 @Data
+@NoArgsConstructor
 @AllArgsConstructor
 public class CreateCinemaForm {
 
@@ -18,4 +21,9 @@ public class CreateCinemaForm {
 
 	private Integer provinceId;
 
+	private String imageUrl;
+	
+	private Double latitude;
+	
+	private Double longitude;
 }

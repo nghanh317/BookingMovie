@@ -78,6 +78,14 @@ const useAuthStore = create(
           const isNetworkError =
             !err.response || err.code === 'ERR_NETWORK' || err.code === 'ECONNREFUSED';
 
+          // Log chi tiết lỗi để debug
+          console.error('[Login] Backend error:', {
+            status: err.response?.status,
+            data: err.response?.data,
+            code: err.code,
+            isNetworkError,
+          });
+
           if (isNetworkError) {
             const demo = DEMO_ACCOUNTS.find(
               (a) => a.userName === userName && a.passwordHash === passwordHash
@@ -93,8 +101,9 @@ const useAuthStore = create(
           }
 
           const message =
+            err.response?.data?.detailMessage ||
             err.response?.data?.message ||
-            err.response?.data ||
+            (typeof err.response?.data === 'string' ? err.response.data : null) ||
             'Tên đăng nhập hoặc mật khẩu không đúng';
           return { success: false, message: String(message) };
         }

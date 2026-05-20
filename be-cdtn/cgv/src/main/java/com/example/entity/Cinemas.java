@@ -74,6 +74,9 @@ public class Cinemas implements Serializable{
 	@Temporal (TemporalType.TIMESTAMP)
 	@CreationTimestamp
 	private Date createDate;
+
+	@Column (name = "image_url", length = 255)
+	private String imageUrl;
 	
 	@Column (name = "is_deleted")
 	private Boolean isDeleted;

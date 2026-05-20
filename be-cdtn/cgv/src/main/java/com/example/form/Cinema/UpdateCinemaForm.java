@@ -3,7 +3,10 @@ package com.example.form.Cinema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import lombok.NoArgsConstructor;
+
 @Data
+@NoArgsConstructor
 @AllArgsConstructor
 public class UpdateCinemaForm {
 	private String cinemaName;
@@ -13,4 +16,12 @@ public class UpdateCinemaForm {
 	private String phone;
 	
 	private String email;
+	
+	private Integer provinceId;
+	
+	private String imageUrl;
+	
+	private Double latitude;
+	
+	private Double longitude;
 }

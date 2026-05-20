@@ -30,21 +30,23 @@ export default function MovieCard({ movie, index = 0 }) {
       <div className="card overflow-hidden flex flex-col h-full">
         {/* Poster */}
         <div className="relative overflow-hidden aspect-[2/3] flex-shrink-0">
-          <img
-            src={movie.poster}
-            alt={movie.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-            loading="lazy"
-            onError={(e) => {
-              e.target.src = `https://placehold.co/300x450/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title)}`;
-            }}
-          />
+          <Link to={`/movies/${movie.id}`} className="block w-full h-full">
+            <img
+              src={movie.poster || `https://placehold.co/300x450/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title)}`}
+              alt={movie.title}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              loading="lazy"
+              onError={(e) => {
+                e.target.src = `https://placehold.co/300x450/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title)}`;
+              }}
+            />
+          </Link>
 
           {/* Overlay on hover */}
-          <div className="absolute inset-0 bg-gradient-cinema opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
+          <div className="absolute inset-0 bg-gradient-cinema opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4 pointer-events-none">
             <Link
               to={`/booking/${movie.id}`}
-              className="w-full btn-primary text-sm py-2 text-center"
+              className="w-full btn-primary text-sm py-2 text-center pointer-events-auto"
               onClick={(e) => e.stopPropagation()}
             >
               🎟️ Đặt Vé Ngay

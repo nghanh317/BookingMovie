@@ -1,7 +1,8 @@
 import { useParams, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MOVIES, CINEMAS, SHOWTIMES, AGE_RATINGS } from '../../constants/mockData';
+import { CINEMAS, SHOWTIMES, AGE_RATINGS } from '../../constants/mockData';
+import movieService from '../../services/movieService';
 import MovieCard from '../../components/movie/MovieCard';
 import ReviewSection from '../../components/movie/ReviewSection';
 import useFavoriteStore from '../../store/favoriteStore';
@@ -21,11 +22,33 @@ function StarRating({ rating }) {
 
 export default function MovieDetail() {
   const { id } = useParams();
-  const movie = MOVIES.find(m => m.id === Number(id));
+  const [movie, setMovie] = useState(null);
+  const [relatedMovies, setRelatedMovies] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    movieService.getById(id)
+      .then(data => {
+        setMovie(data);
+        if (data) {
+          movieService.getAll().then(all => {
+            const related = all.filter(m => m.id !== data.id && m.genre.some(g => data.genre.includes(g))).slice(0, 6);
+            setRelatedMovies(related);
+          });
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [id]);
+
   const { isFavorite, toggleFavorite } = useFavoriteStore();
   const { addNotification } = useNotificationStore();
   const favorite = movie ? isFavorite(movie.id) : false;
   const [isReminded, setIsReminded] = useState(false);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div></div>;
+  }
 
   if (!movie) {
     return (
@@ -40,7 +63,6 @@ export default function MovieDetail() {
   }
 
   const ageInfo = AGE_RATINGS[movie.ageRating];
-  const relatedMovies = MOVIES.filter(m => m.id !== movie.id && m.genre.some(g => movie.genre.includes(g))).slice(0, 6);
 
   return (
     <div className="min-h-screen animate-fade-in">

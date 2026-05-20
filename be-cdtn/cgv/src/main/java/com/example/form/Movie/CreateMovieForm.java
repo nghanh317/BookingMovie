@@ -34,4 +34,6 @@ public class CreateMovieForm {
     private String posterUrl;
     
     private String trailerUrl;
+    
+    private String status;
 }

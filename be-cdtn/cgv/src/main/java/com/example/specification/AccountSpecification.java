@@ -18,35 +18,29 @@ public class AccountSpecification {
 	
 	public static Specification<Accounts> buildWhere (AccountFilterForm accountForm){
 		Specification<Accounts> where = null;
-		CustomSpecification notDeleteSpe = new CustomSpecification("isDelete", false);
-		where = notDeleteSpe;
+		CustomSpecification notDeleteSpe = new CustomSpecification("isDeleted", false);
+		where = Specification.where(notDeleteSpe);
+		
 		if (accountForm == null)
 			return where;
 		
 		if (!StringUtils.isEmpty(accountForm.getSearch())) {
-			String search = accountForm.getSearch();
-			search =search.trim();
-			CustomSpecification nameSpecification = new CustomSpecification ("userName", search);
-			where = Specification.where(nameSpecification);
-		}
-		
-		if (!StringUtils.isEmpty(accountForm.getSearch())) {
-			String search = accountForm.getSearch();
-			search =search.trim();
-			CustomSpecification phoneSpecification = new CustomSpecification ("phone", search);
-			where = Specification.where(phoneSpecification);
-		}
-		if (!StringUtils.isEmpty(accountForm.getSearch())) {
-			String search = accountForm.getSearch();
-			search =search.trim();
-			CustomSpecification fullNameSpecification = new CustomSpecification ("fullName", search);
-			where = Specification.where(fullNameSpecification);
+			String search = accountForm.getSearch().trim();
+			CustomSpecification nameSpecification = new CustomSpecification("userName", search);
+			CustomSpecification phoneSpecification = new CustomSpecification("phone", search);
+			CustomSpecification fullNameSpecification = new CustomSpecification("fullName", search);
+			
+			Specification<Accounts> searchSpec = Specification.where(nameSpecification)
+					.or(phoneSpecification)
+					.or(fullNameSpecification);
+					
+			where = where.and(searchSpec);
 		}
 		
 		if (accountForm.getRole() != null) {
-			CustomSpecification	roleSpecification = new CustomSpecification("role" , accountForm.getRole());
+			CustomSpecification roleSpecification = new CustomSpecification("role" , accountForm.getRole());
 			where = where.and(roleSpecification);
-			}
+		}
 		return where;
 	}
 		

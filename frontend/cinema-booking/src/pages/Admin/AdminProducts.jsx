@@ -108,7 +108,16 @@ export default function AdminProducts() {
   const [deleteId, setDeleteId] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const { addToast } = useNotificationStore();
+  const { addNotification } = useNotificationStore();
+
+  const addToast = (msg, type = 'success') => {
+    addNotification({
+      title: type === 'success' ? 'Thành công' : 'Lỗi',
+      message: msg,
+      type: type,
+      isAdmin: true
+    });
+  };
 
   useEffect(() => {
     fetchProducts();
@@ -148,7 +157,16 @@ export default function AdminProducts() {
       setModal(null);
       fetchProducts();
     } catch (err) {
-      addToast('Lỗi khi lưu sản phẩm', 'error');
+      if (err.response?.status === 401) {
+        addToast('Phiên đăng nhập đã hết hạn hoặc không có quyền Admin. Đang chuyển hướng...', 'error');
+        setTimeout(() => {
+          localStorage.removeItem('cinema-auth');
+          window.location.href = '/login';
+        }, 2500);
+        return;
+      }
+      const errMsg = err.response?.data?.detail || err.response?.data?.message || err.response?.data?.detailMessage || err.message || 'Lỗi khi lưu sản phẩm';
+      addToast(errMsg, 'error');
     } finally {
       setSaving(false);
     }
@@ -160,7 +178,16 @@ export default function AdminProducts() {
       addToast('Đã xoá sản phẩm', 'success');
       fetchProducts();
     } catch (err) {
-      addToast('Lỗi khi xoá sản phẩm', 'error');
+      if (err.response?.status === 401) {
+        addToast('Phiên đăng nhập đã hết hạn hoặc không có quyền Admin. Đang chuyển hướng...', 'error');
+        setTimeout(() => {
+          localStorage.removeItem('cinema-auth');
+          window.location.href = '/login';
+        }, 2500);
+        return;
+      }
+      const errMsg = err.response?.data?.detail || err.response?.data?.message || err.response?.data?.detailMessage || err.message || 'Lỗi khi xoá sản phẩm';
+      addToast(errMsg, 'error');
     } finally {
       setDeleteId(null);
     }

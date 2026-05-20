@@ -1,21 +1,23 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MOVIES, PROVINCES, CINEMAS } from '../../constants/mockData';
+import movieService from '../../services/movieService';
 import MovieCard from '../../components/movie/MovieCard';
-import useLocationStore from '../../store/locationStore';
 
 // --- Hero Carousel ---
-function HeroBanner() {
-  const featured = MOVIES.filter(m => m.status === 'now_showing').slice(0, 3);
+function HeroBanner({ movies }) {
+  const featured = movies.filter(m => m.status === 'now_showing').slice(0, 3);
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
+    if (featured.length === 0) return;
     const timer = setInterval(() => {
       setCurrent((prev) => (prev + 1) % featured.length);
     }, 5000);
     return () => clearInterval(timer);
   }, [featured.length]);
+
+  if (featured.length === 0) return null;
 
   const movie = featured[current];
 
@@ -24,7 +26,7 @@ function HeroBanner() {
       <AnimatePresence mode="wait">
         <motion.div key={movie.id} initial={{ opacity: 0, scale: 1.05 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="absolute inset-0">
-          <img src={movie.backdrop} alt={movie.title} className="w-full h-full object-cover"
+          <img src={movie.backdrop || `https://placehold.co/1920x1080/1A1A24/A0A0B4?text=${encodeURIComponent(movie.title)}`} alt={movie.title} className="w-full h-full object-cover"
             onError={(e) => { e.target.src = `https://placehold.co/1920x1080/1A1A24/A0A0B4?text=${encodeURIComponent(movie.title)}`; }} />
           <div className="absolute inset-0 bg-gradient-to-r from-cinema-black via-cinema-black/70 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-transparent to-transparent" />
@@ -150,13 +152,26 @@ function PromoBanner() {
 
 // --- Main Home Page ---
 export default function Home() {
+  const [movies, setMovies] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const nowShowing = MOVIES.filter(m => m.status === 'now_showing');
-  const comingSoon = MOVIES.filter(m => m.status === 'coming_soon');
+  useEffect(() => {
+    movieService.getAll().then(data => {
+      setMovies(data);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div></div>;
+  }
+
+  const nowShowing = movies.filter(m => m.status === 'now_showing');
+  const comingSoon = movies.filter(m => m.status === 'coming_soon');
 
   return (
     <div className="animate-fade-in">
-      <HeroBanner />
+      <HeroBanner movies={movies} />
       <StatsBar />
 
       <div className="container mx-auto px-4 max-w-7xl py-12 space-y-16">

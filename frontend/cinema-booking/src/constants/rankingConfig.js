@@ -46,7 +46,6 @@ export const RANKS = [
     perks: [
       'Tích 1 điểm / 10.000đ chi tiêu',
       'Giảm 5% cho mọi giao dịch',
-      'Ưu tiên chọn ghế sớm hơn 24h',
       'Voucher sinh nhật 50.000đ',
     ],
   },
@@ -66,7 +65,6 @@ export const RANKS = [
       'Tích 1,2 điểm / 10.000đ chi tiêu',
       'Giảm 10% cho mọi giao dịch',
       'Combo bắp nước giảm 20%',
-      'Ưu tiên chọn ghế sớm hơn 48h',
       'Voucher sinh nhật 100.000đ',
     ],
   },
@@ -86,7 +84,6 @@ export const RANKS = [
       'Tích 1,5 điểm / 10.000đ chi tiêu',
       'Giảm 15% cho mọi giao dịch',
       'Combo bắp nước miễn phí mỗi tháng',
-      'Ưu tiên VIP – chọn ghế bất kỳ lúc nào',
       'Voucher sinh nhật 200.000đ',
       'Hỗ trợ khách hàng ưu tiên 24/7',
     ],
@@ -99,25 +96,25 @@ export const POINT_RATE = 10000; // 10.000đ = 1 điểm cơ bản
 
 // Hệ số nhân theo hạng (khi đã lên hạng cao hơn)
 export const RANK_MULTIPLIER = {
-  bronze:  1.0,
-  silver:  1.0,
-  gold:    1.2,
+  bronze: 1.0,
+  silver: 1.0,
+  gold: 1.2,
   diamond: 1.5,
 };
 
 // Điểm tích lũy theo từng loại vé / dịch vụ (ví dụ tham chiếu)
 export const POINT_EARN_EXAMPLES = [
-  { label: 'Vé thường (2D)',        price: 75000,   points: 7,  icon: '🎟️' },
-  { label: 'Vé VIP (2D)',           price: 110000,  points: 11, icon: '⭐' },
-  { label: 'Vé đôi (2D)',          price: 200000,  points: 20, icon: '💑' },
-  { label: 'Vé thường (3D)',        price: 90000,   points: 9,  icon: '🎟️' },
-  { label: 'Vé VIP (3D)',           price: 130000,  points: 13, icon: '⭐' },
-  { label: 'Vé thường (IMAX)',      price: 130000,  points: 13, icon: '🎬' },
-  { label: 'Vé VIP (IMAX)',         price: 180000,  points: 18, icon: '👑' },
-  { label: 'Bỏng rang bơ (M)',      price: 45000,   points: 4,  icon: '🍿' },
-  { label: 'Nước uống (M)',         price: 35000,   points: 3,  icon: '🥤' },
-  { label: 'Combo đôi',            price: 70000,   points: 7,  icon: '🎉' },
-  { label: 'Combo gia đình',       price: 95000,   points: 9,  icon: '🎊' },
+  { label: 'Vé thường (2D)', price: 75000, points: 7, icon: '🎟️' },
+  { label: 'Vé VIP (2D)', price: 110000, points: 11, icon: '⭐' },
+  { label: 'Vé đôi (2D)', price: 200000, points: 20, icon: '💑' },
+  { label: 'Vé thường (3D)', price: 90000, points: 9, icon: '🎟️' },
+  { label: 'Vé VIP (3D)', price: 130000, points: 13, icon: '⭐' },
+  { label: 'Vé thường (IMAX)', price: 130000, points: 13, icon: '🎬' },
+  { label: 'Vé VIP (IMAX)', price: 180000, points: 18, icon: '👑' },
+  { label: 'Bỏng rang bơ (M)', price: 45000, points: 4, icon: '🍿' },
+  { label: 'Nước uống (M)', price: 35000, points: 3, icon: '🥤' },
+  { label: 'Combo đôi', price: 70000, points: 7, icon: '🎉' },
+  { label: 'Combo gia đình', price: 95000, points: 9, icon: '🎊' },
 ];
 
 // Helper: Lấy thông tin hạng dựa trên điểm

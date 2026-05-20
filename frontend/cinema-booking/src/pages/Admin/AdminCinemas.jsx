@@ -1,22 +1,111 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CINEMAS, CINEMA_ROOMS, PROVINCES } from '../../constants/mockData';
+import { CINEMA_ROOMS } from '../../constants/mockData';
 import useNotificationStore from '../../store/notificationStore';
+import useAuthStore from '../../store/authStore';
+import cinemaService from '../../services/cinemaService';
+import provinceService from '../../services/provinceService';
 
 // ── Cinema Modal (Add / Edit) ─────────────────────────────
-function CinemaModal({ initialData, onClose, onSave }) {
+function CinemaModal({ initialData, onClose, onSave, provinces }) {
   const isEdit = !!initialData;
   const [form, setForm] = useState(
-    initialData || { name: '', address: '', city: '', province: '', image: '', rating: 0 }
+    initialData
+      ? { ...initialData, newProvinceName: '' }
+      : { name: '', address: '', phone: '', email: '', provinceId: '', newProvinceName: '', image: '', latitude: '', longitude: '' }
   );
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSave = () => {
-    if (!form.name || !form.province || !form.address) return;
-    onSave({ ...form, id: isEdit ? form.id : Date.now(), city: form.province, rating: Number(form.rating) || 0 });
-    onClose();
+  // Auto-geocode khi địa chỉ thay đổi (debounce 1.5s)
+  useEffect(() => {
+    if (!form.address || (initialData && form.address === initialData.address)) return;
+    const timer = setTimeout(handleGeocode, 1500);
+    return () => clearTimeout(timer);
+  }, [form.address]);
+
+  const handleGeocode = async () => {
+    if (!form.address) return;
+    setIsGeocoding(true);
+    try {
+      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(form.address)}&limit=1`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.features?.length > 0) {
+        const [lng, lat] = data.features[0].geometry.coordinates;
+        setForm(prev => ({ ...prev, latitude: parseFloat(lat), longitude: parseFloat(lng) }));
+      }
+    } catch (_) {
+      // Geocoding thất bại — không ảnh hưởng đến luồng chính
+    } finally {
+      setIsGeocoding(false);
+    }
   };
 
-  const f = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+  const handleSave = async () => {
+    // Validate bắt buộc
+    if (!form.name.trim() || !form.address.trim()) {
+      setError('Vui lòng nhập Tên Rạp và Địa chỉ.');
+      return;
+    }
+
+    let finalProvinceId = form.provinceId;
+
+    // Nếu chọn "Thêm tỉnh mới"
+    if (form.provinceId === 'new') {
+      if (!form.newProvinceName.trim()) {
+        setError('Vui lòng nhập tên tỉnh/thành phố mới.');
+        return;
+      }
+      setSaving(true);
+      try {
+        // Backend trả void → re-fetch để tìm ID tỉnh vừa tạo
+        await provinceService.create({ provinceName: form.newProvinceName.trim() });
+        const freshProvinces = await provinceService.getAll();
+        const provList = Array.isArray(freshProvinces)
+          ? freshProvinces
+          : (freshProvinces?.content || freshProvinces?.data || []);
+        const created = provList.find(p => (p.provinceName || p.name) === form.newProvinceName.trim());
+        if (!created) throw new Error('Không tìm thấy tỉnh vừa tạo.');
+        finalProvinceId = created.id;
+      } catch (err) {
+        setError(`Tạo tỉnh thất bại: ${err.message}`);
+        setSaving(false);
+        return;
+      }
+    }
+
+    if (!finalProvinceId) {
+      setError('Vui lòng chọn Tỉnh / Thành Phố.');
+      setSaving(false);
+      return;
+    }
+
+    setError('');
+    setSaving(true);
+    try {
+      // Truyền dữ liệu sạch lên parent — parent gọi API và đóng modal khi thành công
+      await onSave({
+        id: form.id,
+        name: form.name.trim(),
+        address: form.address.trim(),
+        phone: form.phone || '',
+        email: form.email || '',
+        provinceId: finalProvinceId,
+        image: form.image || '',
+        latitude: form.latitude || null,
+        longitude: form.longitude || null,
+      });
+    } catch (_) {
+      // Lỗi đã được xử lý bởi handleSaveCinema (parent)
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const f = (key, val) => { setError(''); setForm(prev => ({ ...prev, [key]: val })); };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -25,6 +114,13 @@ function CinemaModal({ initialData, onClose, onSave }) {
         <h3 className="font-heading font-bold text-white text-lg mb-5">
           {isEdit ? '✏️ Cập Nhật Rạp Phim' : '➕ Thêm Rạp Mới'}
         </h3>
+
+        {error && (
+          <div className="mb-4 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs">
+            ⚠️ {error}
+          </div>
+        )}
+
         <div className="space-y-4">
           <div>
             <label className="text-cinema-muted text-xs mb-1 block">Tên Rạp *</label>
@@ -32,23 +128,62 @@ function CinemaModal({ initialData, onClose, onSave }) {
           </div>
           <div>
             <label className="text-cinema-muted text-xs mb-1 block">Tỉnh / Thành Phố *</label>
-            <select className="input-field cursor-pointer" value={form.province} onChange={e => f('province', e.target.value)}>
-              <option value="">Chọn tỉnh thành...</option>
-              {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
+            <div className="flex gap-2">
+              <select className="input-field cursor-pointer flex-1" value={form.provinceId || ''}
+                onChange={e => f('provinceId', e.target.value === 'new' ? 'new' : Number(e.target.value))}>
+                <option value="">Chọn tỉnh thành...</option>
+                {provinces.map(p => <option key={p.id} value={p.id}>{p.provinceName || p.name}</option>)}
+                <option value="new">➕ Thêm tỉnh thành khác...</option>
+              </select>
+              {form.provinceId === 'new' && (
+                <input className="input-field flex-1" placeholder="Nhập tên tỉnh mới..."
+                  value={form.newProvinceName} onChange={e => f('newProvinceName', e.target.value)} autoFocus />
+              )}
+            </div>
           </div>
           <div>
             <label className="text-cinema-muted text-xs mb-1 block">Địa chỉ *</label>
-            <input className="input-field" placeholder="VD: 72 Lê Thánh Tôn, Q.1" value={form.address} onChange={e => f('address', e.target.value)} />
+            <div className="flex gap-2 items-center">
+              <input className="input-field flex-1" placeholder="VD: Tầng 3, TTTM Vincom..."
+                value={form.address} onChange={e => f('address', e.target.value)} />
+              <button type="button" onClick={handleGeocode} disabled={isGeocoding}
+                className="btn-outline px-3 text-xs">📍 Quét</button>
+            </div>
+            {isGeocoding && <span className="text-xs text-primary mt-1 inline-block animate-pulse">Đang dò toạ độ...</span>}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">Số điện thoại</label>
+              <input className="input-field" placeholder="VD: 0924783748" value={form.phone} onChange={e => f('phone', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">Email</label>
+              <input className="input-field" placeholder="VD: email@cgv.vn" value={form.email} onChange={e => f('email', e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">Vĩ độ (Latitude)</label>
+              <input type="number" className="input-field opacity-60 cursor-not-allowed" readOnly disabled
+                placeholder="Tự động từ địa chỉ..." value={form.latitude ?? ''} />
+            </div>
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">Kinh độ (Longitude)</label>
+              <input type="number" className="input-field opacity-60 cursor-not-allowed" readOnly disabled
+                placeholder="Tự động từ địa chỉ..." value={form.longitude ?? ''} />
+            </div>
           </div>
           <div>
             <label className="text-cinema-muted text-xs mb-1 block">Link ảnh (URL)</label>
             <input className="input-field" placeholder="https://..." value={form.image} onChange={e => f('image', e.target.value)} />
           </div>
         </div>
+
         <div className="flex gap-3 mt-6">
-          <button onClick={onClose} className="flex-1 btn-outline py-2.5 text-sm">Hủy</button>
-          <button onClick={handleSave} className="flex-1 btn-primary py-2.5 text-sm">{isEdit ? 'Lưu Thay Đổi' : 'Thêm Rạp'}</button>
+          <button onClick={onClose} disabled={saving} className="flex-1 btn-outline py-2.5 text-sm">Hủy</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 btn-primary py-2.5 text-sm">
+            {saving ? 'Đang lưu...' : (isEdit ? 'Lưu Thay Đổi' : 'Thêm Rạp')}
+          </button>
         </div>
       </motion.div>
     </div>
@@ -57,8 +192,30 @@ function CinemaModal({ initialData, onClose, onSave }) {
 
 // ── Main Component ─────────────────────────────────────────
 export default function AdminCinemas() {
-  const [cinemas, setCinemas] = useState(CINEMAS);
+  const [cinemas, setCinemas] = useState([]);
+  const [provinces, setProvinces] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState(CINEMA_ROOMS);
+  const navigate = useNavigate();
+  const { token } = useAuthStore();
+
+  // Phát hiện token demo hoặc không hợp lệ ngay khi vào trang
+  const isDemoToken = !token || token === 'demo-admin-token' || token === 'demo-user-token';
+
+  useEffect(() => {
+    Promise.all([
+      cinemaService.getAll(),
+      provinceService.getAll()
+    ]).then(([cinemasData, provincesData]) => {
+      setCinemas(Array.isArray(cinemasData) ? cinemasData : []);
+      const provs = Array.isArray(provincesData) ? provincesData : (provincesData?.content || provincesData?.data || []);
+      setProvinces(provs);
+    }).catch(err => {
+      console.error(err);
+      setCinemas([]);
+      setProvinces([]);
+    }).finally(() => setLoading(false));
+  }, []);
   
   const [search, setSearch] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('all');
@@ -159,21 +316,79 @@ export default function AdminCinemas() {
   const openAddModal = () => { setEditingCinema(null); setShowModal(true); };
   const openEditModal = (c, e) => { e.stopPropagation(); setEditingCinema(c); setShowModal(true); };
 
-  const handleSaveCinema = (cinemaData) => {
-    if (editingCinema) {
-      setCinemas(prev => prev.map(c => c.id === cinemaData.id ? cinemaData : c));
-      addNotification({ title: 'Thành công', message: `Đã cập nhật rạp: ${cinemaData.name}`, type: 'success', isAdmin: true });
-    } else {
-      setCinemas(prev => [{...cinemaData, status: 'active'}, ...prev]);
-      addNotification({ title: 'Thành công', message: `Đã thêm rạp mới: ${cinemaData.name}`, type: 'success', isAdmin: true });
+  const handleSaveCinema = async (cinemaData) => {
+    // Chặn sớm nếu đang dùng demo token — không thể gọi API admin
+    if (isDemoToken) {
+      addNotification({
+        title: 'Chưa đăng nhập thật',
+        message: 'Bạn đang dùng tài khoản demo. Hãy đăng xuất và đăng nhập bằng tài khoản admin thật (admin / 123456).',
+        type: 'error',
+        isAdmin: true
+      });
+      return;
+    }
+    try {
+      if (editingCinema) {
+        await cinemaService.update(cinemaData.id, cinemaData);
+        addNotification({ title: 'Thành công', message: `Đã cập nhật rạp: ${cinemaData.name}`, type: 'success', isAdmin: true });
+      } else {
+        await cinemaService.create(cinemaData);
+        addNotification({ title: 'Thành công', message: `Đã thêm rạp mới: ${cinemaData.name}`, type: 'success', isAdmin: true });
+      }
+
+      // Đồng bộ lại danh sách rạp từ backend
+      const freshCinemas = await cinemaService.getAll();
+      setCinemas(freshCinemas);
+      setShowModal(false);
+    } catch (error) {
+      console.error('[AdminCinemas] handleSaveCinema error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        // Token hết hạn thật sự → xóa cache và yêu cầu đăng nhập lại
+        addNotification({
+          title: 'Phiên đăng nhập hết hạn',
+          message: 'Token không hợp lệ hoặc đã hết hạn. Vui lòng đăng xuất và đăng nhập lại.',
+          type: 'error',
+          isAdmin: true
+        });
+        localStorage.removeItem('cinema-auth');
+        setTimeout(() => navigate('/login'), 2500);
+        return;
+      }
+      if (error.response?.status === 403) {
+        addNotification({ title: 'Không có quyền', message: 'Tài khoản không có quyền Admin để thực hiện thao tác này.', type: 'error', isAdmin: true });
+        return;
+      }
+      const errMsg = error.response?.data?.detailMessage || error.response?.data?.message || error.message || 'Không thể lưu rạp chiếu phim';
+      addNotification({ title: 'Lỗi', message: errMsg, type: 'error', isAdmin: true });
     }
   };
 
-  const handleDeleteCinema = (id, e) => {
+  const handleDeleteCinema = async (id, e) => {
     e.stopPropagation();
-    const cinema = cinemas.find(c => c.id === id);
-    setCinemas(prev => prev.filter(c => c.id !== id));
-    addNotification({ title: 'Thành công', message: `Đã xoá hiển thị rạp: ${cinema?.name}`, type: 'success', isAdmin: true });
+    if (isDemoToken) {
+      addNotification({ title: 'Chưa đăng nhập thật', message: 'Hãy đăng nhập bằng tài khoản admin thật để thực hiện thao tác này.', type: 'error', isAdmin: true });
+      return;
+    }
+    try {
+      await cinemaService.remove(id);
+      const cinema = cinemas.find(c => c.id === id);
+      setCinemas(prev => prev.filter(c => c.id !== id));
+      addNotification({ title: 'Thành công', message: `Đã xoá rạp: ${cinema?.name}`, type: 'success', isAdmin: true });
+    } catch (error) {
+      console.error('[AdminCinemas] handleDeleteCinema error:', error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        addNotification({ title: 'Phiên đăng nhập hết hạn', message: 'Token không hợp lệ. Vui lòng đăng xuất và đăng nhập lại.', type: 'error', isAdmin: true });
+        localStorage.removeItem('cinema-auth');
+        setTimeout(() => navigate('/login'), 2500);
+        return;
+      }
+      if (error.response?.status === 403) {
+        addNotification({ title: 'Không có quyền', message: 'Tài khoản không có quyền Admin để xoá rạp.', type: 'error', isAdmin: true });
+        return;
+      }
+      const errMsg = error.response?.data?.detailMessage || error.response?.data?.message || error.message || 'Không thể xoá rạp chiếu phim';
+      addNotification({ title: 'Lỗi', message: errMsg, type: 'error', isAdmin: true });
+    }
   };
 
   return (
@@ -199,8 +414,8 @@ export default function AdminCinemas() {
           className="input-field max-w-[200px] cursor-pointer bg-cinema-surface"
         >
           <option value="all">Tất cả khu vực</option>
-          {PROVINCES.map(p => (
-            <option key={p} value={p}>{p}</option>
+          {provinces.map(p => (
+            <option key={p.id} value={p.provinceName || p.name}>{p.provinceName || p.name}</option>
           ))}
         </select>
       </div>
@@ -361,7 +576,7 @@ export default function AdminCinemas() {
       </div>
 
       {showModal && (
-        <CinemaModal initialData={editingCinema} onClose={() => setShowModal(false)} onSave={handleSaveCinema} />
+        <CinemaModal initialData={editingCinema} onClose={() => setShowModal(false)} onSave={handleSaveCinema} provinces={provinces} />
       )}
     </div>
   );

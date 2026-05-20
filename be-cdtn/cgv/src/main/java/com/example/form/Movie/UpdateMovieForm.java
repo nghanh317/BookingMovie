@@ -8,21 +8,21 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class UpdateMovieForm {
-	
+
 	private String title;
-	
+
 	private String description;
-	
+
 	private Integer duration;
-	
+
 	private Date releaseDate;
-	
+
 	private String director;
-	
+
 	private String cast;
-	
+
 	private String genre;
-	
+
 	private String language;
 	private String posterUrl;
 	private String trailerUrl;

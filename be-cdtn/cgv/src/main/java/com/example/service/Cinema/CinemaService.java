@@ -60,6 +60,11 @@ public class CinemaService implements ICinemaService{
 		province.setId(form.getProvinceId());
 		createCinema.setProvinces(province);
 		
+		createCinema.setImageUrl(form.getImageUrl());
+		
+		if (form.getLatitude() != null) createCinema.setLatitude(java.math.BigDecimal.valueOf(form.getLatitude()));
+		if (form.getLongitude() != null) createCinema.setLongitude(java.math.BigDecimal.valueOf(form.getLongitude()));
+		
 		cinemaRepository.save(createCinema);
 	}
 
@@ -70,6 +75,16 @@ public class CinemaService implements ICinemaService{
 		updateCinema.setAddress(form.getAddress());
 		updateCinema.setPhone(form.getPhone());
 		updateCinema.setEmail(form.getEmail());
+		updateCinema.setImageUrl(form.getImageUrl());
+		
+		if (form.getProvinceId() != null) {
+			Provinces province = new Provinces();
+			province.setId(form.getProvinceId());
+			updateCinema.setProvinces(province);
+		}
+		
+		if (form.getLatitude() != null) updateCinema.setLatitude(java.math.BigDecimal.valueOf(form.getLatitude()));
+		if (form.getLongitude() != null) updateCinema.setLongitude(java.math.BigDecimal.valueOf(form.getLongitude()));
 		
 		cinemaRepository.save(updateCinema);
 	}

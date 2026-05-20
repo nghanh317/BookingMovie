@@ -1,8 +1,12 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CINEMAS, MOVIES, SHOWTIMES, PROVINCES } from '../../constants/mockData';
 import useLocationStore from '../../store/locationStore';
+import cinemaService from '../../services/cinemaService';
+import provinceService from '../../services/provinceService';
+import slotService from '../../services/slotService';
+import movieService from '../../services/movieService';
+import roomService from '../../services/roomService';
 
 const FORMAT_COLORS = {
   IMAX: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -15,18 +19,18 @@ function getToday() {
   return new Date().toISOString().split('T')[0];
 }
 
-function getMoviesAtCinema(cinemaId) {
+function getMoviesAtCinema(cinemaId, allMovies, allShowtimes) {
   const today = getToday();
-  const todayShowtimes = SHOWTIMES.filter(s => s.cinemaId === cinemaId && s.date === today);
+  const todayShowtimes = allShowtimes.filter(s => s.cinemaId === cinemaId && s.date === today);
   const movieIds = [...new Set(todayShowtimes.map(s => s.movieId))];
   return movieIds
-    .map(id => ({ movie: MOVIES.find(m => m.id === id), showtimes: todayShowtimes.filter(s => s.movieId === id) }))
+    .map(id => ({ movie: allMovies.find(m => m.id === id), showtimes: todayShowtimes.filter(s => s.movieId === id) }))
     .filter(x => x.movie);
 }
 
-function CinemaCard({ cinema, index }) {
+function CinemaCard({ cinema, index, allMovies, allShowtimes }) {
   const [expanded, setExpanded] = useState(false);
-  const moviesNow = useMemo(() => getMoviesAtCinema(cinema.id), [cinema.id]);
+  const moviesNow = useMemo(() => getMoviesAtCinema(cinema.id, allMovies, allShowtimes), [cinema.id, allMovies, allShowtimes]);
 
   return (
     <motion.div
@@ -193,10 +197,55 @@ export default function Cinemas() {
   const [showAllProvinces, setShowAllProvinces] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
   const provincesContainerRef = useRef(null);
+  
+  const [cinemas, setCinemas] = useState([]);
+  const [provinces, setProvinces] = useState([]);
+  const [movies, setMovies] = useState([]);
+  const [showtimes, setShowtimes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      cinemaService.getAll(),
+      provinceService.getAll(),
+      movieService.getAll(),
+      roomService.getAll(),
+      slotService.getAll({ size: 1000 })
+    ]).then(([cinemasData, provincesData, moviesData, roomsData, slotsData]) => {
+      setCinemas(Array.isArray(cinemasData) ? cinemasData : []);
+      
+      const provs = Array.isArray(provincesData) ? provincesData : (provincesData?.content || provincesData?.data || []);
+      setProvinces(provs.map(p => p.provinceName || p.name || p));
+      
+      setMovies(Array.isArray(moviesData) ? moviesData : (moviesData?.content || moviesData?.data || []));
+      
+      const fetchedRooms = Array.isArray(roomsData) ? roomsData : (roomsData?.content || roomsData?.data || []);
+      const slotsRaw = Array.isArray(slotsData) ? slotsData : (slotsData?.content || slotsData?.data || []);
+      
+      const slots = slotsRaw.map(s => {
+        const [date, timeWithSec] = (s.showTime || '2024-01-01 00:00:00').split(' ');
+        const time = timeWithSec ? timeWithSec.substring(0, 5) : '';
+        const room = fetchedRooms.find(r => r.id === s.roomId);
+        return {
+          id: s.id,
+          movieId: s.movieId,
+          roomId: s.roomId,
+          cinemaId: room?.cinemaId,
+          date,
+          time,
+          hall: s.roomName || room?.name,
+          type: '2D', // Default fallback
+        };
+      });
+      setShowtimes(slots);
+    }).catch(err => {
+      console.error("Error fetching data in Cinemas.jsx:", err);
+    }).finally(() => setLoading(false));
+  }, []);
 
   const availableProvinces = useMemo(() => {
-    return PROVINCES;
-  }, []);
+    return provinces;
+  }, [provinces]);
 
   useEffect(() => {
     const checkOverflow = () => {
@@ -210,15 +259,15 @@ export default function Cinemas() {
   }, [availableProvinces]);
 
   const filtered = useMemo(() => {
-    let result = CINEMAS;
+    let result = cinemas;
     const province = localProvince || selectedProvince;
-    if (province) result = result.filter(c => c.province === province);
+    if (province) result = result.filter(c => c.province === province || c.city === province);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(c => c.name.toLowerCase().includes(q) || c.address.toLowerCase().includes(q));
     }
     return result;
-  }, [localProvince, selectedProvince, searchQuery]);
+  }, [cinemas, localProvince, selectedProvince, searchQuery]);
 
   const grouped = useMemo(() => {
     const map = {};
@@ -233,6 +282,10 @@ export default function Cinemas() {
     setLocalProvince(p);
     if (p) setProvince(p); else clearProvince();
   };
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div></div>;
+  }
 
   return (
     <div className="min-h-screen animate-fade-in">
@@ -339,10 +392,10 @@ export default function Cinemas() {
         {(!localProvince && !selectedProvince) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
           {[
-            { icon: '🏟️', value: CINEMAS.length, label: 'Tổng rạp' },
+            { icon: '🏟️', value: cinemas.length, label: 'Tổng rạp' },
             { icon: '📍', value: availableProvinces.length, label: 'Tỉnh thành' },
-            { icon: '🎬', value: CINEMAS.reduce((a, c) => a + c.screens, 0), label: 'Phòng chiếu' },
-            { icon: '⭐', value: (CINEMAS.reduce((a, c) => a + c.rating, 0) / CINEMAS.length).toFixed(1), label: 'Đánh giá TB' },
+            { icon: '🎬', value: cinemas.reduce((a, c) => a + c.screens, 0), label: 'Phòng chiếu' },
+            { icon: '⭐', value: cinemas.length > 0 ? (cinemas.reduce((a, c) => a + c.rating, 0) / cinemas.length).toFixed(1) : 0, label: 'Đánh giá TB' },
           ].map((s, i) => (
             <motion.div
               key={s.label}
@@ -384,7 +437,7 @@ export default function Cinemas() {
               </div>
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {cinemas.map((cinema, i) => (
-                  <CinemaCard key={cinema.id} cinema={cinema} index={i} />
+                  <CinemaCard key={cinema.id} cinema={cinema} index={i} allMovies={movies} allShowtimes={showtimes} />
                 ))}
               </div>
             </div>
