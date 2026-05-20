@@ -1,65 +1,147 @@
 /**
  * api.js — Axios instance trung tâm
- * - Tự động gắn Bearer token vào mọi request
- * - Chặn demo/invalid token ngay tại request interceptor
- * - Tự động logout + redirect khi nhận 401
+ *
+ * Cơ chế token:
+ *   - Mọi request gắn accessToken (15 phút) vào header Authorization
+ *   - Nếu backend trả 401 → tự động gọi /auth/refresh bằng refreshToken
+ *   - Nếu refresh thành công → lưu accessToken mới + retry request gốc
+ *   - Nếu refresh thất bại (refreshToken hết hạn 7 ngày) → logout + redirect /login
  */
 import axios from 'axios';
+import authService from './authService';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
-// JWT thật luôn bắt đầu bằng "eyJ" (base64 của {"alg":...})
+// Chỉ token bắt đầu bằng "eyJ" mới là JWT thật
 const isRealJWT = (token) => typeof token === 'string' && token.startsWith('eyJ');
 
+// ── Đọc tokens từ localStorage (zustand persist) ────────────
+const getTokens = () => {
+  try {
+    const raw = localStorage.getItem('cinema-auth');
+    if (!raw) return { accessToken: null, refreshToken: null };
+    const parsed = JSON.parse(raw);
+    return {
+      accessToken: parsed?.state?.accessToken || null,
+      refreshToken: parsed?.state?.refreshToken || null,
+    };
+  } catch {
+    return { accessToken: null, refreshToken: null };
+  }
+};
+
+// ── Ghi accessToken mới vào localStorage (zustand persist format) ──
+const saveNewAccessToken = (newToken) => {
+  try {
+    const raw = localStorage.getItem('cinema-auth');
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed?.state) {
+      parsed.state.accessToken = newToken;
+      localStorage.setItem('cinema-auth', JSON.stringify(parsed));
+    }
+  } catch {
+    // ignore
+  }
+};
+
+// ── Tạo axios instance ───────────────────────────────────────
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// ── Request interceptor: chặn token giả, chỉ gắn JWT thật ──
+// ── REQUEST interceptor: gắn accessToken ────────────────────
 api.interceptors.request.use(
   (config) => {
-    const authData = localStorage.getItem('cinema-auth');
-    if (authData) {
-      try {
-        const parsed = JSON.parse(authData);
-        const token = parsed?.state?.token;
-
-        if (token && isRealJWT(token)) {
-          // Token hợp lệ → gắn vào header
-          config.headers.Authorization = `Bearer ${token}`;
-        } else if (token && !isRealJWT(token)) {
-          // Token giả (demo-admin-token, demo-user-token, ...) → xóa ngay
-          console.warn('[API] Demo/invalid token detected and removed:', token);
-          localStorage.removeItem('cinema-auth');
-          // Không gắn Authorization → backend trả lỗi 401 công khai nếu cần auth
-        }
-      } catch (_) {
-        // ignore parse errors
-      }
+    const { accessToken } = getTokens();
+    if (accessToken && isRealJWT(accessToken)) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// ── Response interceptor: xử lý 401 ────────────────────────
+// ── Biến chống gọi refresh song song nhiều lần ──────────────
+let isRefreshing = false;
+let pendingQueue = []; // Hàng đợi các request đang chờ token mới
+
+const processQueue = (error, token = null) => {
+  pendingQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  pendingQueue = [];
+};
+
+// ── RESPONSE interceptor: tự động refresh khi 401 ───────────
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      const currentPath = window.location.pathname;
-      console.warn('[API] 401 Unauthorized — token expired or invalid. URL:', error.config?.url);
-      localStorage.removeItem('cinema-auth');
-      if (currentPath !== '/login') {
-        window.location.href = '/login';
-      }
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Chỉ xử lý 401 và chưa retry
+    if (error.response?.status !== 401 || originalRequest._retry) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    const { refreshToken } = getTokens();
+
+    // Không có refresh token → logout ngay
+    if (!refreshToken || !isRealJWT(refreshToken)) {
+      forceLogout();
+      return Promise.reject(error);
+    }
+
+    // Đang refresh → đưa request vào hàng đợi
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        pendingQueue.push({ resolve, reject });
+      }).then((newAccessToken) => {
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        return api(originalRequest);
+      });
+    }
+
+    // Bắt đầu refresh
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    try {
+      const { accessToken: newAccessToken } = await authService.refresh(refreshToken);
+
+      // Lưu token mới
+      saveNewAccessToken(newAccessToken);
+
+      // Cập nhật header cho request hiện tại và các request đang chờ
+      api.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
+      processQueue(null, newAccessToken);
+
+      // Retry request gốc với token mới
+      originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+      return api(originalRequest);
+    } catch (refreshError) {
+      // Refresh thất bại → refresh token hết hạn 7 ngày → buộc đăng nhập lại
+      processQueue(refreshError, null);
+      forceLogout();
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   }
 );
+
+// ── Logout + redirect về /login ──────────────────────────────
+function forceLogout() {
+  localStorage.removeItem('cinema-auth');
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+}
 
 export default api;

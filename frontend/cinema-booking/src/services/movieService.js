@@ -86,7 +86,7 @@ const movieService = {
       language: payload.language || 'Tiếng Anh',
       posterUrl: payload.poster || payload.posterUrl || '',
       trailerUrl: payload.trailer || payload.trailerUrl || '',
-      status: (payload.status || 'now_showing').toUpperCase().replace('_', '_'),
+      status: (payload.status || 'NOW_SHOWING').toUpperCase(),
     });
     return res.data ? normalize(res.data) : null;
   },
@@ -99,14 +99,12 @@ const movieService = {
       duration: parseInt(payload.duration) || 0,
       releaseDate: payload.releaseDate,
       director: payload.director,
-      //cast: Array.isArray(payload.cast) ? payload.cast.join(', ') : (payload.cast || ''),
-      cast: "Miho Okasaki, Mao Ichimichi, Tomoaki Maeno, Makoto Furukawa, Sayaka Senbongi",
-      //genre: Array.isArray(payload.genre) ? payload.genre.join(', ') : (payload.genre || ''),
-      genre: "Khoa học viễn tưởng, Hành động, Phiêu lưu",
+      cast: Array.isArray(payload.cast) ? payload.cast.join(', ') : (payload.cast || ''),
+      genre: Array.isArray(payload.genre) ? payload.genre.join(', ') : (payload.genre || ''),
       language: payload.language || 'Tiếng Anh',
       posterUrl: payload.poster || payload.posterUrl || '',
       trailerUrl: payload.trailer || payload.trailerUrl || '',
-      //status: (payload.status || 'now_showing').toUpperCase().replace('_', '_'),
+      status: (payload.status || 'NOW_SHOWING').toUpperCase(),
     });
     return res.data ? normalize(res.data) : null;
   },

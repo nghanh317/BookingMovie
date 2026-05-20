@@ -1,68 +1,48 @@
+/**
+ * axiosClient.js — Instance dùng bởi các api/ folder (slot, room, ticket, seat...)
+ * Đồng bộ cơ chế token với api.js:
+ *   - Đọc accessToken từ localStorage (zustand persist)
+ *   - 401 → redirect /login (các endpoint này không cần silent refresh)
+ */
 import axios from 'axios';
+
+const isRealJWT = (token) => typeof token === 'string' && token.startsWith('eyJ');
+
+const getAccessToken = () => {
+  try {
+    const raw = localStorage.getItem('cinema-auth');
+    if (!raw) return null;
+    return JSON.parse(raw)?.state?.accessToken || null;
+  } catch {
+    return null;
+  }
+};
 
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// JWT thật luôn bắt đầu bằng "eyJ"
-const isRealJWT = (token) => typeof token === 'string' && token.startsWith('eyJ');
-
-// ── Request interceptor: tự động gắn JWT token ──────────────
+// ── Request interceptor ──────────────────────────────────────
 axiosClient.interceptors.request.use(
   (config) => {
-    try {
-      const authData = JSON.parse(localStorage.getItem('cinema-auth'));
-      const token = authData?.state?.token;
-      if (token && isRealJWT(token)) {
-        config.headers.Authorization = `Bearer ${token}`;
-      } else if (token && !isRealJWT(token)) {
-        console.warn('[axiosClient] Demo/invalid token detected and removed:', token);
-        localStorage.removeItem('cinema-auth');
-      }
-    } catch (e) {
-      // ignore parse error
+    const token = getAccessToken();
+    if (token && isRealJWT(token)) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// ── Response interceptor: xử lý lỗi chung ──────────────────
+// ── Response interceptor ─────────────────────────────────────
 axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response) {
-      const { status, config } = error.response;
-      const requestUrl = config?.url || '';
-
-      // Danh sách endpoint công khai - không redirect khi lỗi 401/403
-      const isPublicEndpoint =
-        requestUrl.includes('/api/v1/auth/') ||
-        requestUrl.includes('/api/v1/movies') ||
-        requestUrl.includes('/api/v1/slots') ||
-        requestUrl.includes('/api/v1/rooms') ||
-        requestUrl.includes('/api/v1/cinemas') ||
-        requestUrl.includes('/api/v1/provinces') ||
-        requestUrl.includes('/api/v1/promotions') || // Thêm các endpoint public khác
-        requestUrl.includes('/api/v1/products');
-
-      // Chỉ logout + redirect khi token thực sự hết hạn (401)
-      // KHÔNG logout khi 403 (thiếu quyền) vì admin vẫn đang đăng nhập hợp lệ
-      if (status === 401 && !isPublicEndpoint) {
-        try {
-          const authData = JSON.parse(localStorage.getItem('cinema-auth'));
-          if (authData?.state?.token) {
-            localStorage.removeItem('cinema-auth');
-            if (window.location.pathname !== '/login') {
-              window.location.href = '/login';
-            }
-          }
-        } catch (e) {
-          // ignore
-        }
+    if (error.response?.status === 401) {
+      localStorage.removeItem('cinema-auth');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
       }
     }
     return Promise.reject(error);

@@ -153,10 +153,10 @@ export default function AdminMovies() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const navigate = useNavigate();
-  const { token } = useAuthStore();
+  const { accessToken } = useAuthStore();
 
-  // Phát hiện token demo hoặc không hợp lệ
-  const isDemoToken = !token || token === 'demo-admin-token' || token === 'demo-user-token';
+  // accessToken là JWT thật khi bắt đầu bằng 'eyJ', còn lại đều coi là chưa auth
+  const isAuthenticated = accessToken && accessToken.startsWith('eyJ');
 
   // ── Fetch danh sách phìm ──────────────────────────────
   useEffect(() => {
@@ -189,8 +189,8 @@ export default function AdminMovies() {
   });
 
   const handleSave = async (form) => {
-    if (isDemoToken) {
-      setToast({ msg: '❌ Bạn đang dùng tài khoản demo. Hãy đăng xuất và đăng nhập bằng admin thật (admin / 123456).', type: 'error' });
+    if (!isAuthenticated) {
+      setToast({ msg: '❌ Chưa đăng nhập hoặc phiên hết hạn. Vui lòng đăng nhập lại.', type: 'error' });
       setTimeout(() => setToast(null), 4000);
       return;
     }
@@ -199,8 +199,6 @@ export default function AdminMovies() {
       if (modal && modal !== 'add') {
         await movieService.update(modal.id, form);
         showToast(`✅ Đã cập nhật phim: ${form.title}`);
-        console.log('✅ Đã cập nhật phim:', form);
-        console.log('ID:', modal);
       } else {
         await movieService.create(form);
         showToast(`✅ Đã thêm phim mới: ${form.title}`);
@@ -209,15 +207,8 @@ export default function AdminMovies() {
       setMovies(freshMovies);
     } catch (err) {
       console.error('[AdminMovies] handleSave error:', err.response?.data || err.message);
-      if (err.response?.status === 401) {
-        setToast({ msg: '❌ Phiên đăng nhập hết hạn. Đang chuyển hướng đăng nhập lại...', type: 'error' });
-        addNotification({ title: 'Phiên hết hạn', message: 'Token không hợp lệ. Vui lòng đăng nhập lại.', type: 'error', isAdmin: true });
-        localStorage.removeItem('cinema-auth');
-        setTimeout(() => navigate('/login'), 2500);
-        return;
-      }
       if (err.response?.status === 403) {
-        setToast({ msg: '❌ Tài khoản không có quyền Admin để thực hiện thao tác này.', type: 'error' });
+        setToast({ msg: '❌ Tài khoản không có quyền Admin.', type: 'error' });
         return;
       }
       const errMsg = err.response?.data?.detailMessage || err.response?.data?.message || err.message || 'Lỗi không xác định';
@@ -228,8 +219,8 @@ export default function AdminMovies() {
   };
 
   const handleDelete = async (id) => {
-    if (isDemoToken) {
-      setToast({ msg: '❌ Hãy đăng nhập bằng tài khoản admin thật để xoá phim.', type: 'error' });
+    if (!isAuthenticated) {
+      setToast({ msg: '❌ Chưa đăng nhập. Vui lòng đăng nhập lại để xoá phim.', type: 'error' });
       setTimeout(() => setToast(null), 4000);
       return;
     }
@@ -241,10 +232,8 @@ export default function AdminMovies() {
       showToast(`✅ Đã xóa phim: ${movie?.title}`);
     } catch (err) {
       console.error('[AdminMovies] handleDelete error:', err.response?.data || err.message);
-      if (err.response?.status === 401) {
-        setToast({ msg: '❌ Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.', type: 'error' });
-        localStorage.removeItem('cinema-auth');
-        setTimeout(() => navigate('/login'), 2500);
+      if (err.response?.status === 403) {
+        setToast({ msg: '❌ Tài khoản không có quyền Admin để xoá phim.', type: 'error' });
         return;
       }
       const errMsg = err.response?.data?.detailMessage || err.response?.data?.message || err.message || 'Không thể xóa phim';

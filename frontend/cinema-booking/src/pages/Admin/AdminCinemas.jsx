@@ -197,10 +197,10 @@ export default function AdminCinemas() {
   const [loading, setLoading] = useState(true);
   const [rooms, setRooms] = useState(CINEMA_ROOMS);
   const navigate = useNavigate();
-  const { token } = useAuthStore();
+  const { accessToken } = useAuthStore();
 
-  // Phát hiện token demo hoặc không hợp lệ ngay khi vào trang
-  const isDemoToken = !token || token === 'demo-admin-token' || token === 'demo-user-token';
+  // accessToken là JWT thật khi bắt đầu bằng 'eyJ'
+  const isAuthenticated = accessToken && accessToken.startsWith('eyJ');
 
   useEffect(() => {
     Promise.all([
@@ -317,11 +317,10 @@ export default function AdminCinemas() {
   const openEditModal = (c, e) => { e.stopPropagation(); setEditingCinema(c); setShowModal(true); };
 
   const handleSaveCinema = async (cinemaData) => {
-    // Chặn sớm nếu đang dùng demo token — không thể gọi API admin
-    if (isDemoToken) {
+    if (!isAuthenticated) {
       addNotification({
-        title: 'Chưa đăng nhập thật',
-        message: 'Bạn đang dùng tài khoản demo. Hãy đăng xuất và đăng nhập bằng tài khoản admin thật (admin / 123456).',
+        title: 'Chưa đăng nhập',
+        message: 'Phiên đăng nhập đã hết hoặc chưa đăng nhập. Vui lòng đăng nhập lại.',
         type: 'error',
         isAdmin: true
       });
@@ -335,27 +334,13 @@ export default function AdminCinemas() {
         await cinemaService.create(cinemaData);
         addNotification({ title: 'Thành công', message: `Đã thêm rạp mới: ${cinemaData.name}`, type: 'success', isAdmin: true });
       }
-
-      // Đồng bộ lại danh sách rạp từ backend
       const freshCinemas = await cinemaService.getAll();
       setCinemas(freshCinemas);
       setShowModal(false);
     } catch (error) {
       console.error('[AdminCinemas] handleSaveCinema error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        // Token hết hạn thật sự → xóa cache và yêu cầu đăng nhập lại
-        addNotification({
-          title: 'Phiên đăng nhập hết hạn',
-          message: 'Token không hợp lệ hoặc đã hết hạn. Vui lòng đăng xuất và đăng nhập lại.',
-          type: 'error',
-          isAdmin: true
-        });
-        localStorage.removeItem('cinema-auth');
-        setTimeout(() => navigate('/login'), 2500);
-        return;
-      }
       if (error.response?.status === 403) {
-        addNotification({ title: 'Không có quyền', message: 'Tài khoản không có quyền Admin để thực hiện thao tác này.', type: 'error', isAdmin: true });
+        addNotification({ title: 'Không có quyền', message: 'Tài khoản không có quyền Admin.', type: 'error', isAdmin: true });
         return;
       }
       const errMsg = error.response?.data?.detailMessage || error.response?.data?.message || error.message || 'Không thể lưu rạp chiếu phim';
@@ -365,8 +350,8 @@ export default function AdminCinemas() {
 
   const handleDeleteCinema = async (id, e) => {
     e.stopPropagation();
-    if (isDemoToken) {
-      addNotification({ title: 'Chưa đăng nhập thật', message: 'Hãy đăng nhập bằng tài khoản admin thật để thực hiện thao tác này.', type: 'error', isAdmin: true });
+    if (!isAuthenticated) {
+      addNotification({ title: 'Chưa đăng nhập', message: 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.', type: 'error', isAdmin: true });
       return;
     }
     try {
@@ -376,12 +361,6 @@ export default function AdminCinemas() {
       addNotification({ title: 'Thành công', message: `Đã xoá rạp: ${cinema?.name}`, type: 'success', isAdmin: true });
     } catch (error) {
       console.error('[AdminCinemas] handleDeleteCinema error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        addNotification({ title: 'Phiên đăng nhập hết hạn', message: 'Token không hợp lệ. Vui lòng đăng xuất và đăng nhập lại.', type: 'error', isAdmin: true });
-        localStorage.removeItem('cinema-auth');
-        setTimeout(() => navigate('/login'), 2500);
-        return;
-      }
       if (error.response?.status === 403) {
         addNotification({ title: 'Không có quyền', message: 'Tài khoản không có quyền Admin để xoá rạp.', type: 'error', isAdmin: true });
         return;

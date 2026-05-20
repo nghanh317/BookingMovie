@@ -6,11 +6,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-import com.example.dto.AccountDTO;
-
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,52 +18,104 @@ import jakarta.servlet.http.HttpServletRequest;
 @Service
 public class JWTTokenService implements IJWTTokenService {
 
-    @Value("${jwt.token.time.expiration}")
-    private long EXPIRATION_TIME;
-
-    @Value("${jwt.token.secret}")
+    @Value("${jwt.secret}")
     private String SECRET;
 
-    @Value("${jwt.token.header.authorization}")
-    private String TOKEN_AUTHORIZATION;
+    @Value("${jwt.access.expiration}")
+    private long ACCESS_EXPIRATION; // 900000ms = 15 phút
 
-    @Value("${jwt.token.prefix}")
-    private String TOKEN_PREFIX;
+    @Value("${jwt.refresh.expiration}")
+    private long REFRESH_EXPIRATION; // 604800000ms = 7 ngày
+
+    @Value("${jwt.header}")
+    private String HEADER; // Authorization
+
+    @Value("${jwt.prefix}")
+    private String PREFIX; // Bearer
 
     @Autowired
-    private IAccountService accountService;
+    private IAccountService accountService; // implements UserDetailsService
 
+    // ── Tạo access token (15 phút) ──────────────────────────
     @Override
-    public String generateJWTToken(String userName) {
+    public String generateAccessToken(String username) {
+        return buildToken(username, ACCESS_EXPIRATION);
+    }
+
+    // ── Tạo refresh token (7 ngày) ──────────────────────────
+    @Override
+    public String generateRefreshToken(String username) {
+        return buildToken(username, REFRESH_EXPIRATION);
+    }
+
+    private String buildToken(String username, long expirationMs) {
         return Jwts.builder()
-                .setSubject(userName)
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+                .setSubject(username)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(SignatureAlgorithm.HS512, SECRET)
                 .compact();
     }
 
-    public Authentication parseTokenToUserInformation(HttpServletRequest request) {
-        String token = request.getHeader(TOKEN_AUTHORIZATION);
+    // ── Lấy username từ token ────────────────────────────────
+    @Override
+    public String getUsernameFromToken(String token) {
+        try {
+            return getClaims(token).getSubject();
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
-        if (token == null) {
+    // ── Kiểm tra token hợp lệ (chưa hết hạn, đúng chữ ký) ──
+    @Override
+    public boolean isTokenValid(String token) {
+        try {
+            Claims claims = getClaims(token);
+            return !claims.getExpiration().before(new Date());
+        } catch (ExpiredJwtException e) {
+            return false; // Hết hạn
+        } catch (Exception e) {
+            return false; // Sai chữ ký hoặc token dị dạng
+        }
+    }
+
+    // ── Parse access token từ request HTTP ──────────────────
+    @Override
+    public Authentication parseAccessToken(HttpServletRequest request) {
+        String header = request.getHeader(HEADER);
+        if (header == null || !header.startsWith(PREFIX)) {
+            return null;
+        }
+
+        String token = header.substring(PREFIX.length()).trim();
+
+        if (!isTokenValid(token)) {
             return null;
         }
 
         try {
-            String userName = Jwts.parser()
-                    .setSigningKey(SECRET)
-                    .parseClaimsJws(token.replace(TOKEN_PREFIX, "").trim())
-                    .getBody()
-                    .getSubject();
+            String username = getUsernameFromToken(token);
+            if (username == null) return null;
 
-            AccountDTO account = accountService.getAccountByUserName(userName);
+            // Dùng loadUserByUsername — đọc thẳng từ entity, không qua ModelMapper
+            // Đảm bảo authority được tạo đúng từ Role enum (không bị null)
+            UserDetails userDetails = accountService.loadUserByUsername(username);
 
-            return userName != null ? new UsernamePasswordAuthenticationToken(
-                    account.getUserName(),
+            return new UsernamePasswordAuthenticationToken(
+                    userDetails.getUsername(),
                     null,
-                    AuthorityUtils.createAuthorityList(account.getRole().toString())) : null;
+                    userDetails.getAuthorities());
         } catch (Exception e) {
             return null;
         }
+    }
+
+    // ── Helper: parse claims ─────────────────────────────────
+    private Claims getClaims(String token) {
+        return Jwts.parser()
+                .setSigningKey(SECRET)
+                .parseClaimsJws(token)
+                .getBody();
     }
 }
