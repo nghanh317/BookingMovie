@@ -87,6 +87,13 @@ public class MovieService implements IMovieService {
 		createMovie.setPosterUrl(form.getPosterUrl());
 		createMovie.setTrailerUrl(form.getTrailerUrl());
 
+		//THÊM MỚI: Cho phép Admin cập nhật lại trạng thái phim và nhãn độ tuổi
+		if (form.getStatus() != null) {
+			createMovie.setStatus(Movies.Status.toEnum(form.getStatus()));
+		}
+		if (form.getAgeRating() != null) {
+			createMovie.setAgeRating(form.getAgeRating());
+		}
 		movieRepository.save(createMovie);
 	}
 
@@ -103,6 +110,14 @@ public class MovieService implements IMovieService {
 		updateMovie.setReleaseDate(form.getReleaseDate());
 		updateMovie.setPosterUrl(form.getPosterUrl());
 		updateMovie.setTrailerUrl(form.getTrailerUrl());
+
+		// ✨ THÊM MỚI: Cho phép Admin cập nhật lại trạng thái phim và nhãn độ tuổi
+        if (form.getStatus() != null) {
+            updateMovie.setStatus(Movies.Status.toEnum(form.getStatus()));
+        }
+        if (form.getAgeRating() != null) {
+            updateMovie.setAgeRating(form.getAgeRating());
+        }
 
 		movieRepository.save(updateMovie);
 

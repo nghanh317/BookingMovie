@@ -2,6 +2,7 @@ package com.example.form.Movie;
 
 import java.util.Date;
 
+import com.example.entity.Movies.AgeRating;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import lombok.AllArgsConstructor;
@@ -36,4 +37,6 @@ public class CreateMovieForm {
     private String trailerUrl;
     
     private String status;
+
+    private AgeRating ageRating;
 }

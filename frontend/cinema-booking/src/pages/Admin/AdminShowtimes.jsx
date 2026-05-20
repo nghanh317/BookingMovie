@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import useNotificationStore from '../../store/notificationStore';
 import DatePickerInput from '../../components/ui/DatePickerInput';
 import movieService from '../../services/movieService';
@@ -26,42 +26,59 @@ export default function AdminShowtimes() {
   const [rooms, setRooms] = useState([]);
   const [showtimes, setShowtimes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  // Helper: chuyển SlotDTO -> local showtime object
+  const normalizeSlot = useCallback((s, fetchedRooms) => {
+    const allRooms = fetchedRooms || rooms;
+    const showTimeStr = s.showTime
+      ? (typeof s.showTime === 'string' ? s.showTime : new Date(s.showTime).toISOString())
+      : '2024-01-01T00:00:00';
+    const dateObj = new Date(showTimeStr);
+    const date = dateObj.toISOString().split('T')[0];
+    const time = dateObj.toTimeString().substring(0, 5);
+    const room = allRooms.find(r => r.id === s.roomId);
+    return {
+      id: s.id,
+      movieId: s.movieId,
+      roomId: s.roomId,
+      cinemaId: room?.cinemaId,
+      cinemaName: s.cinemaName,
+      date,
+      time,
+      hall: s.roomName || room?.roomName || room?.name || '',
+      type: room?.roomType || '2D',
+      availableSeats: s.emptySeats || 0,
+      price: s.price,
+      seatPrices: { standard: Number(s.price) || 75000, vip: Number(s.price) || 110000, couple: Number(s.price) || 200000 }
+    };
+  }, [rooms]);
+
+  const fetchSlots = useCallback(async (fetchedRooms) => {
+    try {
+      const slotsData = await slotService.getAll({ size: 1000 });
+      const slotsRaw = Array.isArray(slotsData) ? slotsData : (slotsData?.content || slotsData?.data || []);
+      setShowtimes(slotsRaw.map(s => normalizeSlot(s, fetchedRooms)));
+    } catch (err) {
+      console.error('[AdminShowtimes] fetchSlots error:', err.message);
+    }
+  }, [normalizeSlot]);
 
   useEffect(() => {
     Promise.all([
       movieService.getAll(),
       cinemaService.getAll(),
-      roomService.getAll(),
-      slotService.getAll({ size: 1000 })
-    ]).then(([moviesData, cinemasData, roomsData, slotsData]) => {
+      roomService.getAll({ size: 500 }),
+    ]).then(([moviesData, cinemasData, roomsData]) => {
       setMovies(Array.isArray(moviesData) ? moviesData : (moviesData?.content || moviesData?.data || []));
       setCinemas(Array.isArray(cinemasData) ? cinemasData : (cinemasData?.content || cinemasData?.data || []));
-      
       const fetchedRooms = Array.isArray(roomsData) ? roomsData : (roomsData?.content || roomsData?.data || []);
       setRooms(fetchedRooms);
-      
-      const slotsRaw = Array.isArray(slotsData) ? slotsData : (slotsData?.content || slotsData?.data || []);
-      const slots = slotsRaw.map(s => {
-        const [date, timeWithSec] = (s.showTime || '2024-01-01 00:00:00').split(' ');
-        const time = timeWithSec ? timeWithSec.substring(0, 5) : '';
-        const room = fetchedRooms.find(r => r.id === s.roomId);
-        return {
-          id: s.id,
-          movieId: s.movieId,
-          roomId: s.roomId,
-          cinemaId: room?.cinemaId,
-          date,
-          time,
-          hall: s.roomName || room?.name,
-          type: '2D',
-          availableSeats: s.emptySeats || 0,
-          seatPrices: { standard: s.price, vip: s.price, couple: s.price }
-        };
-      });
-      setShowtimes(slots);
-    }).catch(err => {
-      console.error("Error fetching data in AdminShowtimes.jsx:", err);
-    }).finally(() => setLoading(false));
+      return fetchedRooms;
+    }).then(fetchedRooms => fetchSlots(fetchedRooms))
+      .catch(err => console.error('[AdminShowtimes] init error:', err))
+      .finally(() => setLoading(false));
   }, []);
 
   const [showForm, setShowForm] = useState(false);
@@ -89,47 +106,81 @@ export default function AdminShowtimes() {
 
   const { addNotification } = useNotificationStore();
 
-  const handleAdd = () => {
-    if (!form.movieId || !form.cinemaId || !form.roomId || !form.date || !form.time) return;
-    
-    if (editingId) {
-      setShowtimes(prev => prev.map(s => s.id === editingId ? { ...s, ...form, movieId: +form.movieId, cinemaId: +form.cinemaId, availableSeats: +form.availableSeats } : s));
-      const movie = movies.find(m => m.id === +form.movieId);
-      addNotification({ title: 'Thành công', message: `Đã cập nhật suất chiếu phim "${movie?.title}" lúc ${form.time}`, type: 'success', isAdmin: true });
-    } else {
-      setShowtimes(prev => [...prev, { ...form, id: Date.now(), movieId: +form.movieId, cinemaId: +form.cinemaId, availableSeats: +form.availableSeats }]);
-      const movie = movies.find(m => m.id === +form.movieId);
-      addNotification({ title: 'Thành công', message: `Đã tạo suất chiếu phim "${movie?.title}" lúc ${form.time}`, type: 'success', isAdmin: true });
-    }
+  // Tạo datetime string theo format backend: "yyyy-MM-dd HH:mm:ss"
+  const toDateTimeStr = (date, time) => `${date} ${time}:00`;
 
-    setForm({ movieId: '', cinemaId: '', roomId: '', date: '', time: '', hall: '', type: '2D', availableSeats: 0, seatPrices: { ...DEFAULT_SEAT_PRICES } });
-    setShowForm(false);
-    setEditingId(null);
+  const handleAdd = async () => {
+    if (!form.movieId || !form.cinemaId || !form.roomId || !form.date || !form.time) return;
+    setSaving(true);
+    try {
+      const showTime = toDateTimeStr(form.date, form.time);
+      // endTime = showTime + duration phim (nếu không có thì +2h)
+      const movie = movies.find(m => m.id === +form.movieId);
+      const durationMs = (movie?.duration || 120) * 60 * 1000;
+      const endTimeDate = new Date(new Date(`${form.date}T${form.time}:00`).getTime() + durationMs);
+      const endTime = `${endTimeDate.toISOString().split('T')[0]} ${endTimeDate.toTimeString().substring(0,5)}:00`;
+
+      if (editingId) {
+        await slotService.update(editingId, {
+          movieId: +form.movieId,
+          roomId: +form.roomId,
+          showTime,
+          endTime,
+        });
+        addNotification({ title: 'Thành công', message: `Đã cập nhật suất chiếu phim "${movie?.title}"`, type: 'success', isAdmin: true });
+      } else {
+        await slotService.create({
+          movieId: +form.movieId,
+          roomId: +form.roomId,
+          showTime,
+          endTime,
+        });
+        addNotification({ title: 'Thành công', message: `Đã tạo suất chiếu phim "${movie?.title}" lúc ${form.time}`, type: 'success', isAdmin: true });
+      }
+      await fetchSlots();
+      setForm({ movieId: '', cinemaId: '', roomId: '', date: '', time: '', hall: '', type: '2D', availableSeats: 0, seatPrices: { ...DEFAULT_SEAT_PRICES } });
+      setShowForm(false);
+      setEditingId(null);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Không thể lưu suất chiếu';
+      addNotification({ title: 'Lỗi', message: msg, type: 'error', isAdmin: true });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEdit = (st) => {
-    const room = rooms.find(r => r.cinemaId === st.cinemaId && r.name === st.hall);
     setForm({
       movieId: st.movieId,
-      cinemaId: st.cinemaId,
-      roomId: room ? room.id : '',
+      cinemaId: st.cinemaId || '',
+      roomId: st.roomId || '',
       date: st.date,
       time: st.time,
       hall: st.hall,
       type: st.type,
       availableSeats: st.availableSeats,
-      seatPrices: st.seatPrices || room?.seatPrices || { ...DEFAULT_SEAT_PRICES },
+      seatPrices: st.seatPrices || { ...DEFAULT_SEAT_PRICES },
     });
     setEditingId(st.id);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = (id) => {
-    const st = showtimes.find(s => s.id === id);
-    const movie = movies.find(m => m.id === st?.movieId);
-    setShowtimes(prev => prev.filter(s => s.id !== id));
-    addNotification({ title: 'Thành công', message: `Đã xoá hiển thị suất chiếu phim "${movie?.title}" lúc ${st?.time}`, type: 'success', isAdmin: true });
+  const handleDelete = async (id) => {
+    if (!window.confirm('Xoá suất chiếu này?')) return;
+    setDeletingId(id);
+    try {
+      await slotService.remove(id);
+      const st = showtimes.find(s => s.id === id);
+      const movie = movies.find(m => m.id === st?.movieId);
+      addNotification({ title: 'Thành công', message: `Đã xoá suất chiếu phim "${movie?.title}" lúc ${st?.time}`, type: 'success', isAdmin: true });
+      await fetchSlots();
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Không thể xoá suất chiếu';
+      addNotification({ title: 'Lỗi', message: msg, type: 'error', isAdmin: true });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const cancelEdit = () => {
@@ -240,8 +291,12 @@ export default function AdminShowtimes() {
                 disabled={!form.cinemaId}
               >
                 <option value="">Chọn phòng chiếu...</option>
-                {rooms.filter(r => r.cinemaId === +form.cinemaId).map(r => (
-                  <option key={r.id} value={r.id}>{r.name} - {r.format} ({r.totalSeats} ghế)</option>
+                {rooms.filter(r => {
+                  // rooms từ API có thể có cinemaId hoặc cinemasName — filter theo cinemaId
+                  const cinemaIdNum = +form.cinemaId;
+                  return r.cinemaId === cinemaIdNum;
+                }).map(r => (
+                  <option key={r.id} value={r.id}>{r.roomName || r.name} - {r.roomType || r.format} ({r.totalSeats} ghế)</option>
                 ))}
               </select>
             </div>
@@ -298,8 +353,10 @@ export default function AdminShowtimes() {
           </div>
 
           <div className="flex gap-3 mt-5">
-            <button onClick={cancelEdit} className="btn-outline text-sm px-5 py-2">Huỷ</button>
-            <button onClick={handleAdd} className="btn-primary text-sm px-5 py-2">{editingId ? 'Lưu thay đổi' : 'Tạo suất chiếu'}</button>
+            <button onClick={cancelEdit} disabled={saving} className="btn-outline text-sm px-5 py-2">Huỷ</button>
+            <button onClick={handleAdd} disabled={saving} className="btn-primary text-sm px-5 py-2">
+              {saving ? 'Đang lưu...' : (editingId ? 'Lưu thay đổi' : 'Tạo suất chiếu')}
+            </button>
           </div>
         </div>
       )}
@@ -369,12 +426,12 @@ export default function AdminShowtimes() {
                                           ✏️ Sửa
                                         </button>
                                         <button 
-                                          disabled={!canEdit}
+                                          disabled={!canEdit || deletingId === st.id}
                                           onClick={() => handleDelete(st.id)} 
                                           className={`flex-1 text-xs py-1.5 border rounded transition-colors ${canEdit ? 'text-red-400 border-red-400/50 hover:bg-red-500/10' : 'text-gray-500 border-gray-700 cursor-not-allowed bg-cinema-surface/50'}`}
                                           title={!canEdit ? 'Đã có khách đặt vé, không thể xoá' : 'Xoá suất chiếu'}
                                         >
-                                          🗑️ Xoá
+                                          {deletingId === st.id ? 'Đang xoá...' : '🗑️ Xoá'}
                                         </button>
                                       </div>
                                       {!canEdit && (

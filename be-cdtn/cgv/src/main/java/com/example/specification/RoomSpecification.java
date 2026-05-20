@@ -33,6 +33,10 @@ public static Specification<Rooms> buildWhere (RoomFilterForm filterform){
 		CustomSpecification seatIdSpe = new CustomSpecification("seats.id", filterform.getSeatId());
 		where = where.and(seatIdSpe);
 	}
+	if (filterform.getCinemaId() != null) {
+		CustomSpecification cinemaSpecification = new CustomSpecification("cinemas.id", filterform.getCinemaId());
+		where = where.and(cinemaSpecification);
+	}
 	return where;
 }
 
@@ -61,6 +65,9 @@ static class CustomSpecification implements Specification<Rooms>{
 		}
 		if (field.equalsIgnoreCase("seats.id")) {
 			return criteriaBuilder.equal(root.join("seats").get("id"), value);
+		}
+		if (field.equalsIgnoreCase("cinemas.id")) {
+			return criteriaBuilder.equal(root.get("cinemas").get("id"), value);
 		}
 		return null;
 	}

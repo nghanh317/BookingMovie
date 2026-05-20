@@ -5,6 +5,7 @@ import lombok.Data;
 import java.util.Date;
 
 import com.example.entity.Movies.Status;
+import com.example.entity.Movies.AgeRating;
 
 @Data
 public class MovieDTO {
@@ -31,6 +32,8 @@ public class MovieDTO {
 	private String trailerUrl;
 	
 	private Status status;
+	
+	private AgeRating ageRating;
 
 	private Date createDate;
 	     

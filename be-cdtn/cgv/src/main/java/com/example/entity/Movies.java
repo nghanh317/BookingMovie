@@ -57,7 +57,6 @@ public class Movies implements Serializable{
 	
 	@Column ( name = "release_date")
 	@Temporal (TemporalType.DATE)
-	@CreationTimestamp
 	@NonNull
 	private Date releaseDate;
 	
@@ -92,6 +91,10 @@ public class Movies implements Serializable{
 	@CreationTimestamp
 	private Date createDate;
 	
+	@Column(name = "age_rating", nullable = false)
+    @Convert(converter = AgeRatingConverter.class)
+    private AgeRating ageRating;
+
 	@Column ( name = "update_at")
 	@Temporal (TemporalType.TIMESTAMP)
 	@UpdateTimestamp
@@ -147,7 +150,28 @@ public enum Status{
 			return null;
 		}
 	}
+@Getter
+@NoArgsConstructor
+public enum AgeRating {
+	P("P"), K("K"), T13("T13"), T16("T16"), T18("T18");
+
+	private String value;
+
+	AgeRating(String value) {
+		this.value = value;
+	}
+
+	public static AgeRating toEnum(String sqlValue) {
+		for (AgeRating rating : AgeRating.values()) {
+			if (rating.getValue().equals(sqlValue)) {
+				return rating;
+			}
+		}
+		return null;
+	}
 }
+}
+
 @Converter (autoApply = true)
 class moviesStatusConverter implements AttributeConverter<Movies.Status, String>{
 	
@@ -164,4 +188,24 @@ class moviesStatusConverter implements AttributeConverter<Movies.Status, String>
 		}
 		return Movies.Status.toEnum(sqlStatus);
 	}
+}
+
+@Converter (autoApply = true)
+class AgeRatingConverter implements AttributeConverter<Movies.AgeRating, String> {
+
+    @Override
+    public String convertToDatabaseColumn(Movies.AgeRating attribute) {
+        if (attribute == null) {
+            return null;
+        }
+        return attribute.getValue();
+    }
+
+    @Override
+    public Movies.AgeRating convertToEntityAttribute(String dbData) {
+        if (dbData == null) {
+            return null;
+        }
+        return Movies.AgeRating.toEnum(dbData);
+    }
 }

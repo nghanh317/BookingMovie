@@ -86,7 +86,8 @@ const movieService = {
       language: payload.language || 'Tiếng Anh',
       posterUrl: payload.poster || payload.posterUrl || '',
       trailerUrl: payload.trailer || payload.trailerUrl || '',
-      status: (payload.status || 'NOW_SHOWING').toUpperCase(),
+      status: (payload.status || 'now_showing').toLowerCase(),
+      ageRating: payload.ageRating || 'P',
     });
     return res.data ? normalize(res.data) : null;
   },
@@ -104,7 +105,8 @@ const movieService = {
       language: payload.language || 'Tiếng Anh',
       posterUrl: payload.poster || payload.posterUrl || '',
       trailerUrl: payload.trailer || payload.trailerUrl || '',
-      status: (payload.status || 'NOW_SHOWING').toUpperCase(),
+      status: (payload.status || 'now_showing').toLowerCase(),
+      ageRating: payload.ageRating || 'P',
     });
     return res.data ? normalize(res.data) : null;
   },

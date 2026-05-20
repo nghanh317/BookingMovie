@@ -34,8 +34,13 @@ public class SeatService implements ISeatService {
 	private ModelMapper modelMapper;
 
 	@Override
-	public Page<SeatDTO> getAllSeat(Pageable pageable) {
-		Page<Seats> seatPage = seatRepository.findAll(pageable);
+	public Page<SeatDTO> getAllSeat(Pageable pageable, Integer roomId) {
+		Page<Seats> seatPage;
+		if (roomId != null) {
+			seatPage = seatRepository.findByRoomsId(roomId, pageable);
+		} else {
+			seatPage = seatRepository.findAll(pageable);
+		}
 
 		List<SeatDTO> dto = modelMapper.map(
 			seatPage.getContent(),

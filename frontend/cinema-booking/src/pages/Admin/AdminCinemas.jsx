@@ -1,11 +1,13 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CINEMA_ROOMS } from '../../constants/mockData';
 import useNotificationStore from '../../store/notificationStore';
 import useAuthStore from '../../store/authStore';
 import cinemaService from '../../services/cinemaService';
 import provinceService from '../../services/provinceService';
+import roomService from '../../services/roomService';
+import seatService from '../../services/seatService';
+import seatTypeService from '../../services/seatTypeService';
 
 // ── Cinema Modal (Add / Edit) ─────────────────────────────
 function CinemaModal({ initialData, onClose, onSave, provinces }) {
@@ -195,11 +197,12 @@ export default function AdminCinemas() {
   const [cinemas, setCinemas] = useState([]);
   const [provinces, setProvinces] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [rooms, setRooms] = useState(CINEMA_ROOMS);
+  // roomsByCinema: { [cinemaId]: RoomDTO[] }
+  const [roomsByCinema, setRoomsByCinema] = useState({});
+  const [roomsLoading, setRoomsLoading] = useState({});
   const navigate = useNavigate();
   const { accessToken } = useAuthStore();
 
-  // accessToken là JWT thật khi bắt đầu bằng 'eyJ'
   const isAuthenticated = accessToken && accessToken.startsWith('eyJ');
 
   useEffect(() => {
@@ -215,6 +218,21 @@ export default function AdminCinemas() {
       setCinemas([]);
       setProvinces([]);
     }).finally(() => setLoading(false));
+  }, []);
+
+  // Fetch rooms của một rạp theo cinemaId
+  const fetchRoomsForCinema = useCallback(async (cinemaId) => {
+    setRoomsLoading(prev => ({ ...prev, [cinemaId]: true }));
+    try {
+      const res = await roomService.getAll({ cinemaId, size: 100 });
+      const list = Array.isArray(res) ? res : (res?.content || res?.data || []);
+      setRoomsByCinema(prev => ({ ...prev, [cinemaId]: list }));
+    } catch (err) {
+      console.error('[AdminCinemas] fetchRooms error:', err.message);
+      setRoomsByCinema(prev => ({ ...prev, [cinemaId]: [] }));
+    } finally {
+      setRoomsLoading(prev => ({ ...prev, [cinemaId]: false }));
+    }
   }, []);
   
   const [search, setSearch] = useState('');
@@ -238,17 +256,57 @@ export default function AdminCinemas() {
   }, [filteredCinemas]);
 
   const [expandedCinemaId, setExpandedCinemaId] = useState(null);
-  const [showRoomForm, setShowRoomForm] = useState(null); 
-  const [roomForm, setRoomForm] = useState({ name: '', format: '2D', roomType: 'Standard', seatsStandard: 50, seatsVIP: 30, seatsCouple: 20 });
+  const [showRoomForm, setShowRoomForm] = useState(null);
+  const [roomForm, setRoomForm] = useState({ name: '', roomType: 'Standard' });
+  const [savingRoom, setSavingRoom] = useState(false);
 
   const [editingRoomId, setEditingRoomId] = useState(null);
-  const [editRoomForm, setEditRoomForm] = useState({ format: '', roomType: '', seatsStandard: 0, seatsVIP: 0, seatsCouple: 0 });
+  const [editRoomForm, setEditRoomForm] = useState({ roomName: '', roomType: 'Standard' });
 
   const { addNotification } = useNotificationStore();
 
-  // Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingCinema, setEditingCinema] = useState(null);
+
+  // ── Seat management state ──
+  const [seatsModalRoom, setSeatsModalRoom] = useState(null); // room object
+  const [seatsByRoom, setSeatsByRoom] = useState({});         // { roomId: SeatDTO[] }
+  const [seatsLoading, setSeatsLoading] = useState({});
+  const [seatTypes, setSeatTypes] = useState([]);
+
+  // Fetch seat types once
+  useEffect(() => {
+    seatTypeService.getAll({ size: 100 })
+      .then(data => {
+        const list = Array.isArray(data) ? data : (data?.content || data?.data || []);
+        setSeatTypes(list);
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchSeatsForRoom = useCallback(async (roomId) => {
+    setSeatsLoading(prev => ({ ...prev, [roomId]: true }));
+    try {
+      const data = await seatService.getAll({ roomId, size: 500 });
+      const list = Array.isArray(data) ? data : (data?.content || data?.data || []);
+      list.sort((a, b) => {
+        const r = (a.seatRow || '').localeCompare(b.seatRow || '');
+        return r !== 0 ? r : (a.seatNumber || 0) - (b.seatNumber || 0);
+      });
+      setSeatsByRoom(prev => ({ ...prev, [roomId]: list }));
+    } catch (err) {
+      console.error('[AdminCinemas] fetchSeats error:', err.message);
+      setSeatsByRoom(prev => ({ ...prev, [roomId]: [] }));
+    } finally {
+      setSeatsLoading(prev => ({ ...prev, [roomId]: false }));
+    }
+  }, []);
+
+  const openSeatsModal = (room) => {
+    setSeatsModalRoom(room);
+    if (!seatsByRoom[room.id]) fetchSeatsForRoom(room.id);
+  };
+
 
   const toggleCinema = (id) => {
     if (expandedCinemaId === id) {
@@ -257,60 +315,64 @@ export default function AdminCinemas() {
     } else {
       setExpandedCinemaId(id);
       setShowRoomForm(null);
+      // Chỉ fetch nếu chưa có dữ liệu
+      if (!roomsByCinema[id]) fetchRoomsForCinema(id);
     }
   };
 
-  const handleAddRoom = (cinemaId) => {
-    if (!roomForm.name || !roomForm.format) return;
-    const std = parseInt(roomForm.seatsStandard) || 0;
-    const vip = parseInt(roomForm.seatsVIP) || 0;
-    const couple = parseInt(roomForm.seatsCouple) || 0;
-    const newRoom = {
-      id: Date.now(),
-      cinemaId,
-      name: roomForm.name,
-      format: roomForm.format,
-      roomType: roomForm.roomType,
-      seatsStandard: std,
-      seatsVIP: vip,
-      seatsCouple: couple,
-      totalSeats: std + vip + couple
-    };
-    setRooms(prev => [...prev, newRoom]);
-    setRoomForm({ name: '', format: '2D', roomType: 'Standard', seatsStandard: 50, seatsVIP: 30, seatsCouple: 20 });
-    setShowRoomForm(null);
-    const cinema = cinemas.find(c => c.id === cinemaId);
-    addNotification({ title: 'Thành công', message: `Đã thêm phòng chiếu "${roomForm.name}" cho rạp ${cinema?.name}`, type: 'success', isAdmin: true });
+  const handleAddRoom = async (cinemaId) => {
+    if (!roomForm.name.trim()) return;
+    setSavingRoom(true);
+    try {
+      await roomService.create({
+        cinemaId,
+        roomName: roomForm.name.trim(),
+        roomType: roomForm.roomType,
+      });
+      const cinema = cinemas.find(c => c.id === cinemaId);
+      addNotification({ title: 'Thành công', message: `Đã thêm phòng "${roomForm.name}" cho rạp ${cinema?.name}`, type: 'success', isAdmin: true });
+      setRoomForm({ name: '', roomType: 'Standard' });
+      setShowRoomForm(null);
+      await fetchRoomsForCinema(cinemaId);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Không thể thêm phòng';
+      addNotification({ title: 'Lỗi', message: msg, type: 'error', isAdmin: true });
+    } finally {
+      setSavingRoom(false);
+    }
   };
 
   const startEditRoom = (room) => {
     setEditingRoomId(room.id);
-    setEditRoomForm({ 
-      format: room.format, 
-      roomType: room.roomType || 'Standard', 
-      seatsStandard: room.seatsStandard || 0, 
-      seatsVIP: room.seatsVIP || 0, 
-      seatsCouple: room.seatsCouple || 0 
-    });
+    setEditRoomForm({ roomName: room.roomName || room.name || '', roomType: room.roomType || 'Standard' });
   };
 
-  const saveEditRoom = () => {
-    const std = parseInt(editRoomForm.seatsStandard) || 0;
-    const vip = parseInt(editRoomForm.seatsVIP) || 0;
-    const couple = parseInt(editRoomForm.seatsCouple) || 0;
-    setRooms(prev => prev.map(r => r.id === editingRoomId ? { 
-      ...r, 
-      format: editRoomForm.format, 
-      roomType: editRoomForm.roomType,
-      seatsStandard: std,
-      seatsVIP: vip,
-      seatsCouple: couple,
-      totalSeats: std + vip + couple 
-    } : r));
-    setEditingRoomId(null);
-    const room = rooms.find(r => r.id === editingRoomId);
-    const cinema = cinemas.find(c => c.id === room?.cinemaId);
-    addNotification({ title: 'Thành công', message: `Đã cập nhật phòng chiếu "${room?.name}" tại ${cinema?.name}`, type: 'success', isAdmin: true });
+  const saveEditRoom = async (cinemaId) => {
+    if (!editRoomForm.roomName.trim()) return;
+    try {
+      await roomService.update(editingRoomId, {
+        roomName: editRoomForm.roomName.trim(),
+        roomType: editRoomForm.roomType,
+      });
+      addNotification({ title: 'Thành công', message: `Đã cập nhật phòng chiếu`, type: 'success', isAdmin: true });
+      setEditingRoomId(null);
+      await fetchRoomsForCinema(cinemaId);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Không thể cập nhật phòng';
+      addNotification({ title: 'Lỗi', message: msg, type: 'error', isAdmin: true });
+    }
+  };
+
+  const handleDeleteRoom = async (roomId, cinemaId) => {
+    if (!window.confirm('Xoá phòng chiếu này?')) return;
+    try {
+      await roomService.remove(roomId);
+      addNotification({ title: 'Thành công', message: 'Đã xoá phòng chiếu', type: 'success', isAdmin: true });
+      await fetchRoomsForCinema(cinemaId);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Không thể xoá phòng';
+      addNotification({ title: 'Lỗi', message: msg, type: 'error', isAdmin: true });
+    }
   };
 
   const openAddModal = () => { setEditingCinema(null); setShowModal(true); };
@@ -432,7 +494,7 @@ export default function AdminCinemas() {
                   </button>
                 </div>
                 <div className="flex items-center gap-2 text-cinema-muted ml-2 border-l border-cinema-border pl-4">
-                  <span className="text-sm">{rooms.filter(r => r.cinemaId === cinema.id).length} phòng chiếu</span>
+                  <span className="text-sm">{(roomsByCinema[cinema.id] || []).length} phòng chiếu</span>
                   <svg className={`w-5 h-5 transition-transform ${expandedCinemaId === cinema.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -463,82 +525,82 @@ export default function AdminCinemas() {
                     {showRoomForm === cinema.id && (
                       <div className="mb-4 bg-cinema-card p-4 rounded-lg border border-primary/30 flex items-end gap-3 flex-wrap">
                         <div>
-                          <label className="block text-cinema-muted text-xs mb-1">Tên phòng</label>
-                          <input value={roomForm.name} onChange={e => setRoomForm({...roomForm, name: e.target.value})} className="input-field py-1.5" placeholder="VD: Cinema 1" />
-                        </div>
-                        <div>
-                          <label className="block text-cinema-muted text-xs mb-1">Định dạng</label>
-                          <select value={roomForm.format} onChange={e => setRoomForm({...roomForm, format: e.target.value})} className="input-field py-1.5 pr-8">
-                            {['2D', '3D', 'IMAX', '4DX'].map(f => <option key={f} value={f}>{f}</option>)}
-                          </select>
+                          <label className="block text-cinema-muted text-xs mb-1">Tên phòng *</label>
+                          <input value={roomForm.name} onChange={e => setRoomForm({...roomForm, name: e.target.value})} className="input-field py-1.5" placeholder="VD: Phòng 1" />
                         </div>
                         <div>
                           <label className="block text-cinema-muted text-xs mb-1">Loại phòng</label>
                           <select value={roomForm.roomType} onChange={e => setRoomForm({...roomForm, roomType: e.target.value})} className="input-field py-1.5 pr-8">
-                            {['Standard', 'VIP'].map(f => <option key={f} value={f}>{f}</option>)}
+                            {['Standard', 'VIP', 'IMAX', '4DX'].map(f => <option key={f} value={f}>{f}</option>)}
                           </select>
                         </div>
-                        <div>
-                          <label className="block text-cinema-muted text-xs mb-1">Ghế Thường</label>
-                          <input type="number" value={roomForm.seatsStandard} onChange={e => setRoomForm({...roomForm, seatsStandard: e.target.value})} className="input-field py-1.5 w-20" />
-                        </div>
-                        <div>
-                          <label className="block text-cinema-muted text-xs mb-1">Ghế VIP</label>
-                          <input type="number" value={roomForm.seatsVIP} onChange={e => setRoomForm({...roomForm, seatsVIP: e.target.value})} className="input-field py-1.5 w-20" />
-                        </div>
-                        <div>
-                          <label className="block text-cinema-muted text-xs mb-1">Ghế Đôi</label>
-                          <input type="number" value={roomForm.seatsCouple} onChange={e => setRoomForm({...roomForm, seatsCouple: e.target.value})} className="input-field py-1.5 w-20" />
-                        </div>
-                        <button onClick={() => handleAddRoom(cinema.id)} className="btn-primary px-4 py-1.5 text-sm h-[38px]">Lưu</button>
+                        <button onClick={() => handleAddRoom(cinema.id)} disabled={savingRoom} className="btn-primary px-4 py-1.5 text-sm h-[38px]">
+                          {savingRoom ? 'Đang lưu...' : 'Lưu'}
+                        </button>
                       </div>
                     )}
 
-                    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {rooms.filter(r => r.cinemaId === cinema.id).map(room => (
-                        <div key={room.id} className="bg-cinema-card p-3 rounded-lg border border-cinema-border">
-                          {editingRoomId === room.id ? (
-                            <div className="space-y-2">
-                              <p className="text-white font-semibold text-sm">{room.name}</p>
-                              <div className="flex gap-2">
-                                <select value={editRoomForm.format} onChange={e => setEditRoomForm({...editRoomForm, format: e.target.value})} className="input-field py-1 text-xs w-20">
-                                  {['2D', '3D', 'IMAX', '4DX'].map(f => <option key={f} value={f}>{f}</option>)}
-                                </select>
-                                <select value={editRoomForm.roomType} onChange={e => setEditRoomForm({...editRoomForm, roomType: e.target.value})} className="input-field py-1 text-xs w-24">
-                                  {['Standard', 'VIP'].map(f => <option key={f} value={f}>{f}</option>)}
-                                </select>
+                    {roomsLoading[cinema.id] ? (
+                      <p className="text-cinema-muted text-sm animate-pulse py-4 text-center">Đang tải phòng chiếu...</p>
+                    ) : (
+                      <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {(roomsByCinema[cinema.id] || []).length === 0 ? (
+                          <p className="text-cinema-muted text-xs col-span-3 py-2">Chưa có phòng chiếu nào.</p>
+                        ) : (roomsByCinema[cinema.id] || []).map(room => (
+                          <div key={room.id} className="bg-cinema-card p-3 rounded-lg border border-cinema-border">
+                            {editingRoomId === room.id ? (
+                              <div className="space-y-2">
+                                <div>
+                                  <label className="text-cinema-muted text-xs">Tên phòng</label>
+                                  <input value={editRoomForm.roomName} onChange={e => setEditRoomForm({...editRoomForm, roomName: e.target.value})} className="input-field py-1 text-xs mt-1" />
+                                </div>
+                                <div>
+                                  <label className="text-cinema-muted text-xs">Loại phòng</label>
+                                  <select value={editRoomForm.roomType} onChange={e => setEditRoomForm({...editRoomForm, roomType: e.target.value})} className="input-field py-1 text-xs mt-1 w-full">
+                                    {['Standard', 'VIP', 'IMAX', '4DX'].map(f => <option key={f} value={f}>{f}</option>)}
+                                  </select>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button onClick={() => saveEditRoom(cinema.id)} className="text-green-400 text-xs hover:underline">Lưu</button>
+                                  <button onClick={() => setEditingRoomId(null)} className="text-cinema-muted text-xs hover:underline">Huỷ</button>
+                                </div>
                               </div>
-                              <div className="flex gap-2 items-center text-xs">
-                                <span className="text-cinema-muted">Thường:</span>
-                                <input type="number" value={editRoomForm.seatsStandard} onChange={e => setEditRoomForm({...editRoomForm, seatsStandard: e.target.value})} className="input-field py-1 text-xs w-14" />
-                                <span className="text-cinema-muted ml-1">VIP:</span>
-                                <input type="number" value={editRoomForm.seatsVIP} onChange={e => setEditRoomForm({...editRoomForm, seatsVIP: e.target.value})} className="input-field py-1 text-xs w-14" />
-                                <span className="text-cinema-muted ml-1">Đôi:</span>
-                                <input type="number" value={editRoomForm.seatsCouple} onChange={e => setEditRoomForm({...editRoomForm, seatsCouple: e.target.value})} className="input-field py-1 text-xs w-14" />
+                            ) : (
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h5 className="text-white font-semibold text-sm">{room.roomName || room.name}</h5>
+                                  <p className="text-cinema-muted text-xs mt-1">Loại: <span className="text-primary">{room.roomType || 'Standard'}</span></p>
+                                  <p className="text-cinema-muted text-xs mt-0.5">Tổng ghế: <span className="text-white font-medium">{room.totalSeats ?? 0}</span></p>
+                                  <p className="text-cinema-muted text-xs mt-0.5">Trạng thái: <span className={room.status === 'active' ? 'text-green-400' : 'text-red-400'}>{room.status || 'active'}</span></p>
+                                </div>
+                                <div className="flex flex-col gap-1 items-end">
+                                  <button onClick={() => startEditRoom(room)} className="text-cinema-muted hover:text-primary text-xs">✏️</button>
+                                  <button onClick={() => handleDeleteRoom(room.id, cinema.id)} className="text-cinema-muted hover:text-red-400 text-xs">🗑️</button>
+                                </div>
                               </div>
-                              <div className="flex gap-2">
-                                <button onClick={saveEditRoom} className="text-green-400 text-xs hover:underline">Lưu</button>
-                                <button onClick={() => setEditingRoomId(null)} className="text-cinema-muted text-xs hover:underline">Huỷ</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h5 className="text-white font-semibold text-sm">{room.name}</h5>
-                                <p className="text-cinema-muted text-xs mt-1">Định dạng: <span className="text-white">{room.format}</span> - <span className="text-primary">{room.roomType || 'Standard'}</span></p>
-                                <p className="text-cinema-muted text-xs mt-1">
-                                  Ghế: {room.seatsStandard || 0} Thường, {room.seatsVIP || 0} VIP, {room.seatsCouple || 0} Đôi
-                                </p>
-                                <p className="text-cinema-muted text-xs mt-0.5">Tổng ghế: <span className="text-white font-medium">{room.totalSeats}</span></p>
-                              </div>
-                              <button onClick={() => startEditRoom(room)} className="text-cinema-muted hover:text-primary text-xs">
-                                ✏️
-                              </button>
-                            </div>
-                          )}
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Seats button per room */}
+                    {(roomsByCinema[cinema.id] || []).length > 0 && !roomsLoading[cinema.id] && (
+                      <div className="mt-3 pt-3 border-t border-cinema-border/50">
+                        <p className="text-cinema-muted text-xs mb-2">Nhấn vào phòng để quản lý ghế:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {(roomsByCinema[cinema.id] || []).map(room => (
+                            <button
+                              key={room.id}
+                              onClick={() => openSeatsModal(room)}
+                              className="text-xs px-2 py-1 rounded bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors"
+                            >
+                              💺 {room.roomName || room.name} ({room.totalSeats ?? 0} ghế)
+                            </button>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -557,6 +619,235 @@ export default function AdminCinemas() {
       {showModal && (
         <CinemaModal initialData={editingCinema} onClose={() => setShowModal(false)} onSave={handleSaveCinema} provinces={provinces} />
       )}
+
+      {/* Seat Management Modal */}
+      {seatsModalRoom && (
+        <SeatManagementModal
+          room={seatsModalRoom}
+          seats={seatsByRoom[seatsModalRoom.id] || []}
+          loading={!!seatsLoading[seatsModalRoom.id]}
+          seatTypes={seatTypes}
+          onClose={() => setSeatsModalRoom(null)}
+          onRefresh={() => fetchSeatsForRoom(seatsModalRoom.id)}
+          addNotification={addNotification}
+        />
+      )}
     </div>
   );
 }
+
+// ── Seat Management Modal ──────────────────────────────────
+function SeatManagementModal({ room, seats, loading, seatTypes, onClose, onRefresh, addNotification }) {
+  const roomName = room.roomName || room.name || `Phòng ${room.id}`;
+  const [addForm, setAddForm] = useState({ seatRow: 'A', seatNumber: 1, seatTypesId: '' });
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulk, setBulk] = useState({ fromRow: 'A', toRow: 'E', seatsPerRow: 10, seatTypesId: '' });
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  // Group by row
+  const seatsByRow = seats.reduce((acc, s) => {
+    const r = s.seatRow || '?';
+    if (!acc[r]) acc[r] = [];
+    acc[r].push(s);
+    return acc;
+  }, {});
+  const rows = Object.keys(seatsByRow).sort();
+
+  const handleAdd = async () => {
+    if (!addForm.seatRow || !addForm.seatNumber || !addForm.seatTypesId) return;
+    setSaving(true);
+    try {
+      await seatService.create({
+        roomsId: room.id,
+        seatRow: addForm.seatRow.toUpperCase(),
+        seatNumber: +addForm.seatNumber,
+        seatTypesId: +addForm.seatTypesId,
+      });
+      addNotification({ title: 'Thành công', message: `Đã thêm ghế ${addForm.seatRow}${addForm.seatNumber}`, type: 'success', isAdmin: true });
+      onRefresh();
+    } catch (err) {
+      addNotification({ title: 'Lỗi', message: err.response?.data?.message || err.message, type: 'error', isAdmin: true });
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (seatId, label) => {
+    if (!window.confirm(`Xoá ghế ${label}?`)) return;
+    setDeletingId(seatId);
+    try {
+      await seatService.remove(seatId);
+      addNotification({ title: 'Thành công', message: `Đã xoá ghế ${label}`, type: 'success', isAdmin: true });
+      onRefresh();
+    } catch (err) {
+      addNotification({ title: 'Lỗi', message: err.response?.data?.message || err.message, type: 'error', isAdmin: true });
+    } finally { setDeletingId(null); }
+  };
+
+  const handleBulkAdd = async () => {
+    if (!bulk.seatTypesId) { addNotification({ title: 'Lỗi', message: 'Chọn loại ghế', type: 'error', isAdmin: true }); return; }
+    const startCode = bulk.fromRow.toUpperCase().charCodeAt(0);
+    const endCode = bulk.toRow.toUpperCase().charCodeAt(0);
+    if (startCode > endCode) { addNotification({ title: 'Lỗi', message: 'Hàng bắt đầu phải <= hàng kết thúc', type: 'error', isAdmin: true }); return; }
+    setBulkSaving(true);
+    let count = 0;
+    try {
+      for (let c = startCode; c <= endCode; c++) {
+        const row = String.fromCharCode(c);
+        for (let n = 1; n <= +bulk.seatsPerRow; n++) {
+          await seatService.create({ roomsId: room.id, seatRow: row, seatNumber: n, seatTypesId: +bulk.seatTypesId });
+          count++;
+        }
+      }
+      addNotification({ title: 'Thành công', message: `Đã tạo ${count} ghế cho ${roomName}`, type: 'success', isAdmin: true });
+      onRefresh();
+      setBulkMode(false);
+    } catch (err) {
+      addNotification({ title: 'Lỗi (tạo được ' + count + ' ghế)', message: err.response?.data?.message || err.message, type: 'error', isAdmin: true });
+    } finally { setBulkSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+      <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        className="bg-cinema-card border border-cinema-border rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-card-hover">
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-cinema-border flex-shrink-0">
+          <div>
+            <h3 className="font-heading font-bold text-white text-lg">💺 Quản lý ghế — {roomName}</h3>
+            <p className="text-cinema-muted text-xs mt-0.5">Loại phòng: {room.roomType || 'Standard'} · {seats.length} ghế hiện tại</p>
+          </div>
+          <button onClick={onClose} className="text-cinema-muted hover:text-white text-xl leading-none">✕</button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+
+          {/* Add single seat */}
+          <div className="bg-cinema-surface rounded-xl p-4 border border-cinema-border">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-white font-semibold text-sm">Thêm ghế</h4>
+              <button onClick={() => setBulkMode(!bulkMode)} className="text-xs text-primary hover:underline">
+                {bulkMode ? '← Thêm 1 ghế' : '⚡ Thêm hàng loạt'}
+              </button>
+            </div>
+
+            {!bulkMode ? (
+              <div className="flex flex-wrap gap-3 items-end">
+                <div>
+                  <label className="text-cinema-muted text-xs block mb-1">Hàng (Row)</label>
+                  <input value={addForm.seatRow} maxLength={2} onChange={e => setAddForm(p => ({...p, seatRow: e.target.value.toUpperCase()}))}
+                    className="input-field py-1.5 w-20 text-center uppercase" placeholder="A" />
+                </div>
+                <div>
+                  <label className="text-cinema-muted text-xs block mb-1">Số ghế</label>
+                  <input type="number" min={1} value={addForm.seatNumber} onChange={e => setAddForm(p => ({...p, seatNumber: e.target.value}))}
+                    className="input-field py-1.5 w-20 text-center" />
+                </div>
+                <div>
+                  <label className="text-cinema-muted text-xs block mb-1">Loại ghế</label>
+                  <select value={addForm.seatTypesId} onChange={e => setAddForm(p => ({...p, seatTypesId: e.target.value}))}
+                    className="input-field py-1.5 pr-8">
+                    <option value="">Chọn loại...</option>
+                    {seatTypes.map(t => <option key={t.id} value={t.id}>{t.seatTypeName || t.name}</option>)}
+                  </select>
+                </div>
+                <button onClick={handleAdd} disabled={saving} className="btn-primary px-4 py-1.5 text-sm h-[38px]">
+                  {saving ? 'Đang lưu...' : '+ Thêm'}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-cinema-muted text-xs">Tạo nhiều ghế theo hàng (A-Z) cùng lúc.</p>
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div>
+                    <label className="text-cinema-muted text-xs block mb-1">Từ hàng</label>
+                    <input value={bulk.fromRow} maxLength={1} onChange={e => setBulk(p => ({...p, fromRow: e.target.value.toUpperCase()}))}
+                      className="input-field py-1.5 w-16 text-center uppercase" />
+                  </div>
+                  <div>
+                    <label className="text-cinema-muted text-xs block mb-1">Đến hàng</label>
+                    <input value={bulk.toRow} maxLength={1} onChange={e => setBulk(p => ({...p, toRow: e.target.value.toUpperCase()}))}
+                      className="input-field py-1.5 w-16 text-center uppercase" />
+                  </div>
+                  <div>
+                    <label className="text-cinema-muted text-xs block mb-1">Ghế / hàng</label>
+                    <input type="number" min={1} max={30} value={bulk.seatsPerRow} onChange={e => setBulk(p => ({...p, seatsPerRow: e.target.value}))}
+                      className="input-field py-1.5 w-20 text-center" />
+                  </div>
+                  <div>
+                    <label className="text-cinema-muted text-xs block mb-1">Loại ghế</label>
+                    <select value={bulk.seatTypesId} onChange={e => setBulk(p => ({...p, seatTypesId: e.target.value}))}
+                      className="input-field py-1.5 pr-8">
+                      <option value="">Chọn loại...</option>
+                      {seatTypes.map(t => <option key={t.id} value={t.id}>{t.seatTypeName || t.name}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={handleBulkAdd} disabled={bulkSaving}
+                    className="btn-primary px-4 py-1.5 text-sm h-[38px]">
+                    {bulkSaving ? 'Đang tạo...' : '⚡ Tạo hàng loạt'}
+                  </button>
+                </div>
+                {!bulkSaving && bulk.fromRow && bulk.toRow && bulk.seatsPerRow && (
+                  <p className="text-cinema-muted text-xs">
+                    → Sẽ tạo {(bulk.toRow.toUpperCase().charCodeAt(0) - bulk.fromRow.toUpperCase().charCodeAt(0) + 1) * +bulk.seatsPerRow} ghế
+                    (hàng {bulk.fromRow.toUpperCase()}→{bulk.toRow.toUpperCase()}, {bulk.seatsPerRow} ghế/hàng)
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Seat map */}
+          {loading ? (
+            <div className="flex items-center justify-center py-10">
+              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+              <span className="text-cinema-muted ml-3 text-sm">Đang tải ghế...</span>
+            </div>
+          ) : seats.length === 0 ? (
+            <div className="text-center py-10 text-cinema-muted">
+              <p className="text-3xl mb-2">💺</p>
+              <p className="text-sm">Phòng này chưa có ghế nào. Hãy thêm ghế ở trên!</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <h4 className="text-white font-semibold text-sm mb-2">Sơ đồ ghế ({seats.length} ghế)</h4>
+              {rows.map(row => (
+                <div key={row} className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-cinema-muted text-xs w-5 font-mono">{row}</span>
+                  {seatsByRow[row].map(seat => {
+                    const label = `${seat.seatRow}${seat.seatNumber}`;
+                    const isBooked = seat.status?.toString().toUpperCase() === 'BOOKED';
+                    return (
+                      <button
+                        key={seat.id}
+                        title={`${label} - ${seat.seatTypeName || 'N/A'} - ${seat.status || 'ACTIVE'}${isBooked ? ' (Đã đặt)' : ''}`}
+                        disabled={deletingId === seat.id}
+                        onClick={() => !isBooked && handleDelete(seat.id, label)}
+                        className={`w-9 h-9 rounded-lg border text-[10px] font-mono font-bold transition-all ${
+                          deletingId === seat.id
+                            ? 'opacity-40 cursor-wait bg-cinema-border/20 border-cinema-border/30 text-cinema-muted'
+                            : isBooked
+                            ? 'bg-red-500/20 border-red-500/50 text-red-400 cursor-not-allowed'
+                            : seat.seatTypeName?.toUpperCase().includes('VIP')
+                            ? 'bg-yellow-900/30 border-yellow-600/50 text-yellow-400 hover:bg-red-500/20 hover:border-red-500/50 cursor-pointer'
+                            : seat.seatTypeName?.toUpperCase().includes('COUPLE') || seat.seatTypeName?.toUpperCase().includes('ĐÔI')
+                            ? 'bg-pink-900/30 border-pink-600/50 text-pink-400 hover:bg-red-500/20 hover:border-red-500/50 cursor-pointer'
+                            : 'bg-cinema-surface/80 border-cinema-border text-cinema-muted hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-400 cursor-pointer'
+                        }`}
+                      >
+                        {deletingId === seat.id ? '...' : seat.seatNumber}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+              <p className="text-cinema-muted text-[10px] mt-2">💡 Click vào ghế để xoá (ghế đã đặt không thể xoá)</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+

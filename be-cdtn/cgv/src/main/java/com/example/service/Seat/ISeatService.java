@@ -9,7 +9,7 @@ import com.example.form.Seat.UpdateSeatForm;
 
 public interface ISeatService {
 	
-	Page<SeatDTO> getAllSeat(Pageable pageable);
+	Page<SeatDTO> getAllSeat(Pageable pageable, Integer roomId);
 	
 	SeatDTO getById(Integer id);
 	

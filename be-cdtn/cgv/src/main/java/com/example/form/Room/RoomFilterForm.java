@@ -12,6 +12,8 @@ public class RoomFilterForm {
 	private Integer seatId;
 	
 	private Integer roomId;
+
+	private Integer cinemaId;
 	
 //	private Rooms.Status status;
 }

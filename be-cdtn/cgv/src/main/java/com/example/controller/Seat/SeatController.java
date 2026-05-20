@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.dto.SeatDTO;
@@ -25,8 +26,8 @@ public class SeatController {
 	private ISeatService seatService;
 	
 	@GetMapping
-	public Page<SeatDTO> getAllSeat(Pageable pageable) {
-		return seatService.getAllSeat(pageable);
+	public Page<SeatDTO> getAllSeat(Pageable pageable, @RequestParam(required = false) Integer roomId) {
+		return seatService.getAllSeat(pageable, roomId);
 	}
 
 	@GetMapping("/{id}")

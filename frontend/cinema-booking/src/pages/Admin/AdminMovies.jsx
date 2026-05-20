@@ -8,7 +8,7 @@ import DatePickerInput from '../../components/ui/DatePickerInput';
 
 function MovieFormModal({ movie, onClose, onSave }) {
   const [form, setForm] = useState(movie || {
-    title: '', originalTitle: '', rating: '', genre: [], duration: '',
+    title: '', genre: [], cast: '', duration: '',
     language: 'Tiếng Anh', releaseDate: '', director: '', description: '',
     ageRating: 'T13', status: 'coming_soon', poster: '', backdrop: '', trailer: ''
   });
@@ -48,24 +48,14 @@ function MovieFormModal({ movie, onClose, onSave }) {
                 placeholder="Avengers: Secret Wars" className="input-field" />
             </div>
             <div>
-              <label className="block text-cinema-muted text-xs mb-1.5">Tên gốc</label>
-              <input value={form.originalTitle || ''} onChange={e => setForm({...form, originalTitle: e.target.value})}
-                className="input-field" />
-            </div>
-            <div>
               <label className="block text-cinema-muted text-xs mb-1.5">Đạo diễn</label>
               <input value={form.director || ''} onChange={e => setForm({...form, director: e.target.value})}
-                className="input-field" />
+                placeholder="VD: Christopher Nolan" className="input-field" />
             </div>
             <div>
               <label className="block text-cinema-muted text-xs mb-1.5">Thời lượng (phút)</label>
               <input type="number" value={form.duration} onChange={e => setForm({...form, duration: e.target.value})}
                 placeholder="120" className="input-field" />
-            </div>
-            <div>
-              <label className="block text-cinema-muted text-xs mb-1.5">Đánh giá (1-10)</label>
-              <input type="number" step="0.1" min="0" max="10" value={form.rating} onChange={e => setForm({...form, rating: e.target.value})}
-                placeholder="8.5" className="input-field" />
             </div>
             <div>
               <label className="block text-cinema-muted text-xs mb-1.5">Ngày khởi chiếu</label>
@@ -109,6 +99,15 @@ function MovieFormModal({ movie, onClose, onSave }) {
                   >{g}</button>
                 ))}
               </div>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-cinema-muted text-xs mb-1.5">Diễn viên (phân cách bằng dấu phẩy)</label>
+              <input
+                value={Array.isArray(form.cast) ? form.cast.join(', ') : (form.cast || '')}
+                onChange={e => setForm({...form, cast: e.target.value})}
+                placeholder="VD: Tom Hanks, Brad Pitt, Scarlett Johansson"
+                className="input-field"
+              />
             </div>
             <div className="col-span-2">
               <label className="block text-cinema-muted text-xs mb-1.5">Mô tả</label>

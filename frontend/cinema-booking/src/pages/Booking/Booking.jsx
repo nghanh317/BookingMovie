@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MOVIES, SHOWTIMES, CINEMAS, PROVINCES } from '../../constants/mockData';
 import useLocationStore from '../../store/locationStore';
+import movieService from '../../services/movieService';
+import slotService from '../../services/slotService';
+import provinceService from '../../services/provinceService';
 
 // Generate 7 days from today
 const DATES = Array.from({ length: 7 }, (_, i) => {
@@ -54,50 +56,94 @@ function StepIndicator({ current }) {
   );
 }
 
+// Chuyển showTime string/Date -> { date: 'YYYY-MM-DD', time: 'HH:mm' }
+function parseShowTime(showTime) {
+  if (!showTime) return { date: '', time: '' };
+  // Hỗ trợ format "yyyy-MM-dd HH:mm:ss" hoặc ISO hoặc timestamp
+  const str = typeof showTime === 'string'
+    ? showTime.replace(' ', 'T')
+    : new Date(showTime).toISOString();
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return { date: '', time: '' };
+  const date = d.toISOString().split('T')[0];
+  const time = d.toTimeString().substring(0, 5);
+  return { date, time };
+}
+
 export default function Booking() {
   const { movieId } = useParams();
   const navigate = useNavigate();
   const { selectedProvince, setProvince } = useLocationStore();
 
-  const movie = MOVIES.find(m => m.id === Number(movieId));
+  const [movie, setMovie] = useState(null);
+  const [slots, setSlots] = useState([]);
+  const [provinces, setProvinces] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [province, setLocalProvince] = useState(selectedProvince || '');
   const [selectedDate, setSelectedDate] = useState(selectedProvince ? DATES[0].value : null);
   const [selectedShowtime, setSelectedShowtime] = useState(null);
 
-  // Dates that have showtimes for this movie in the selected province
-  const datesWithShowtimes = useMemo(() => {
-    let cinemaIds = CINEMAS.map(c => c.id);
-    if (province) {
-      cinemaIds = CINEMAS.filter(c => c.province === province).map(c => c.id);
-    }
-    const relevantShowtimes = SHOWTIMES.filter(s => 
-      s.movieId === Number(movieId) && cinemaIds.includes(s.cinemaId)
-    );
-    return [...new Set(relevantShowtimes.map(s => s.date))];
-  }, [movieId, province]);
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      movieService.getById(movieId),
+      slotService.getAll({ movieId, size: 500 }),
+      provinceService.getAll(),
+    ]).then(([movieData, slotsData, provData]) => {
+      setMovie(movieData);
+      const rawSlots = Array.isArray(slotsData) ? slotsData : (slotsData?.content || slotsData?.data || []);
+      setSlots(rawSlots);
+      const provList = Array.isArray(provData) ? provData : (provData?.content || provData?.data || []);
+      setProvinces(provList);
+    }).catch(err => console.error('[Booking] fetch error:', err))
+      .finally(() => setLoading(false));
+  }, [movieId]);
 
-  // Cinemas in selected province
-  const cinemasInProvince = useMemo(() => {
-    if (!province) return CINEMAS;
-    return CINEMAS.filter(c => c.province === province);
-  }, [province]);
+  // Normalize slots -> thêm date/time/hall/type
+  const normalizedSlots = useMemo(() => slots.map(s => {
+    const { date, time } = parseShowTime(s.showTime);
+    return {
+      ...s,
+      date,
+      time,
+      hall: s.roomName || '',
+      type: '2D',
+      availableSeats: s.emptySeats || 0,
+      price: Number(s.price) || 0,
+    };
+  }), [slots]);
 
-  // Showtimes grouped by cinema for selected date & province
+  // Province names từ API provinceService + slots
+  const allProvinces = useMemo(() => {
+    const fromApi = provinces.map(p => p.provinceName || p.name).filter(Boolean);
+    const fromSlots = normalizedSlots.map(s => s.provinceName).filter(Boolean);
+    return [...new Set([...fromApi, ...fromSlots])];
+  }, [provinces, normalizedSlots]);
+
+  // Lọc slots theo province đã chọn
+  const slotsInProvince = useMemo(() => {
+    if (!province) return normalizedSlots;
+    return normalizedSlots.filter(s => s.provinceName === province);
+  }, [normalizedSlots, province]);
+
+  // Dates có suất chiếu
+  const datesWithShowtimes = useMemo(() =>
+    [...new Set(slotsInProvince.map(s => s.date).filter(Boolean))],
+  [slotsInProvince]);
+
+  // Group theo cinemaName cho ngày đã chọn
   const groupedShowtimes = useMemo(() => {
-    const cinemaIds = cinemasInProvince.map(c => c.id);
-    const sts = SHOWTIMES.filter(s =>
-      s.movieId === Number(movieId) &&
-      s.date === selectedDate &&
-      cinemaIds.includes(s.cinemaId)
-    );
+    if (!selectedDate) return {};
+    const filtered = slotsInProvince.filter(s => s.date === selectedDate);
     const grouped = {};
-    sts.forEach(s => {
-      if (!grouped[s.cinemaId]) grouped[s.cinemaId] = [];
-      grouped[s.cinemaId].push(s);
+    filtered.forEach(s => {
+      const key = s.cinemaName || 'Không xác định';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(s);
     });
     return grouped;
-  }, [movieId, selectedDate, cinemasInProvince]);
+  }, [slotsInProvince, selectedDate]);
 
   const handleProvinceSelect = (p) => {
     setLocalProvince(p);
@@ -116,10 +162,19 @@ export default function Booking() {
       state: {
         movie,
         showtime: selectedShowtime,
-        cinema: CINEMAS.find(c => c.id === selectedShowtime.cinemaId),
+        cinema: { name: selectedShowtime.cinemaName, id: null },
+        slotId: selectedShowtime.id,
       }
     });
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   if (!movie) {
     return (
@@ -145,7 +200,7 @@ export default function Booking() {
           <div>
             <h1 className="font-heading font-bold text-white text-xl mb-1">{movie.title}</h1>
             <div className="flex flex-wrap gap-3 text-sm text-cinema-muted">
-              <span>⭐ {movie.rating}</span>
+              <span>⭐ {movie.rating || 'N/A'}</span>
               <span>•</span>
               <span>⏱ {movie.duration} phút</span>
               <span>•</span>
@@ -163,18 +218,16 @@ export default function Booking() {
                 <span className="w-6 h-6 rounded-full bg-primary text-cinema-black flex items-center justify-center text-xs font-bold">1</span>
                 Chọn Tỉnh / Thành Phố
               </h2>
-              <div className="flex flex-wrap gap-2">
-                <select
-                  value={province}
-                  onChange={(e) => handleProvinceSelect(e.target.value)}
-                  className="input-field py-2.5 text-sm font-medium w-full max-w-xs cursor-pointer bg-cinema-surface"
-                >
-                  <option value="">Chọn thành phố</option>
-                  {PROVINCES.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </div>
+              <select
+                value={province}
+                onChange={(e) => handleProvinceSelect(e.target.value)}
+                className="input-field py-2.5 text-sm font-medium w-full max-w-xs cursor-pointer bg-cinema-surface"
+              >
+                <option value="">Chọn thành phố</option>
+                {allProvinces.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
             </section>
 
             {/* Step 2: Chọn ngày */}
@@ -214,7 +267,7 @@ export default function Booking() {
               )}
             </section>
 
-            {/* Step 3: Rạp + Suất chiếu nhóm theo rạp */}
+            {/* Step 3: Rạp + Suất chiếu */}
             <section>
               <h2 className="font-heading font-bold text-white text-lg mb-3 flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-primary text-cinema-black flex items-center justify-center text-xs font-bold">3</span>
@@ -241,34 +294,19 @@ export default function Booking() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {Object.entries(groupedShowtimes).map(([cinemaId, showtimes]) => {
-                    const cinema = CINEMAS.find(c => c.id === Number(cinemaId));
-                    if (!cinema) return null;
-                    return (
-                      <motion.div key={cinemaId}
-                        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                        className="bg-cinema-surface border border-cinema-border rounded-xl p-4 hover:border-cinema-muted transition-colors"
-                      >
-                        {/* Cinema info */}
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="text-white font-semibold">{cinema.name}</h3>
-                            <p className="text-cinema-muted text-xs mt-0.5 flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                              </svg>
-                              {cinema.address}
-                            </p>
-                          </div>
-                          {cinema.rating > 0 && (
-                            <span className="flex items-center gap-1 text-primary text-xs font-semibold">
-                              ⭐ {cinema.rating}
-                            </span>
-                          )}
-                        </div>
-                        {/* Showtimes */}
-                        <div className="flex flex-wrap gap-2">
-                          {showtimes.map(st => (
+                  {Object.entries(groupedShowtimes).map(([cinemaName, cinemaSlots]) => (
+                    <motion.div key={cinemaName}
+                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                      className="bg-cinema-surface border border-cinema-border rounded-xl p-4 hover:border-cinema-muted transition-colors"
+                    >
+                      <div className="mb-3">
+                        <h3 className="text-white font-semibold">{cinemaName}</h3>
+                        <p className="text-cinema-muted text-xs mt-0.5">{cinemaSlots[0]?.provinceName}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {cinemaSlots
+                          .sort((a, b) => a.time.localeCompare(b.time))
+                          .map(st => (
                             <button key={st.id}
                               onClick={() => setSelectedShowtime(st)}
                               disabled={st.availableSeats === 0}
@@ -288,12 +326,16 @@ export default function Booking() {
                               <div className="text-[10px] mt-0.5 opacity-60">
                                 {st.availableSeats > 0 ? `${st.availableSeats} ghế` : 'Hết chỗ'}
                               </div>
+                              {st.price > 0 && (
+                                <div className="text-[10px] mt-0.5 text-primary font-semibold">
+                                  {new Intl.NumberFormat('vi-VN').format(st.price)}đ
+                                </div>
+                              )}
                             </button>
                           ))}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               )}
             </section>
@@ -327,7 +369,7 @@ export default function Booking() {
                     <div className="flex justify-between">
                       <span className="text-cinema-muted">Rạp</span>
                       <span className="text-white font-medium text-right max-w-[150px]">
-                        {CINEMAS.find(c => c.id === selectedShowtime.cinemaId)?.name}
+                        {selectedShowtime.cinemaName}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -338,6 +380,14 @@ export default function Booking() {
                       <span className="text-cinema-muted">Phòng</span>
                       <span className="text-white font-medium">{selectedShowtime.hall} ({selectedShowtime.type})</span>
                     </div>
+                    {selectedShowtime.price > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-cinema-muted">Giá vé</span>
+                        <span className="text-primary font-bold">
+                          {new Intl.NumberFormat('vi-VN').format(selectedShowtime.price)}đ
+                        </span>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

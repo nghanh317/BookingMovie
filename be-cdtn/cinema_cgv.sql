@@ -29,6 +29,9 @@ CREATE TABLE `accounts` (
   `full_name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `avatar_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `role` enum('admin','user') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'user',
+  `points` int unsigned NOT NULL DEFAULT '0',
+  `history_points` int unsigned NOT NULL DEFAULT '0',
+  `vip_level` enum('bronze','silver','gold','platinum') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'bronze',
   `create_at` datetime DEFAULT NULL,
   `update_at` datetime DEFAULT NULL,
   `is_deleted` tinyint(1) DEFAULT '0',
@@ -193,6 +196,7 @@ CREATE TABLE `movies` (
   `language` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `poster_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `trailer_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `age_rating` enum('P', 'K', 'T13', 'T16', 'T18') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'P',
   `status` enum('coming_soon','now_showing','ended') COLLATE utf8mb4_unicode_ci DEFAULT 'coming_soon',
   `create_at` datetime DEFAULT NULL,
   `update_at` datetime DEFAULT NULL,
@@ -408,16 +412,15 @@ UNLOCK TABLES;
 -- Table structure for table `reviews`
 --
 
-DROP TABLE IF EXISTS `reviews`;
+DROP TABLE IF EXISTS `movie_reviews`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `reviews` (
+CREATE TABLE `movie_reviews` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `account_id` int unsigned NOT NULL,
   `movie_id` int unsigned NOT NULL,
   `rating` tinyint unsigned NOT NULL,
   `comment` text COLLATE utf8mb4_unicode_ci,
-  `status` enum('pending','approved','rejected') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
   `create_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `update_at` datetime DEFAULT NULL,
   `is_deleted` tinyint(1) DEFAULT '0',
@@ -426,9 +429,8 @@ CREATE TABLE `reviews` (
   KEY `idx_reviews_movie_id` (`movie_id`),
   KEY `idx_reviews_account_id` (`account_id`),
   KEY `idx_reviews_rating` (`rating`),
-  KEY `idx_reviews_status` (`status`),
-  CONSTRAINT `reviews_ibfk_1` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `reviews_ibfk_2` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `movie_reviews_ibfk_1` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `movie_reviews_ibfk_2` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -436,15 +438,42 @@ CREATE TABLE `reviews` (
 -- Dumping data for table `reviews`
 --
 
-LOCK TABLES `reviews` WRITE;
-/*!40000 ALTER TABLE `reviews` DISABLE KEYS */;
-INSERT INTO `reviews` VALUES (2,3,10,5,'Phim rất hay nhá','approved','2026-03-09 00:42:31','2026-03-09 00:42:42',0),(3,3,9,4,'Cũng rất hay nha','rejected','2026-03-09 00:44:35','2026-03-09 00:44:47',1),(6,1,9,5,'WOW','approved','2026-03-09 01:02:21','2026-03-09 01:02:29',0);
-/*!40000 ALTER TABLE `reviews` ENABLE KEYS */;
+LOCK TABLES `movie_reviews` WRITE;
+/*!40000 ALTER TABLE `movie_reviews` DISABLE KEYS */;
+INSERT INTO `movie_reviews` VALUES (2,3,10,5,'Phim rất hay nhá','2026-03-09 00:42:31','2026-03-09 00:42:42',0),(3,3,9,4,'Cũng rất hay nha','2026-03-09 00:44:35','2026-03-09 00:44:47',1),(6,1,9,5,'WOW','2026-03-09 01:02:21','2026-03-09 01:02:29',0);
+/*!40000 ALTER TABLE `movie_reviews` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
 -- Table structure for table `rooms`
 --
+DROP TABLE IF EXISTS `cinema_reviews`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `cinema_reviews` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `account_id` int unsigned NOT NULL,
+  `cinema_id` int unsigned NOT NULL,
+  `rating` tinyint unsigned NOT NULL,
+  `comment` text COLLATE utf8mb4_unicode_ci,
+  `create_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `update_at` datetime DEFAULT NULL,
+  `is_deleted` tinyint(1) DEFAULT '0',
+  PRIMARY KEY (`id`),
+  
+  -- Đảm bảo 1 user chỉ được đánh giá 1 cụm rạp 1 lần duy nhất
+  UNIQUE KEY `account_cinema_unique` (`account_id`,`cinema_id`),
+  
+  -- Các chỉ mục tối ưu tốc độ tìm kiếm
+  KEY `idx_reviews_cinema_id` (`cinema_id`),
+  KEY `idx_reviews_account_id` (`account_id`),
+  KEY `idx_reviews_rating` (`rating`),
+  
+  -- Khóa ngoại liên kết chuẩn xác với bảng accounts và cinemas
+  CONSTRAINT `cinema_reviews_ibfk_1` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `cinema_reviews_ibfk_2` FOREIGN KEY (`cinema_id`) REFERENCES `cinemas` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
 DROP TABLE IF EXISTS `rooms`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -483,8 +512,7 @@ DROP TABLE IF EXISTS `seatlocks`;
 CREATE TABLE `seatlocks` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `seat_id` int unsigned NOT NULL,
-  `user_id` int unsigned DEFAULT NULL,
-  `session_id` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `account_id` int unsigned NOT NULL,
   `locked_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `expires_at` datetime NOT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
@@ -493,9 +521,10 @@ CREATE TABLE `seatlocks` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_seat_lock` (`seat_id`),
   KEY `idx_seat_lock_seat` (`seat_id`),
-  KEY `idx_seat_lock_user` (`user_id`),
-  KEY `idx_seat_lock_session` (`session_id`),
-  KEY `idx_seat_lock_expires` (`expires_at`)
+  KEY `idx_seat_lock_account` (`account_id`),
+  KEY `idx_seat_lock_expires` (`expires_at`),
+  CONSTRAINT `seatlocks_ibfk_1` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `seatlocks_ibfk_2` FOREIGN KEY (`seat_id`) REFERENCES `seats` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -701,6 +730,7 @@ CREATE TABLE `ticketsdetails` (
 --
 -- Dumping data for table `ticketsdetails`
 --
+
 
 LOCK TABLES `ticketsdetails` WRITE;
 /*!40000 ALTER TABLE `ticketsdetails` DISABLE KEYS */;
