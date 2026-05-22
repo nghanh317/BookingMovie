@@ -43,6 +43,17 @@ public class ExceptionConfiguration extends ResponseEntityExceptionHandler {
 
 		return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
 	}
+
+	// Business logic exception (e.g. user chưa mua vé)
+	@ExceptionHandler({ IllegalStateException.class })
+	public ResponseEntity<Object> handleIllegalState(IllegalStateException exception) {
+		ErrorResponse response = new ErrorResponse(
+				exception.getMessage(),
+				exception.getLocalizedMessage(),
+				9,
+				exception);
+		return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+	}
 	
 	// Not found url handler
 	@Override

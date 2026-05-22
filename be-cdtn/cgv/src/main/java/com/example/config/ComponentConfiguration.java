@@ -12,7 +12,10 @@ public class ComponentConfiguration {
 
 	@Bean
 	public ModelMapper initModelMapper() {
-		return new ModelMapper();
+		ModelMapper modelMapper = new ModelMapper();
+		modelMapper.getConfiguration()
+			.setMatchingStrategy(org.modelmapper.convention.MatchingStrategies.LOOSE);
+		return modelMapper;
 	}
 
 	@Bean

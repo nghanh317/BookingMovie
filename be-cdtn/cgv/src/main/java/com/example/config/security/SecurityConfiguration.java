@@ -71,11 +71,31 @@ public class SecurityConfiguration {
 						.requestMatchers(HttpMethod.POST, "/api/v1/rooms/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/rooms/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.DELETE, "/api/v1/rooms/**").hasAuthority("ADMIN")
+						//SLOTS
 						.requestMatchers(HttpMethod.GET, "/api/v1/slots/**", "/api/v1/slots").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/slots/**", "/api/v1/slots").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/slots/**", "/api/v1/slots").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.DELETE, "/api/v1/slots/**", "/api/v1/slots").hasAuthority("ADMIN")
+						// PRODUCTS
 						.requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/products/**").hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.PUT, "/api/v1/products/**").hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.DELETE, "/api/v1/products/**").hasAuthority("ADMIN")
+						//MOVIE REVIEW
+						.requestMatchers(HttpMethod.GET, "/api/v1/movie-reviews/**").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/movie-reviews/**").hasAuthority("USER")
+						.requestMatchers(HttpMethod.PUT, "/api/v1/movie-reviews/**").hasAuthority("USER")
+						.requestMatchers(HttpMethod.DELETE, "/api/v1/movie-reviews/**").hasAuthority("USER")
+						//CINEMA REVIEW
+						.requestMatchers(HttpMethod.GET, "/api/v1/cinema-reviews/**").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/cinema-reviews/**").hasAuthority("USER")
+						.requestMatchers(HttpMethod.PUT, "/api/v1/cinema-reviews/**").hasAuthority("USER")
+						.requestMatchers(HttpMethod.DELETE, "/api/v1/cinema-reviews/**").hasAuthority("USER")
+						//SEAT
+						.requestMatchers(HttpMethod.GET, "/api/v1/seats/**").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/seats/**").hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.PUT, "/api/v1/seats/**").hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.DELETE, "/api/v1/seats/**").hasAuthority("ADMIN")
 
 						.requestMatchers("/api/v1/auth/**").permitAll()
 						.requestMatchers("/api/v1/tickets/**").permitAll()

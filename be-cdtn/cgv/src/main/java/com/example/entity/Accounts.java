@@ -78,7 +78,7 @@ public class Accounts implements Serializable {
 	private List<Favorites> favorites;
 	
 	@OneToMany (mappedBy = "account")
-	private List<Reviews> reviews;
+	private List<MovieReviews> reviews;
 	
 	@OneToMany (mappedBy = "account")
 	private List<PromotionUsage> promotionUsages;

@@ -110,7 +110,7 @@ public class Movies implements Serializable{
 	private List<Favorites> favorites;
 	
 	@OneToMany (mappedBy = "movie")
-	private List<Reviews> reviews;
+	private List<MovieReviews> reviews;
 	
 	@ManyToMany
 	@JoinTable(

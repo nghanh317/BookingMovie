@@ -11,7 +11,7 @@ const normalize = (cinema) => ({
   address: cinema.address || cinema.location || '',
   city: cinema.city || '',
   provinceId: cinema.province?.id || cinema.provinceId || '',
-  province: cinema.province?.provinceName || cinema.provinceName || '',
+  province: cinema.province?.provinceName || cinema.provincesName || cinema.provinceName || cinema.province || '',
   image: cinema.image || cinema.imgUrl || cinema.imageUrl || '',
   latitude: cinema.latitude ? parseFloat(cinema.latitude) : null,
   longitude: cinema.longitude ? parseFloat(cinema.longitude) : null,

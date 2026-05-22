@@ -37,7 +37,7 @@ public void createPromotion (@RequestBody CreatePromotion form) {
 public void updatePromotion (@PathVariable Integer id, @RequestBody UpdatePromotion form) {
 	service.updatePromotion(id, form);
 }
-@DeleteMapping ("{/id}")
+@DeleteMapping ("/{id}")
 public void deletePromotion (@PathVariable Integer id) {
 	service.deletePromotion(id);
 }

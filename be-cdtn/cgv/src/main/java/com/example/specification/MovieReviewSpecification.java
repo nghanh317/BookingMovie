@@ -2,8 +2,8 @@ package com.example.specification;
 
 import org.springframework.data.jpa.domain.Specification;
 
-import com.example.entity.Reviews;
-import com.example.form.Review.ReviewFilterForm;
+import com.example.entity.MovieReviews;
+import com.example.form.MovieReview.MovieReviewFilterForm;
 
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
@@ -12,11 +12,11 @@ import jakarta.persistence.criteria.Root;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
-public class ReviewSpecification {
+public class MovieReviewSpecification {
 
 	@SuppressWarnings({ "removal"})
-	public static Specification<Reviews> buildWhere (ReviewFilterForm filterform){
-		Specification<Reviews> where = Specification.where(null);
+	public static Specification<MovieReviews> buildWhere (MovieReviewFilterForm filterform){
+		Specification<MovieReviews> where = Specification.where(null);
 		if (filterform == null)
 			return where;
 	if (filterform.getRating() != null) {
@@ -30,7 +30,7 @@ public class ReviewSpecification {
 	
 	@SuppressWarnings ("serial")
 	@RequiredArgsConstructor
-	static class CustomSpecification implements Specification<Reviews>{
+	static class CustomSpecification implements Specification<MovieReviews>{
 		
 		@NonNull
 		private String field;
@@ -40,7 +40,7 @@ public class ReviewSpecification {
 		
 		@Override
 		public Predicate toPredicate (
-			Root<Reviews> root,
+			Root<MovieReviews> root,
 			CriteriaQuery<?> query,
 			CriteriaBuilder criteriaBuilder
 				) {

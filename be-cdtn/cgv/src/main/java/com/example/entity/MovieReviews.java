@@ -26,12 +26,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table ( name = "Reviews")
+@Table ( name = "movie_reviews")
 @Getter
 @Setter
 @NoArgsConstructor
 @RequiredArgsConstructor
-public class Reviews implements Serializable{
+public class MovieReviews implements Serializable{
 	private static final long serialVersionUID = 1L;
 
 @Column (name ="id")

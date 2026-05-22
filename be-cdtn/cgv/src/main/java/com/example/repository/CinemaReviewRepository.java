@@ -4,9 +4,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
-import com.example.entity.Reviews;
+import com.example.entity.CinemaReviews;
 
 @Repository
-public interface ReviewRepository extends JpaRepository<Reviews, Integer>, JpaSpecificationExecutor<Reviews>{
+public interface CinemaReviewRepository extends JpaRepository<CinemaReviews, Integer>, JpaSpecificationExecutor<CinemaReviews>{
 
 }

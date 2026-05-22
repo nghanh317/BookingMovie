@@ -1,13 +1,13 @@
-package com.example.form.Review;
+package com.example.form.CinemaReview;
 
 import lombok.Data;
 
 @Data
-public class CreateReview {
+public class CreateCinemaReview {
 
 	private Integer accountId;
 	
-	private Integer movieId;
+	private Integer cinemaId;
 	
 	private Double rating;
 	

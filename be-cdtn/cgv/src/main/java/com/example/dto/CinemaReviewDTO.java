@@ -5,13 +5,13 @@ import java.util.Date;
 import lombok.Data;
 
 @Data
-public class ReviewsDTO {
+public class CinemaReviewDTO {
 
 	private Integer id;
 	
 	private Integer accountId;
 	
-	private Integer movieId;
+	private Integer cinemaId;
 	
 	private Double rating;
 	
