@@ -39,6 +39,7 @@ import AdminVouchers from './pages/Admin/AdminVouchers';
 import AdminTickets from './pages/Admin/AdminTickets';
 import AdminReviews from './pages/Admin/AdminReviews';
 import AdminNews from './pages/Admin/AdminNews';
+import AdminProducts from './pages/Admin/AdminProducts';
 
 function App() {
   return (
@@ -110,6 +111,9 @@ function App() {
         } />
         <Route path="/admin/news" element={
           <RequireAdmin><AdminLayout><AdminNews /></AdminLayout></RequireAdmin>
+        } />
+        <Route path="/admin/products" element={
+          <RequireAdmin><AdminLayout><AdminProducts /></AdminLayout></RequireAdmin>
         } />
       </Routes>
     </BrowserRouter>

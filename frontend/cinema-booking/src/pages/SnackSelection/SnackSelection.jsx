@@ -1,9 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { SNACK_ITEMS } from '../../constants/mockData';
+import productService from '../../services/productService';
 
 const STEPS = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
+
+// Map category enum từ backend → icon + label + màu
+const CATEGORY_META = {
+  FOOD: { icon: '🍿', label: 'Bỏng Rang', color: 'from-yellow-500/10 to-orange-500/10 border-yellow-700/30' },
+  DRINK: { icon: '🥤', label: 'Nước Uống', color: 'from-blue-500/10 to-cyan-500/10 border-blue-700/30' },
+  COMBO: { icon: '🎉', label: 'Combo Tiết Kiệm', color: 'from-primary/10 to-accent/10 border-primary/30' },
+  VOUCHER: { icon: '🎫', label: 'Khác', color: 'from-cinema-surface/10 to-cinema-card/10 border-cinema-border' },
+};
+
+// Chuẩn hoá category string từ backend (object hoặc string)
+function parseCategory(cat) {
+  if (!cat) return 'FOOD';
+  if (typeof cat === 'string') return cat.toUpperCase();
+  if (typeof cat === 'object') return (cat.name || cat.value || '').toUpperCase();
+  return 'FOOD';
+}
 
 function StepIndicator({ current }) {
   return (
@@ -50,10 +66,35 @@ export default function SnackSelection() {
   const navigate = useNavigate();
   const { movie, showtime, cinema, seats, totalPrice } = location.state || {};
 
-  // quantities: { [snackId]: number }
-  const [quantities, setQuantities] = useState(() =>
-    Object.fromEntries(SNACK_ITEMS.map(s => [s.id, 0]))
-  );
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [quantities, setQuantities] = useState({});
+
+  // Fetch products từ API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const res = await productService.getAll({ size: 200 });
+        let items = [];
+        if (res?.content) items = res.content;
+        else if (res?.data?.content) items = res.data.content;
+        else if (Array.isArray(res?.data)) items = res.data;
+        else if (Array.isArray(res)) items = res;
+
+        setProducts(items);
+        // Khởi tạo quantities với mỗi id = 0
+        const initial = {};
+        items.forEach(p => { initial[p.id] = 0; });
+        setQuantities(initial);
+      } catch (err) {
+        console.error('[SnackSelection] fetch products error:', err.message);
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);
 
   if (!movie || !seats) {
     return (
@@ -68,9 +109,15 @@ export default function SnackSelection() {
 
   const setQty = (id, val) => setQuantities(prev => ({ ...prev, [id]: val }));
 
-  const selectedSnacks = SNACK_ITEMS
-    .filter(s => quantities[s.id] > 0)
-    .map(s => ({ ...s, quantity: quantities[s.id], subtotal: s.price * quantities[s.id] }));
+  const selectedSnacks = products
+    .filter(p => (quantities[p.id] || 0) > 0)
+    .map(p => ({
+      ...p,
+      quantity: quantities[p.id],
+      subtotal: parseFloat(p.price) * quantities[p.id],
+      icon: CATEGORY_META[parseCategory(p.category)]?.icon || '🍿',
+      name: p.productName,
+    }));
 
   const snackTotal = selectedSnacks.reduce((sum, s) => sum + s.subtotal, 0);
 
@@ -86,11 +133,13 @@ export default function SnackSelection() {
     });
   };
 
-  const CATEGORIES = [
-    { key: 'snack', label: '🍿 Bỏng Rang', color: 'from-yellow-500/10 to-orange-500/10 border-yellow-700/30' },
-    { key: 'drink', label: '🥤 Nước Uống', color: 'from-blue-500/10 to-cyan-500/10 border-blue-700/30' },
-    { key: 'combo', label: '🎉 Combo Tiết Kiệm', color: 'from-primary/10 to-accent/10 border-primary/30' },
-  ];
+  // Group products theo category
+  const categories = Object.keys(CATEGORY_META);
+  const grouped = categories.map(catKey => ({
+    key: catKey,
+    meta: CATEGORY_META[catKey],
+    items: products.filter(p => parseCategory(p.category) === catKey),
+  })).filter(g => g.items.length > 0);
 
   return (
     <div className="min-h-screen py-8">
@@ -105,35 +154,59 @@ export default function SnackSelection() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left – Items */}
           <div className="lg:col-span-2 space-y-6">
-            {CATEGORIES.map(cat => {
-              const items = SNACK_ITEMS.filter(s => s.category === cat.key);
-              return (
-                <div key={cat.key}>
-                  <h2 className="font-heading font-bold text-white mb-3 text-lg">{cat.label}</h2>
-                  <div className="space-y-3">
-                    {items.map(item => (
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <span className="ml-3 text-cinema-muted">Đang tải sản phẩm...</span>
+              </div>
+            ) : grouped.length === 0 ? (
+              <div className="text-center py-16 text-cinema-muted">
+                <p className="text-4xl mb-3">🍿</p>
+                <p>Hiện tại chưa có sản phẩm nào.</p>
+              </div>
+            ) : grouped.map(({ key, meta, items }) => (
+              <div key={key}>
+                <h2 className="font-heading font-bold text-white mb-3 text-lg">
+                  {meta.icon} {meta.label}
+                </h2>
+                <div className="space-y-3">
+                  {items.map(item => {
+                    const catMeta = CATEGORY_META[parseCategory(item.category)] || CATEGORY_META.FOOD;
+                    return (
                       <motion.div
                         key={item.id}
                         initial={{ opacity: 0, x: -16 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className={`bg-gradient-to-r ${cat.color} border rounded-xl p-4 flex items-center gap-4 hover:shadow-lg transition-all`}
+                        className={`bg-gradient-to-r ${catMeta.color} border rounded-xl p-4 flex items-center gap-4 hover:shadow-lg transition-all`}
                       >
-                        <div className="text-4xl flex-shrink-0">{item.icon}</div>
+                        {/* Ảnh hoặc icon */}
+                        <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-cinema-dark border border-cinema-border flex items-center justify-center">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.productName} className="w-full h-full object-cover"
+                              onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                          ) : null}
+                          <span className="text-3xl" style={{ display: item.imageUrl ? 'none' : 'flex' }}>{catMeta.icon}</span>
+                        </div>
+
                         <div className="flex-1 min-w-0">
-                          <p className="text-white font-semibold">{item.name}</p>
-                          <p className="text-cinema-muted text-xs mt-0.5 line-clamp-1">{item.desc}</p>
-                          <p className="text-primary font-bold mt-1">{item.price.toLocaleString('vi-VN')}đ</p>
+                          <p className="text-white font-semibold">{item.productName}</p>
+                          {item.description && (
+                            <p className="text-cinema-muted text-xs mt-0.5 line-clamp-1">{item.description}</p>
+                          )}
+                          <p className="text-primary font-bold mt-1">
+                            {parseFloat(item.price).toLocaleString('vi-VN')}đ
+                          </p>
                         </div>
                         <QuantityControl
-                          value={quantities[item.id]}
+                          value={quantities[item.id] || 0}
                           onChange={val => setQty(item.id, val)}
                         />
                       </motion.div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
 
           {/* Right – Summary */}
