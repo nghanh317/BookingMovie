@@ -639,12 +639,33 @@ export default function AdminCinemas() {
 // ── Seat Management Modal ──────────────────────────────────
 function SeatManagementModal({ room, seats, loading, seatTypes, onClose, onRefresh, addNotification }) {
   const roomName = room.roomName || room.name || `Phòng ${room.id}`;
-  const [addForm, setAddForm] = useState({ seatRow: 'A', seatNumber: 1, seatTypesId: '' });
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [bulkMode, setBulkMode] = useState(false);
-  const [bulk, setBulk] = useState({ fromRow: 'A', toRow: 'E', seatsPerRow: 10, seatTypesId: '' });
-  const [bulkSaving, setBulkSaving] = useState(false);
+  const [tab, setTab] = useState('map'); // 'map' | 'add'
+
+  // Form thêm 1 ghế
+  const [addForm, setAddForm] = useState({ seatRow: 'A', seatNumber: 1, seatTypesId: '' });
+
+  // Form thêm theo hàng
+  const [rowForm, setRowForm] = useState({ seatRow: 'A', seatsPerRow: 10, seatTypesId: '' });
+  const [rowSaving, setRowSaving] = useState(false);
+
+  // Existing seat set for duplicate check: "A1", "A2"...
+  const existingSet = new Set(seats.map(s => `${s.seatRow}${s.seatNumber}`));
+
+  // Preview ghế sẽ tạo khi thêm theo hàng
+  const rowPreview = (() => {
+    const row = rowForm.seatRow.toUpperCase();
+    const count = Math.max(1, Math.min(50, +rowForm.seatsPerRow || 0));
+    const all = [];
+    for (let n = 1; n <= count; n++) {
+      const key = `${row}${n}`;
+      all.push({ row, n, key, exists: existingSet.has(key) });
+    }
+    return all;
+  })();
+  const newSeats = rowPreview.filter(s => !s.exists);
+  const skipSeats = rowPreview.filter(s => s.exists);
 
   // Group by row
   const seatsByRow = seats.reduce((acc, s) => {
@@ -655,21 +676,38 @@ function SeatManagementModal({ room, seats, loading, seatTypes, onClose, onRefre
   }, {});
   const rows = Object.keys(seatsByRow).sort();
 
-  const handleAdd = async () => {
+  const handleAddSingle = async () => {
     if (!addForm.seatRow || !addForm.seatNumber || !addForm.seatTypesId) return;
+    const key = `${addForm.seatRow.toUpperCase()}${addForm.seatNumber}`;
+    if (existingSet.has(key)) {
+      addNotification({ title: 'Trùng ghế', message: `Ghế ${key} đã tồn tại!`, type: 'warn', isAdmin: true });
+      return;
+    }
     setSaving(true);
     try {
-      await seatService.create({
-        roomsId: room.id,
-        seatRow: addForm.seatRow.toUpperCase(),
-        seatNumber: +addForm.seatNumber,
-        seatTypesId: +addForm.seatTypesId,
-      });
-      addNotification({ title: 'Thành công', message: `Đã thêm ghế ${addForm.seatRow}${addForm.seatNumber}`, type: 'success', isAdmin: true });
+      await seatService.create({ roomsId: room.id, seatRow: addForm.seatRow.toUpperCase(), seatNumber: +addForm.seatNumber, seatTypesId: +addForm.seatTypesId });
+      addNotification({ title: 'Thành công', message: `Đã thêm ghế ${key}`, type: 'success', isAdmin: true });
       onRefresh();
     } catch (err) {
       addNotification({ title: 'Lỗi', message: err.response?.data?.message || err.message, type: 'error', isAdmin: true });
     } finally { setSaving(false); }
+  };
+
+  const handleAddRow = async () => {
+    if (!rowForm.seatTypesId) { addNotification({ title: 'Lỗi', message: 'Chọn loại ghế', type: 'error', isAdmin: true }); return; }
+    if (newSeats.length === 0) { addNotification({ title: 'Thông báo', message: 'Tất cả ghế trong hàng này đã tồn tại!', type: 'warn', isAdmin: true }); return; }
+    setRowSaving(true);
+    let count = 0;
+    try {
+      for (const s of newSeats) {
+        await seatService.create({ roomsId: room.id, seatRow: s.row, seatNumber: s.n, seatTypesId: +rowForm.seatTypesId });
+        count++;
+      }
+      addNotification({ title: 'Thành công', message: `Đã tạo ${count} ghế hàng ${rowForm.seatRow.toUpperCase()}${skipSeats.length > 0 ? ` (bỏ qua ${skipSeats.length} ghế trùng)` : ''}`, type: 'success', isAdmin: true });
+      onRefresh();
+    } catch (err) {
+      addNotification({ title: `Lỗi (tạo được ${count})`, message: err.response?.data?.message || err.message, type: 'error', isAdmin: true });
+    } finally { setRowSaving(false); }
   };
 
   const handleDelete = async (seatId, label) => {
@@ -684,165 +722,188 @@ function SeatManagementModal({ room, seats, loading, seatTypes, onClose, onRefre
     } finally { setDeletingId(null); }
   };
 
-  const handleBulkAdd = async () => {
-    if (!bulk.seatTypesId) { addNotification({ title: 'Lỗi', message: 'Chọn loại ghế', type: 'error', isAdmin: true }); return; }
-    const startCode = bulk.fromRow.toUpperCase().charCodeAt(0);
-    const endCode = bulk.toRow.toUpperCase().charCodeAt(0);
-    if (startCode > endCode) { addNotification({ title: 'Lỗi', message: 'Hàng bắt đầu phải <= hàng kết thúc', type: 'error', isAdmin: true }); return; }
-    setBulkSaving(true);
-    let count = 0;
-    try {
-      for (let c = startCode; c <= endCode; c++) {
-        const row = String.fromCharCode(c);
-        for (let n = 1; n <= +bulk.seatsPerRow; n++) {
-          await seatService.create({ roomsId: room.id, seatRow: row, seatNumber: n, seatTypesId: +bulk.seatTypesId });
-          count++;
-        }
-      }
-      addNotification({ title: 'Thành công', message: `Đã tạo ${count} ghế cho ${roomName}`, type: 'success', isAdmin: true });
-      onRefresh();
-      setBulkMode(false);
-    } catch (err) {
-      addNotification({ title: 'Lỗi (tạo được ' + count + ' ghế)', message: err.response?.data?.message || err.message, type: 'error', isAdmin: true });
-    } finally { setBulkSaving(false); }
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
       <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
         className="bg-cinema-card border border-cinema-border rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-card-hover">
+
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-cinema-border flex-shrink-0">
           <div>
             <h3 className="font-heading font-bold text-white text-lg">💺 Quản lý ghế — {roomName}</h3>
-            <p className="text-cinema-muted text-xs mt-0.5">Loại phòng: {room.roomType || 'Standard'} · {seats.length} ghế hiện tại</p>
+            <p className="text-cinema-muted text-xs mt-0.5">
+              Loại: <span className="text-primary">{room.roomType || 'Standard'}</span> · 
+              Tổng ghế: <span className="text-white font-semibold">{seats.length}</span>
+            </p>
           </div>
           <button onClick={onClose} className="text-cinema-muted hover:text-white text-xl leading-none">✕</button>
         </div>
 
-        {/* Body */}
-        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+        {/* Tabs */}
+        <div className="flex border-b border-cinema-border flex-shrink-0">
+          {[{ key: 'map', label: `🗺️ Sơ đồ (${seats.length})` }, { key: 'add', label: '➕ Thêm ghế' }].map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={`flex-1 py-2.5 text-sm font-medium transition-colors ${tab === t.key ? 'text-primary border-b-2 border-primary' : 'text-cinema-muted hover:text-white'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-          {/* Add single seat */}
-          <div className="bg-cinema-surface rounded-xl p-4 border border-cinema-border">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-white font-semibold text-sm">Thêm ghế</h4>
-              <button onClick={() => setBulkMode(!bulkMode)} className="text-xs text-primary hover:underline">
-                {bulkMode ? '← Thêm 1 ghế' : '⚡ Thêm hàng loạt'}
-              </button>
-            </div>
+        <div className="overflow-y-auto flex-1 p-5">
 
-            {!bulkMode ? (
-              <div className="flex flex-wrap gap-3 items-end">
-                <div>
-                  <label className="text-cinema-muted text-xs block mb-1">Hàng (Row)</label>
-                  <input value={addForm.seatRow} maxLength={2} onChange={e => setAddForm(p => ({...p, seatRow: e.target.value.toUpperCase()}))}
-                    className="input-field py-1.5 w-20 text-center uppercase" placeholder="A" />
-                </div>
-                <div>
-                  <label className="text-cinema-muted text-xs block mb-1">Số ghế</label>
-                  <input type="number" min={1} value={addForm.seatNumber} onChange={e => setAddForm(p => ({...p, seatNumber: e.target.value}))}
-                    className="input-field py-1.5 w-20 text-center" />
-                </div>
-                <div>
-                  <label className="text-cinema-muted text-xs block mb-1">Loại ghế</label>
-                  <select value={addForm.seatTypesId} onChange={e => setAddForm(p => ({...p, seatTypesId: e.target.value}))}
-                    className="input-field py-1.5 pr-8">
-                    <option value="">Chọn loại...</option>
-                    {seatTypes.map(t => <option key={t.id} value={t.id}>{t.seatTypeName || t.name}</option>)}
-                  </select>
-                </div>
-                <button onClick={handleAdd} disabled={saving} className="btn-primary px-4 py-1.5 text-sm h-[38px]">
-                  {saving ? 'Đang lưu...' : '+ Thêm'}
-                </button>
+          {/* ── TAB: SƠ ĐỒ ── */}
+          {tab === 'map' && (
+            loading ? (
+              <div className="flex items-center justify-center py-10">
+                <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+                <span className="text-cinema-muted ml-3 text-sm">Đang tải ghế...</span>
+              </div>
+            ) : seats.length === 0 ? (
+              <div className="text-center py-10 text-cinema-muted">
+                <p className="text-4xl mb-2">💺</p>
+                <p className="text-sm">Chưa có ghế nào. Chuyển sang tab <strong className="text-primary">Thêm ghế</strong> để bắt đầu!</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                <p className="text-cinema-muted text-xs">Tạo nhiều ghế theo hàng (A-Z) cùng lúc.</p>
+              <div className="space-y-2">
+                {/* Legend */}
+                <div className="flex gap-4 text-[10px] text-cinema-muted mb-3 flex-wrap">
+                  <span className="flex items-center gap-1"><span className="w-4 h-4 rounded bg-cinema-surface/80 border border-cinema-border inline-block" />Thường</span>
+                  <span className="flex items-center gap-1"><span className="w-4 h-4 rounded bg-yellow-900/30 border border-yellow-600/50 inline-block" />VIP</span>
+                  <span className="flex items-center gap-1"><span className="w-4 h-4 rounded bg-pink-900/30 border border-pink-600/50 inline-block" />Đôi</span>
+                  <span className="flex items-center gap-1"><span className="w-4 h-4 rounded bg-red-500/20 border border-red-500/50 inline-block" />Đã đặt</span>
+                  <span className="ml-auto text-[10px] text-cinema-muted">Click ghế để xoá</span>
+                </div>
+
+                {/* Screen */}
+                <div className="text-center mb-3">
+                  <div className="inline-block px-16 py-1.5 bg-primary/10 border border-primary/30 rounded-full text-primary text-xs font-semibold">MÀN HÌNH</div>
+                </div>
+
+                {rows.map(row => (
+                  <div key={row} className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-cinema-muted text-xs w-5 font-mono font-bold">{row}</span>
+                    {seatsByRow[row].map(seat => {
+                      const label = `${seat.seatRow}${seat.seatNumber}`;
+                      const isBooked = seat.status?.toString().toUpperCase() === 'BOOKED';
+                      const isVip = seat.seatTypeName?.toUpperCase().includes('VIP');
+                      const isCouple = seat.seatTypeName?.toUpperCase().includes('COUPLE') || seat.seatTypeName?.toUpperCase().includes('ĐÔI');
+                      return (
+                        <button key={seat.id}
+                          title={`${label} · ${seat.seatTypeName || 'N/A'} · ${isBooked ? '🔴 Đã đặt' : '🟢 Trống'}`}
+                          disabled={isBooked || deletingId === seat.id}
+                          onClick={() => !isBooked && handleDelete(seat.id, label)}
+                          className={`w-9 h-9 rounded-lg border text-[10px] font-mono font-bold transition-all ${
+                            deletingId === seat.id ? 'opacity-40 cursor-wait bg-cinema-border/20 border-cinema-border/30 text-cinema-muted'
+                            : isBooked ? 'bg-red-500/20 border-red-500/50 text-red-400 cursor-not-allowed'
+                            : isVip ? 'bg-yellow-900/30 border-yellow-600/50 text-yellow-400 hover:bg-red-500/20 hover:border-red-500/50 cursor-pointer'
+                            : isCouple ? 'bg-pink-900/30 border-pink-600/50 text-pink-400 hover:bg-red-500/20 hover:border-red-500/50 cursor-pointer'
+                            : 'bg-cinema-surface/80 border-cinema-border text-cinema-muted hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-400 cursor-pointer'
+                          }`}>
+                          {deletingId === seat.id ? '...' : seat.seatNumber}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+
+          {/* ── TAB: THÊM GHẾ ── */}
+          {tab === 'add' && (
+            <div className="space-y-6">
+
+              {/* Thêm 1 ghế */}
+              <div className="bg-cinema-surface rounded-xl p-4 border border-cinema-border">
+                <h4 className="text-white font-semibold text-sm mb-3">Thêm 1 ghế lẻ</h4>
                 <div className="flex flex-wrap gap-3 items-end">
                   <div>
-                    <label className="text-cinema-muted text-xs block mb-1">Từ hàng</label>
-                    <input value={bulk.fromRow} maxLength={1} onChange={e => setBulk(p => ({...p, fromRow: e.target.value.toUpperCase()}))}
-                      className="input-field py-1.5 w-16 text-center uppercase" />
+                    <label className="text-cinema-muted text-xs block mb-1">Hàng</label>
+                    <input value={addForm.seatRow} maxLength={2}
+                      onChange={e => setAddForm(p => ({ ...p, seatRow: e.target.value.toUpperCase() }))}
+                      className="input-field py-1.5 w-20 text-center uppercase" placeholder="A" />
                   </div>
                   <div>
-                    <label className="text-cinema-muted text-xs block mb-1">Đến hàng</label>
-                    <input value={bulk.toRow} maxLength={1} onChange={e => setBulk(p => ({...p, toRow: e.target.value.toUpperCase()}))}
-                      className="input-field py-1.5 w-16 text-center uppercase" />
-                  </div>
-                  <div>
-                    <label className="text-cinema-muted text-xs block mb-1">Ghế / hàng</label>
-                    <input type="number" min={1} max={30} value={bulk.seatsPerRow} onChange={e => setBulk(p => ({...p, seatsPerRow: e.target.value}))}
+                    <label className="text-cinema-muted text-xs block mb-1">Số ghế</label>
+                    <input type="number" min={1} value={addForm.seatNumber}
+                      onChange={e => setAddForm(p => ({ ...p, seatNumber: e.target.value }))}
                       className="input-field py-1.5 w-20 text-center" />
                   </div>
                   <div>
                     <label className="text-cinema-muted text-xs block mb-1">Loại ghế</label>
-                    <select value={bulk.seatTypesId} onChange={e => setBulk(p => ({...p, seatTypesId: e.target.value}))}
-                      className="input-field py-1.5 pr-8">
+                    <select value={addForm.seatTypesId} onChange={e => setAddForm(p => ({ ...p, seatTypesId: e.target.value }))}
+                      className="input-field py-1.5">
                       <option value="">Chọn loại...</option>
-                      {seatTypes.map(t => <option key={t.id} value={t.id}>{t.seatTypeName || t.name}</option>)}
+                      {seatTypes.map(t => <option key={t.id} value={t.id}>{t.typeName || t.seatTypeName || t.name}</option>)}
                     </select>
                   </div>
-                  <button onClick={handleBulkAdd} disabled={bulkSaving}
-                    className="btn-primary px-4 py-1.5 text-sm h-[38px]">
-                    {bulkSaving ? 'Đang tạo...' : '⚡ Tạo hàng loạt'}
+                  <button onClick={handleAddSingle} disabled={saving} className="btn-primary px-4 py-1.5 text-sm h-[38px]">
+                    {saving ? 'Đang lưu...' : '+ Thêm'}
                   </button>
                 </div>
-                {!bulkSaving && bulk.fromRow && bulk.toRow && bulk.seatsPerRow && (
-                  <p className="text-cinema-muted text-xs">
-                    → Sẽ tạo {(bulk.toRow.toUpperCase().charCodeAt(0) - bulk.fromRow.toUpperCase().charCodeAt(0) + 1) * +bulk.seatsPerRow} ghế
-                    (hàng {bulk.fromRow.toUpperCase()}→{bulk.toRow.toUpperCase()}, {bulk.seatsPerRow} ghế/hàng)
-                  </p>
+                {existingSet.has(`${addForm.seatRow.toUpperCase()}${addForm.seatNumber}`) && (
+                  <p className="text-orange-400 text-xs mt-2">⚠️ Ghế {addForm.seatRow.toUpperCase()}{addForm.seatNumber} đã tồn tại!</p>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Seat map */}
-          {loading ? (
-            <div className="flex items-center justify-center py-10">
-              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-              <span className="text-cinema-muted ml-3 text-sm">Đang tải ghế...</span>
-            </div>
-          ) : seats.length === 0 ? (
-            <div className="text-center py-10 text-cinema-muted">
-              <p className="text-3xl mb-2">💺</p>
-              <p className="text-sm">Phòng này chưa có ghế nào. Hãy thêm ghế ở trên!</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <h4 className="text-white font-semibold text-sm mb-2">Sơ đồ ghế ({seats.length} ghế)</h4>
-              {rows.map(row => (
-                <div key={row} className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-cinema-muted text-xs w-5 font-mono">{row}</span>
-                  {seatsByRow[row].map(seat => {
-                    const label = `${seat.seatRow}${seat.seatNumber}`;
-                    const isBooked = seat.status?.toString().toUpperCase() === 'BOOKED';
-                    return (
-                      <button
-                        key={seat.id}
-                        title={`${label} - ${seat.seatTypeName || 'N/A'} - ${seat.status || 'ACTIVE'}${isBooked ? ' (Đã đặt)' : ''}`}
-                        disabled={deletingId === seat.id}
-                        onClick={() => !isBooked && handleDelete(seat.id, label)}
-                        className={`w-9 h-9 rounded-lg border text-[10px] font-mono font-bold transition-all ${
-                          deletingId === seat.id
-                            ? 'opacity-40 cursor-wait bg-cinema-border/20 border-cinema-border/30 text-cinema-muted'
-                            : isBooked
-                            ? 'bg-red-500/20 border-red-500/50 text-red-400 cursor-not-allowed'
-                            : seat.seatTypeName?.toUpperCase().includes('VIP')
-                            ? 'bg-yellow-900/30 border-yellow-600/50 text-yellow-400 hover:bg-red-500/20 hover:border-red-500/50 cursor-pointer'
-                            : seat.seatTypeName?.toUpperCase().includes('COUPLE') || seat.seatTypeName?.toUpperCase().includes('ĐÔI')
-                            ? 'bg-pink-900/30 border-pink-600/50 text-pink-400 hover:bg-red-500/20 hover:border-red-500/50 cursor-pointer'
-                            : 'bg-cinema-surface/80 border-cinema-border text-cinema-muted hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-400 cursor-pointer'
-                        }`}
-                      >
-                        {deletingId === seat.id ? '...' : seat.seatNumber}
-                      </button>
-                    );
-                  })}
+              {/* Thêm theo hàng */}
+              <div className="bg-cinema-surface rounded-xl p-4 border border-cinema-border">
+                <h4 className="text-white font-semibold text-sm mb-1">Thêm cả hàng ghế</h4>
+                <p className="text-cinema-muted text-xs mb-3">Nhập tên hàng và số lượng ghế — ghế đã tồn tại sẽ tự động bỏ qua.</p>
+
+                <div className="flex flex-wrap gap-3 items-end mb-4">
+                  <div>
+                    <label className="text-cinema-muted text-xs block mb-1">Tên hàng (A–Z)</label>
+                    <input value={rowForm.seatRow} maxLength={1}
+                      onChange={e => setRowForm(p => ({ ...p, seatRow: e.target.value.toUpperCase() }))}
+                      className="input-field py-1.5 w-20 text-center uppercase font-mono font-bold" placeholder="A" />
+                  </div>
+                  <div>
+                    <label className="text-cinema-muted text-xs block mb-1">Số ghế / hàng</label>
+                    <input type="number" min={1} max={50} value={rowForm.seatsPerRow}
+                      onChange={e => setRowForm(p => ({ ...p, seatsPerRow: e.target.value }))}
+                      className="input-field py-1.5 w-24 text-center" />
+                  </div>
+                  <div>
+                    <label className="text-cinema-muted text-xs block mb-1">Loại ghế</label>
+                    <select value={rowForm.seatTypesId} onChange={e => setRowForm(p => ({ ...p, seatTypesId: e.target.value }))}
+                      className="input-field py-1.5">
+                      <option value="">Chọn loại...</option>
+                      {seatTypes.map(t => <option key={t.id} value={t.id}>{t.typeName || t.seatTypeName || t.name}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={handleAddRow} disabled={rowSaving || newSeats.length === 0}
+                    className="btn-primary px-4 py-1.5 text-sm h-[38px] disabled:opacity-50">
+                    {rowSaving ? 'Đang tạo...' : `⚡ Tạo ${newSeats.length} ghế`}
+                  </button>
                 </div>
-              ))}
-              <p className="text-cinema-muted text-[10px] mt-2">💡 Click vào ghế để xoá (ghế đã đặt không thể xoá)</p>
+
+                {/* Preview */}
+                {rowForm.seatRow && rowForm.seatsPerRow > 0 && (
+                  <div>
+                    <div className="flex gap-4 text-xs mb-2">
+                      <span className="text-green-400">🟢 Sẽ tạo: {newSeats.length}</span>
+                      {skipSeats.length > 0 && <span className="text-orange-400">⚠️ Bỏ qua (trùng): {skipSeats.length}</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {rowPreview.map(s => (
+                        <div key={s.key}
+                          title={s.exists ? `${s.key} — đã tồn tại, bỏ qua` : `${s.key} — sẽ được tạo`}
+                          className={`w-9 h-9 rounded-lg border text-[10px] font-mono font-bold flex items-center justify-center ${
+                            s.exists
+                              ? 'bg-orange-500/10 border-orange-500/30 text-orange-400/60'
+                              : 'bg-green-500/10 border-green-500/40 text-green-400'
+                          }`}>
+                          {s.n}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-cinema-muted text-[10px] mt-2">
+                      🟢 = sẽ tạo · 🟠 = đã tồn tại (bỏ qua)
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
