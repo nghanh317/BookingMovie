@@ -1,24 +1,25 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import useSeatHoldStore from '../../store/seatHoldStore';
 import useAuthStore from '../../store/authStore';
 import seatService from '../../services/seatService';
+import seatLockService from '../../services/seatLockService';
 
-// Màu / icon theo loại ghế
+// ─── Seat type meta ───────────────────────────────────────────────────
 const SEAT_TYPE_META = {
-  VIP:      { icon: '👑', label: 'VIP',       color: 'text-yellow-400', btnBase: 'bg-yellow-900/20 border-yellow-600/40 hover:bg-yellow-700/30 hover:border-yellow-400' },
-  COUPLE:   { icon: '💑', label: 'Ghế đôi',  color: 'text-pink-400',   btnBase: 'bg-pink-900/20 border-pink-600/40 hover:bg-pink-700/30 hover:border-pink-400' },
-  STANDARD: { icon: '💺', label: 'Thường',    color: 'text-white',      btnBase: 'bg-cinema-surface/80 border-cinema-border hover:bg-primary/10 hover:border-primary/60' },
+  VIP:      { icon: '👑', label: 'VIP',      color: 'text-yellow-400', btnBase: 'bg-yellow-900/20 border-yellow-600/40 hover:bg-yellow-700/30 hover:border-yellow-400' },
+  COUPLE:   { icon: '💑', label: 'Ghế đôi', color: 'text-pink-400',   btnBase: 'bg-pink-900/20 border-pink-600/40 hover:bg-pink-700/30 hover:border-pink-400' },
+  STANDARD: { icon: '💺', label: 'Thường',   color: 'text-white',      btnBase: 'bg-cinema-surface/80 border-cinema-border hover:bg-primary/10 hover:border-primary/60' },
 };
 
 function getSeatMeta(seatTypeName) {
-  const name = (seatTypeName || '').toUpperCase();
-  if (name.includes('VIP')) return SEAT_TYPE_META.VIP;
-  if (name.includes('COUPLE') || name.includes('ĐÔI') || name.includes('DOI')) return SEAT_TYPE_META.COUPLE;
+  const n = (seatTypeName || '').toUpperCase();
+  if (n.includes('VIP')) return SEAT_TYPE_META.VIP;
+  if (n.includes('COUPLE') || n.includes('ĐÔI') || n.includes('DOI')) return SEAT_TYPE_META.COUPLE;
   return SEAT_TYPE_META.STANDARD;
 }
 
+// ─── Step Indicator ───────────────────────────────────────────────────
 function StepIndicator({ current }) {
   const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
   return (
@@ -41,22 +42,30 @@ function StepIndicator({ current }) {
   );
 }
 
-function CountdownTimer({ remainingMs, onExpired }) {
-  const [ms, setMs] = useState(remainingMs);
-  const intervalRef = useRef(null);
+// ─── Countdown Timer ─────────────────────────────────────────────────
+// Nhận ISO string `expiresAt` hoặc `durationMs` (ms)
+function CountdownTimer({ expiresAt, durationMs, onExpired }) {
+  const calcMs = () => {
+    if (expiresAt) return Math.max(0, new Date(expiresAt) - Date.now());
+    return Math.max(0, durationMs || 0);
+  };
+
+  const [ms, setMs] = useState(() => calcMs());
 
   useEffect(() => {
-    setMs(remainingMs);
-    if (remainingMs <= 0) { onExpired?.(); return; }
-    intervalRef.current = setInterval(() => {
+    const initial = calcMs();
+    setMs(initial);
+    if (initial <= 0) { onExpired?.(); return; }
+    const iv = setInterval(() => {
       setMs(prev => {
         const next = prev - 1000;
-        if (next <= 0) { clearInterval(intervalRef.current); onExpired?.(); return 0; }
+        if (next <= 0) { clearInterval(iv); onExpired?.(); return 0; }
         return next;
       });
     }, 1000);
-    return () => clearInterval(intervalRef.current);
-  }, [remainingMs]);
+    return () => clearInterval(iv);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expiresAt, durationMs]);
 
   const minutes = Math.floor(ms / 60000);
   const seconds = Math.floor((ms % 60000) / 1000);
@@ -68,88 +77,89 @@ function CountdownTimer({ remainingMs, onExpired }) {
       <p className={`font-heading font-bold text-2xl tabular-nums ${isUrgent ? 'text-red-400' : 'text-primary'}`}>
         {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
       </p>
-      <p className="text-xs text-cinema-muted mt-1">{isUrgent ? '⚠️ Sắp hết thời gian!' : 'Hoàn tất thanh toán trước khi hết hạn'}</p>
+      <p className="text-xs text-cinema-muted mt-1">
+        {isUrgent ? '⚠️ Sắp hết thời gian!' : 'Nhấn Tiếp tục để hoàn tất'}
+      </p>
     </div>
   );
 }
 
+// ─── Main ─────────────────────────────────────────────────────────────
 export default function SeatSelection() {
   const { movieId } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location    = useLocation();
+  const navigate    = useNavigate();
   const { movie, showtime, cinema, slotId } = location.state || {};
-  const { user } = useAuthStore();
-  const { holdSeats, releaseSeats, getHeldSeats, getRemainingTime } = useSeatHoldStore();
+  const { user }    = useAuthStore();
 
-  // Seats từ API
-  const [seats, setSeats] = useState([]);
+  // ── State ──
+  const [seats, setSeats]               = useState([]);
   const [loadingSeats, setLoadingSeats] = useState(false);
+  const [selected, setSelected]         = useState(new Set());
+  const [lockedByOthers, setLockedByOthers] = useState({});
+  const [lockLoading, setLockLoading]   = useState(false);
+  const [error, setError]               = useState('');
 
-  const [selected, setSelected] = useState(new Set()); // Set<seatId (number)>
-  const [holdError, setHoldError] = useState('');
-  const [holdExpired, setHoldExpired] = useState(false);
-  const [remainingMs, setRemainingMs] = useState(0);
-  const [heldByOthers, setHeldByOthers] = useState({});
-  const pollRef = useRef(null);
-
+  const pollRef    = useRef(null);
   const showtimeId = slotId || showtime?.id;
-  const roomId = showtime?.roomId;
-  const userId = user?.id || user?.userId || 'guest';
+  const roomId     = showtime?.roomId;
+  const accountId  = user?.id || user?.userId;
 
-  // Fetch seats của phòng chiếu
+  // ── Fetch ghế của phòng chiếu ──
   useEffect(() => {
     if (!roomId) return;
     setLoadingSeats(true);
     seatService.getAll({ roomId, size: 500 })
       .then(data => {
         const list = Array.isArray(data) ? data : (data?.content || data?.data || []);
-        // Sắp xếp: theo row -> col
         list.sort((a, b) => {
-          const rowCmp = (a.seatRow || '').localeCompare(b.seatRow || '');
-          if (rowCmp !== 0) return rowCmp;
-          return (a.seatNumber || 0) - (b.seatNumber || 0);
+          const r = (a.seatRow || '').localeCompare(b.seatRow || '');
+          return r !== 0 ? r : (a.seatNumber || 0) - (b.seatNumber || 0);
         });
         setSeats(list);
       })
-      .catch(err => console.error('[SeatSelection] fetch seats error:', err))
+      .catch(err => console.error('[SeatSelection] fetch seats:', err))
       .finally(() => setLoadingSeats(false));
   }, [roomId]);
 
-  // Group seats theo row
-  const seatsByRow = seats.reduce((acc, seat) => {
-    const row = seat.seatRow || '?';
-    if (!acc[row]) acc[row] = [];
-    acc[row].push(seat);
-    return acc;
-  }, {});
-  const rows = Object.keys(seatsByRow).sort();
-
-  // Ghế đã đặt (BOOKED) từ backend
-  const bookedIds = new Set(
-    seats.filter(s => s.status?.toString().toUpperCase() === 'BOOKED').map(s => s.id)
-  );
-
-  // Poll held seats từ localStorage
-  const refreshHeldSeats = useCallback(() => {
+  // ── Poll ghế đang bị khoá bởi người khác từ API ──
+  const pollLockedSeats = useCallback(async () => {
     if (!showtimeId) return;
-    const held = getHeldSeats(showtimeId);
-    const byOthers = {};
-    held.forEach(({ seatId, userId: heldUserId, remainingMs: rem }) => {
-      if (String(heldUserId) !== String(userId)) {
-        byOthers[seatId] = { remainingMs: rem };
-      }
-    });
-    setHeldByOthers(byOthers);
-    const myRemaining = getRemainingTime(showtimeId, userId);
-    setRemainingMs(myRemaining);
-  }, [showtimeId, userId, getHeldSeats, getRemainingTime]);
+    try {
+      const locks = await seatLockService.getLockedSeats(showtimeId);
+      const byOthers = {};
+      locks.forEach(lock => {
+        // Chỉ mark là "by others" nếu không phải của mình
+        if (String(lock.accountId) !== String(accountId)) {
+          byOthers[lock.seatId] = lock.expiresAt;
+        }
+      });
+      setLockedByOthers(byOthers);
+    } catch {
+      // Silent fail — không block UI
+    }
+  }, [showtimeId, accountId]);
 
   useEffect(() => {
-    refreshHeldSeats();
-    pollRef.current = setInterval(refreshHeldSeats, 5000);
+    pollLockedSeats();
+    pollRef.current = setInterval(pollLockedSeats, 5000); // Poll 5s/lần
     return () => clearInterval(pollRef.current);
-  }, [refreshHeldSeats]);
+  }, [pollLockedSeats]);
 
+  // ── Khi trang đóng / rời đi: giải phóng lock ──
+  useEffect(() => {
+    if (!accountId || !showtimeId) return;
+    const release = () => {
+      // Gửi beacon khi trang đóng (best-effort)
+      seatLockService.releaseSeats(accountId, showtimeId).catch(() => {});
+    };
+    window.addEventListener('beforeunload', release);
+    return () => {
+      window.removeEventListener('beforeunload', release);
+    };
+  }, [accountId, showtimeId]);
+
+  // ── Guard: chưa chọn suất chiếu ──
   if (!movie || !showtime) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -161,69 +171,71 @@ export default function SeatSelection() {
     );
   }
 
-  const toggleSeat = (seatId) => {
-    if (bookedIds.has(seatId)) return;
-    if (heldByOthers[seatId]) {
-      const seat = seats.find(s => s.id === seatId);
-      const label = seat ? `${seat.seatRow}${seat.seatNumber}` : seatId;
-      setHoldError(`Ghế ${label} đang được người khác giữ. Vui lòng chọn ghế khác.`);
-      setTimeout(() => setHoldError(''), 3000);
-      return;
-    }
+  // ── Derived ──
+  const seatsByRow = seats.reduce((acc, seat) => {
+    const row = seat.seatRow || '?';
+    if (!acc[row]) acc[row] = [];
+    acc[row].push(seat);
+    return acc;
+  }, {});
+  const rows = Object.keys(seatsByRow).sort();
 
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(seatId)) {
-        next.delete(seatId);
-      } else {
-        next.add(seatId);
-      }
+  const bookedIds = new Set(
+    seats.filter(s => s.status?.toString().toUpperCase() === 'BOOKED').map(s => s.id)
+  );
 
-      const newSeats = [...next];
-      if (newSeats.length > 0) {
-        const result = holdSeats(showtimeId, newSeats, userId);
-        if (!result.success) {
-          setHoldError(result.message);
-          setTimeout(() => setHoldError(''), 4000);
-          return prev;
-        }
-        setTimeout(() => {
-          const rem = getRemainingTime(showtimeId, userId);
-          setRemainingMs(rem);
-        }, 100);
-      } else {
-        releaseSeats(showtimeId, userId);
-        setRemainingMs(0);
-        setHoldExpired(false);
-      }
-      return next;
-    });
-    setHoldError('');
-  };
-
-  const handleHoldExpired = () => {
-    setHoldExpired(true);
-    setSelected(new Set());
-    releaseSeats(showtimeId, userId);
-    setRemainingMs(0);
-  };
-
-  // Tính tổng tiền từ showtime.price (price per seat từ SlotDTO)
   const pricePerSeat = showtime?.price || 0;
-
-  // Thu thập thông tin ghế đã chọn
   const selectedSeatObjects = seats.filter(s => selected.has(s.id));
-
   const totalPrice = selectedSeatObjects.reduce((sum, seat) => {
     const meta = getSeatMeta(seat.seatTypeName);
-    // VIP +30%, Couple +80%, Standard giá gốc
-    if (meta === SEAT_TYPE_META.VIP) return sum + pricePerSeat * 1.3;
+    if (meta === SEAT_TYPE_META.VIP)    return sum + pricePerSeat * 1.3;
     if (meta === SEAT_TYPE_META.COUPLE) return sum + pricePerSeat * 1.8;
     return sum + pricePerSeat;
   }, 0);
 
-  const handleProceed = () => {
+  // ── Toggle ghế ──
+  const toggleSeat = (seatId) => {
+    if (bookedIds.has(seatId)) return;
+    if (lockedByOthers[seatId]) {
+      const seat = seats.find(s => s.id === seatId);
+      const label = seat ? `${seat.seatRow}${seat.seatNumber}` : seatId;
+      setError(`Ghế ${label} đang được người khác giữ. Vui lòng chọn ghế khác.`);
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(seatId)) next.delete(seatId);
+      else next.add(seatId);
+      return next;
+    });
+    setError('');
+  };
+
+  // ── "Tiếp tục" — Khoá ghế vào DB (best-effort), luôn navigate sang Snacks ──
+  const handleProceed = async () => {
     if (selected.size === 0) return;
+
+    setLockLoading(true);
+    setError('');
+
+    let lockExpiresAt = null; // Từ server (nếu thành công)
+
+    // Thử lock ghế trong DB — nếu lỗi vẫn cho đi tiếp (local timer trên trang Snacks sẽ xử lý)
+    if (accountId && showtimeId) {
+      try {
+        const result = await seatLockService.lockSeats(accountId, showtimeId, [...selected]);
+        if (result?.success) {
+          lockExpiresAt = result.expiresAt; // Dùng thời gian từ server (chính xác hơn)
+        }
+      } catch {
+        // Silent — backend chưa sẵn sàng hoặc ghế đã bị người khác lock
+        // Trang Snacks sẽ tự tạo local timer 10 phút
+      }
+    }
+
+    setLockLoading(false);
+
     navigate(`/booking/${movieId}/snacks`, {
       state: {
         movie, showtime, cinema,
@@ -237,8 +249,21 @@ export default function SeatSelection() {
         totalPrice,
         showtimeId,
         slotId,
+        lockExpiresAt, // null nếu server chưa sẵn sàng → Snacks tự tạo timer local
       }
     });
+  };
+
+  // ── Xử lý khi lock hết hạn ──
+  const handleHoldExpired = async () => {
+    setHoldExpired(true);
+    setSelected(new Set());
+    setMyExpiresAt(null);
+    setLocalExpiresAt(null);
+    if (accountId && showtimeId) {
+      await seatLockService.releaseSeats(accountId, showtimeId).catch(() => {});
+    }
+    pollLockedSeats();
   };
 
   return (
@@ -261,22 +286,14 @@ export default function SeatSelection() {
 
         {/* Errors */}
         <AnimatePresence>
-          {holdError && (
+          {error && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
-              ⚠️ {holdError}
+              ⚠️ {error}
             </motion.div>
           )}
         </AnimatePresence>
-        <AnimatePresence>
-          {holdExpired && (
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-              className="mb-4 p-4 bg-orange-500/10 border border-orange-500/30 rounded-xl text-orange-400 text-sm">
-              <p className="font-semibold mb-1">⏰ Thời gian giữ ghế đã hết!</p>
-              <p className="text-xs opacity-80">Các ghế bạn chọn đã được giải phóng. Vui lòng chọn lại.</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+
 
         {/* Screen */}
         <div className="mb-6 flex flex-col items-center">
@@ -299,7 +316,6 @@ export default function SeatSelection() {
               <div className="text-center py-16 text-cinema-muted">
                 <p className="text-4xl mb-3">💺</p>
                 <p className="font-semibold">Phòng này chưa có ghế nào</p>
-                <p className="text-sm mt-1">Vui lòng liên hệ admin.</p>
               </div>
             ) : (
               <div className="inline-block min-w-full">
@@ -308,18 +324,18 @@ export default function SeatSelection() {
                     <span className="text-cinema-muted text-xs w-5 text-right font-mono flex-shrink-0">{row}</span>
                     <div className="flex gap-1 flex-wrap">
                       {seatsByRow[row].map(seat => {
-                        const seatId = seat.id;
-                        const meta = getSeatMeta(seat.seatTypeName);
-                        const isBooked = bookedIds.has(seatId);
-                        const isSelected = selected.has(seatId);
-                        const isHeldByOther = !!heldByOthers[seatId];
-                        const label = `${seat.seatRow}${seat.seatNumber}`;
+                        const seatId        = seat.id;
+                        const meta          = getSeatMeta(seat.seatTypeName);
+                        const isBooked      = bookedIds.has(seatId);
+                        const isSelected    = selected.has(seatId);
+                        const isLockedOther = !!lockedByOthers[seatId];
+                        const label         = `${seat.seatRow}${seat.seatNumber}`;
 
                         let icon, btnClass;
                         if (isBooked) {
                           icon = <span className="text-[13px] leading-none opacity-50">✕</span>;
                           btnClass = 'cursor-not-allowed opacity-50 bg-cinema-border/20 border-cinema-border/20';
-                        } else if (isHeldByOther) {
+                        } else if (isLockedOther) {
                           icon = <span className="text-[14px] leading-none">🔒</span>;
                           btnClass = 'cursor-not-allowed bg-orange-500/15 border-orange-500/40';
                         } else if (isSelected) {
@@ -332,21 +348,19 @@ export default function SeatSelection() {
 
                         const tooltip = isBooked
                           ? `${label} - Đã đặt`
-                          : isHeldByOther
+                          : isLockedOther
                           ? `${label} - Đang được giữ`
                           : `${label} - ${seat.seatTypeName || 'Thường'} - ${pricePerSeat > 0 ? pricePerSeat.toLocaleString('vi-VN') + 'đ' : ''}`;
 
                         return (
                           <motion.button
                             key={seatId}
-                            whileTap={(!isBooked && !isHeldByOther) ? { scale: 0.88 } : {}}
+                            whileTap={(!isBooked && !isLockedOther) ? { scale: 0.88 } : {}}
                             onClick={() => toggleSeat(seatId)}
-                            disabled={isBooked || isHeldByOther}
+                            disabled={isBooked || isLockedOther}
                             title={tooltip}
                             className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all duration-150 ${btnClass}`}
-                          >
-                            {icon}
-                          </motion.button>
+                          >{icon}</motion.button>
                         );
                       })}
                     </div>
@@ -390,11 +404,8 @@ export default function SeatSelection() {
               <h3 className="font-heading font-bold text-white text-sm mb-3">Ghế đã chọn</h3>
               {selected.size > 0 ? (
                 <>
-                  {remainingMs > 0 && (
-                    <div className="mb-3">
-                      <CountdownTimer remainingMs={remainingMs} onExpired={handleHoldExpired} />
-                    </div>
-                  )}
+
+
                   <div className="flex flex-wrap gap-1 mb-3">
                     {selectedSeatObjects
                       .sort((a, b) => `${a.seatRow}${a.seatNumber}`.localeCompare(`${b.seatRow}${b.seatNumber}`))
@@ -416,8 +427,17 @@ export default function SeatSelection() {
                       </span>
                     </div>
                   </div>
-                  <button onClick={handleProceed} className="w-full btn-primary text-sm py-2.5">
-                    Tiếp tục →
+                  <button
+                    onClick={handleProceed}
+                    disabled={lockLoading}
+                    className="w-full btn-primary text-sm py-2.5 flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {lockLoading ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-cinema-black border-t-transparent rounded-full animate-spin" />
+                        Đang giữ ghế...
+                      </>
+                    ) : 'Tiếp tục →'}
                   </button>
                 </>
               ) : (
@@ -425,12 +445,12 @@ export default function SeatSelection() {
               )}
             </div>
 
-            {/* Held by others */}
-            {Object.keys(heldByOthers).length > 0 && (
+            {/* Ghế bị lock bởi người khác */}
+            {Object.keys(lockedByOthers).length > 0 && (
               <div className="card p-3 mt-3">
                 <p className="text-xs text-orange-400 font-medium mb-1.5">🔒 Ghế đang được giữ</p>
                 <div className="flex flex-wrap gap-1">
-                  {Object.keys(heldByOthers).sort().map(sid => {
+                  {Object.keys(lockedByOthers).sort().map(sid => {
                     const seat = seats.find(s => s.id === Number(sid));
                     return (
                       <span key={sid} className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 border border-orange-500/30 text-orange-400">

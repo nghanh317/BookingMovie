@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import movieService from '../../services/movieService';
+import cinemaService from '../../services/cinemaService';
+import ticketService from '../../services/ticketService';
+import api from '../../services/api';
 import MovieCard from '../../components/movie/MovieCard';
 
 // --- Hero Carousel ---
@@ -106,18 +109,18 @@ function SectionHeader({ title, subtitle, linkTo, linkText }) {
 }
 
 // --- Stats Bar ---
-function StatsBar() {
-  const stats = [
-    { icon: '🎬', value: '200+', label: 'Phim được chiếu' },
-    { icon: '🏟️', value: '50+', label: 'Rạp chiếu phim' },
-    { icon: '🎟️', value: '1M+', label: 'Vé đã bán' },
-    { icon: '⭐', value: '4.8', label: 'Đánh giá trung bình' },
+function StatsBar({ stats }) {
+  const items = [
+    { icon: '🎬', value: stats.movies, label: 'Phim được chiếu' },
+    { icon: '🏟️', value: stats.cinemas, label: 'Rạp chiếu phim' },
+    { icon: '🎟️', value: stats.tickets, label: 'Vé đã bán' },
+    { icon: '⭐', value: stats.rating, label: 'Đánh giá phim TB' },
   ];
   return (
     <div className="bg-cinema-surface border-y border-cinema-border">
       <div className="container mx-auto px-4 max-w-7xl">
         <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-cinema-border">
-          {stats.map((stat) => (
+          {items.map((stat) => (
             <div key={stat.label} className="py-6 px-4 text-center">
               <div className="text-2xl mb-1">{stat.icon}</div>
               <div className="font-heading font-bold text-2xl text-primary">{stat.value}</div>
@@ -154,12 +157,58 @@ function PromoBanner() {
 export default function Home() {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    movies: '...', cinemas: '...', tickets: '...', rating: '—'
+  });
 
   useEffect(() => {
+    // Fetch phim
     movieService.getAll().then(data => {
       setMovies(data);
       setLoading(false);
+      setStats(prev => ({ ...prev, movies: data.length > 0 ? `${data.length}+` : '0' }));
     });
+
+    // Fetch rạp
+    cinemaService.getAll().then(data => {
+      setStats(prev => ({ ...prev, cinemas: data.length > 0 ? `${data.length}+` : '0' }));
+    }).catch(() => {});
+
+    // Fetch số vé PAID — chỉ cần totalElements từ page
+    ticketService.getAll({ size: 1, paymentStatus: 'PAID' }).then(res => {
+      const total = res?.totalElements ?? res?.total ?? null;
+      if (total !== null) {
+        const display = total >= 1000
+          ? `${(total / 1000).toFixed(0)}K+`
+          : total > 0 ? `${total}+` : '0';
+        setStats(prev => ({ ...prev, tickets: display }));
+      }
+    }).catch(() => {});
+
+    // Fetch rating TB từ movie-reviews
+    api.get('/v1/movie-reviews', { params: { size: 1000, page: 0 } }).then(res => {
+      console.log('[Home] movie-reviews raw:', res.data);
+      // Backend trả Page<MovieReviewDTO>: { content: [], totalElements: N, ... }
+      let reviews = [];
+      if (Array.isArray(res.data?.content)) reviews = res.data.content;
+      else if (Array.isArray(res.data)) reviews = res.data;
+
+      if (reviews.length > 0) {
+        const validRatings = reviews.map(r => r.rating).filter(r => typeof r === 'number' && r > 0);
+        if (validRatings.length > 0) {
+          const avg = validRatings.reduce((sum, r) => sum + r, 0) / validRatings.length;
+          setStats(prev => ({ ...prev, rating: avg.toFixed(1) }));
+        } else {
+          setStats(prev => ({ ...prev, rating: '—' }));
+        }
+      } else {
+        setStats(prev => ({ ...prev, rating: '—' }));
+      }
+    }).catch(err => {
+      console.error('[Home] movie-reviews error:', err.response?.status, err.message);
+      setStats(prev => ({ ...prev, rating: '—' }));
+    });
+
   }, []);
 
   if (loading) {
@@ -172,7 +221,7 @@ export default function Home() {
   return (
     <div className="animate-fade-in">
       <HeroBanner movies={movies} />
-      <StatsBar />
+      <StatsBar stats={stats} />
 
       <div className="container mx-auto px-4 max-w-7xl py-12 space-y-16">
         {/* Now Showing */}

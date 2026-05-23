@@ -1,8 +1,8 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { NEWS_ARTICLES } from '../News/News';
 import { MOVIES, VOUCHERS } from '../../constants/mockData';
 import useNotificationStore from '../../store/notificationStore';
+import newsService from '../../services/newsService';
 
 // ── Tabs giống phía user ─────────────────────────────────────
 const TABS = [
@@ -406,12 +406,51 @@ function ArticleRow({ article, onEdit, onDelete, onTogglePublish }) {
 // ── Main ─────────────────────────────────────────────────────
 export default function AdminNews() {
   const [activeTab, setActiveTab] = useState('review');
-  const [articles, setArticles]   = useState(NEWS_ARTICLES.map(a => ({ ...a, published: true })));
+  const [articles, setArticles]   = useState([]);
+  const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [modal, setModal]         = useState(null); // null | { mode, article }
   const searchRef                 = useRef(null);
   const { addNotification }       = useNotificationStore();
+
+  // Fetch news từ API
+  const fetchNews = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await newsService.getAll({ page: 0, size: 200, sort: 'id,desc' });
+      const content = data?.content ?? data ?? [];
+      // Map sang format dùng trong Admin (thêm field published)
+      setArticles(Array.isArray(content) ? content.map(n => ({
+        ...n,
+        published: !n.isDeleted,
+        // map fields cho ArticleRow
+        coverImage: n.imageUrl || '',
+        excerpt:    n.content?.replace(/<[^>]*>/g, '').slice(0, 120) || '',
+        author:     'Admin',
+        authorAvatar: 'AD',
+        publishedAt: n.createDate,
+        category:   detectCategory(n),
+        tags: [],
+        rating: null,
+      })) : []);
+    } catch {
+      addNotification({ title: 'Lỗi', message: 'Không thể tải danh sách tin tức.', type: 'error', isAdmin: true });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchNews(); }, [fetchNews]);
+
+  // Heuristic category detect (đồng bộ với News.jsx)
+  function detectCategory(news) {
+    const text = ((news.title || '') + ' ' + (news.content || '')).toLowerCase();
+    if (text.includes('khuyến mãi') || text.includes('giảm giá') || text.includes('ưu đãi') || text.includes('voucher')) return 'Khuyến mãi';
+    if (text.includes('review') || text.includes('đánh giá')) return 'Review phim';
+    if (text.includes('dự báo') || text.includes('ra mắt') || text.includes('sắp chiếu')) return 'Dự báo phim';
+    return 'Tin tức';
+  }
 
   const tabMeta = TABS.find(t => t.key === activeTab);
 
@@ -448,28 +487,43 @@ export default function AdminNews() {
     });
   }, [articles, search, activeTab]);
 
-  // Actions
-  const handleSave = (data) => {
-    setArticles(prev => {
-      const idx = prev.findIndex(a => a.id === data.id);
-      if (idx >= 0) return prev.map(a => a.id === data.id ? { ...a, ...data, published: a.published } : a);
-      return [{ ...data, published: true }, ...prev];
-    });
-    addNotification({ title: 'Bài viết đã lưu', message: `"${data.title}" đã được lưu thành công.`, type: 'success', isAdmin: true });
+  // Actions — kết nối API
+  const handleSave = async (data) => {
+    try {
+      const payload = { title: data.title, content: data.excerpt || data.content || '', imageUrl: data.coverImage || '' };
+      if (data.id && articles.find(a => a.id === data.id)) {
+        // Update
+        await newsService.update(data.id, payload);
+        setArticles(prev => prev.map(a => a.id === data.id ? { ...a, ...data, published: a.published } : a));
+      } else {
+        // Create
+        await newsService.create(payload);
+        await fetchNews(); // Reload để lấy ID từ backend
+      }
+      addNotification({ title: 'Bài viết đã lưu', message: `"${data.title}" đã được lưu thành công.`, type: 'success', isAdmin: true });
+    } catch {
+      addNotification({ title: 'Lỗi lưu bài viết', message: 'Không thể lưu. Vui lòng thử lại!', type: 'error', isAdmin: true });
+    }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     const a = articles.find(x => x.id === id);
-    setArticles(prev => prev.filter(x => x.id !== id));
-    addNotification({ title: 'Đã xóa bài viết', message: `"${a?.title}" đã bị xóa.`, type: 'warn', isAdmin: true });
+    try {
+      await newsService.remove(id);
+      setArticles(prev => prev.filter(x => x.id !== id));
+      addNotification({ title: 'Đã xóa bài viết', message: `"${a?.title}" đã bị xóa.`, type: 'warn', isAdmin: true });
+    } catch {
+      addNotification({ title: 'Lỗi', message: 'Không thể xóa bài viết.', type: 'error', isAdmin: true });
+    }
   };
 
   const handleTogglePublish = (id) => {
+    // Backend chỉ có isDeleted, toggle published là UI-only
     setArticles(prev => prev.map(a => a.id === id ? { ...a, published: !a.published } : a));
   };
 
   const stats = useMemo(() => {
-    const tab = articles.filter(a => a.category === tabMeta.category);
+    const tab = articles.filter(a => a.category === tabMeta.category || (tabMeta.category === 'Review phim' && !['Dự báo phim','Khuyến mãi'].includes(a.category)));
     return { total: tab.length, published: tab.filter(a => a.published !== false).length };
   }, [articles, activeTab]);
 
@@ -550,7 +604,13 @@ export default function AdminNews() {
       </div>
 
       {/* Article list */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-16 bg-cinema-surface rounded-xl animate-pulse border border-cinema-border" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-cinema-muted">
           <div className="text-4xl mb-3">{tabMeta.icon}</div>
           <p>Chưa có bài viết nào trong mục này</p>

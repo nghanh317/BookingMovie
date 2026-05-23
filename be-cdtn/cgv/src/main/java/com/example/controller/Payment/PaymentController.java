@@ -25,7 +25,7 @@ public class PaymentController {
     private IPaymentService paymentService;
 
     /**
-     * Tạo URL thanh toán VNPay (có hiệu lực 10 phút)
+     * Tạo URL thanh toán VNPay (có hiệu lực 15 phút)
      * POST /api/v1/payments/create-url
      * Body: { "ticketId": 1, "bankCode": "", "language": "vn" }
      */
@@ -38,12 +38,27 @@ public class PaymentController {
     }
 
     /**
-     * VNPay gọi về sau khi user thanh toán (cả thành công lẫn thất bại)
-     * GET /api/v1/payments/vnpay-callback
+     * Luồng 1 — RETURN URL (trình duyệt khách nhảy về sau khi thanh toán)
+     * VNPay redirect trình duyệt khách về đây → xử lý → redirect tiếp về React.
+     *
+     * GET /api/v1/payments/vnpay-return
      */
-    @GetMapping("/vnpay-callback")
-    public void handleVnpayCallback(HttpServletRequest request,
-                                    HttpServletResponse response) throws IOException {
-        paymentService.handleVnpayCallback(request, response);
+    @GetMapping("/vnpay-return")
+    public void handleVnpayReturn(HttpServletRequest request,
+                                  HttpServletResponse response) throws IOException {
+        paymentService.handleVnpayReturn(request, response);
+    }
+
+    /**
+     * Luồng 2 — IPN (VNPay gọi ngầm Server-to-Server để xác nhận kết quả)
+     * PHẢI trả về JSON, KHÔNG redirect.
+     * URL này phải là public (ngrok hoặc server deploy thật).
+     *
+     * GET /api/v1/payments/vnpay-ipn
+     */
+    @GetMapping("/vnpay-ipn")
+    public ResponseEntity<Map<String, String>> handleVnpayIpn(HttpServletRequest request) {
+        Map<String, String> result = paymentService.handleVnpayIpn(request);
+        return ResponseEntity.ok(result);
     }
 }

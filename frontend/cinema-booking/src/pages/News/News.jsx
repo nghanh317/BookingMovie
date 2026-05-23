@@ -1,239 +1,99 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import newsService from '../../services/newsService';
 
-export const NEWS_ARTICLES = [
-  {
-    id: 1,
-    title: 'Review Dune: Part Two – Bản anh hùng ca vũ trụ choáng ngợp nhất thập kỷ',
-    slug: 'review-dune-part-two',
-    excerpt:
-      'Denis Villeneuve một lần nữa chứng minh tài năng bậc thầy khi đưa khán giả vào hành trình thám hiểm thế giới Arrakis đầy cát bụi và tráng lệ với quy mô sản xuất khổng lồ chưa từng thấy.',
-    coverImage: 'https://image.tmdb.org/t/p/w1280/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg',
-    category: 'Review phim',
-    genre: ['Khoa học viễn tưởng', 'Sử thi'],
-    rating: 9.1,
-    author: 'Minh Tuấn',
-    authorAvatar: 'MT',
-    publishedAt: '2024-03-12',
-    readTime: '8 phút đọc',
-    tags: ['Dune', 'Denis Villeneuve', 'Timothée Chalamet', 'Zendaya'],
-    linkedMovieId: 3,
-  },
-  {
-    id: 2,
-    title: 'Oppenheimer – Khi Nolan tái định nghĩa thể loại tiểu sử lịch sử',
-    slug: 'review-oppenheimer',
-    excerpt:
-      'Ba tiếng đồng hồ không dư thừa một giây – Christopher Nolan đã kiến tạo nên một kiệt tác điện ảnh về người đàn ông tạo ra vũ khí hủy diệt hàng loạt đầu tiên của nhân loại.',
-    coverImage: 'https://image.tmdb.org/t/p/w1280/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg',
-    category: 'Review phim',
-    genre: ['Tiểu sử', 'Lịch sử', 'Kịch tính'],
-    rating: 9.3,
-    author: 'Thu Hằng',
-    authorAvatar: 'TH',
-    publishedAt: '2023-07-25',
-    readTime: '10 phút đọc',
-    tags: ['Oppenheimer', 'Nolan', 'Cillian Murphy', 'IMAX'],
-    linkedMovieId: null,
-  },
-  {
-    id: 3,
-    title: 'Poor Things – Bữa tiệc thị giác kỳ quái và giải phóng nhất năm 2023',
-    slug: 'review-poor-things',
-    excerpt:
-      'Yorgos Lanthimos đã tạo ra một bộ phim không thể phân loại – vừa dị biệt, vừa đẹp đến mê hồn, vừa thách thức mọi quy tắc xã hội với sự xuất sắc của Emma Stone.',
-    coverImage: 'https://image.tmdb.org/t/p/w1280/kCGlIMHnOm8JPXq3rXM6c5wMxcT.jpg',
-    category: 'Review phim',
-    genre: ['Kỳ ảo', 'Hài hước', 'Lãng mạn'],
-    rating: 8.7,
-    author: 'Phương Linh',
-    authorAvatar: 'PL',
-    publishedAt: '2024-01-15',
-    readTime: '7 phút đọc',
-    tags: ['Poor Things', 'Emma Stone', 'Cannes', 'Oscar'],
-    linkedMovieId: null,
-  },
-  {
-    id: 4,
-    title: 'Avengers: Secret Wars – Kỷ nguyên mới của Marvel đã đến?',
-    slug: 'preview-avengers-secret-wars',
-    excerpt:
-      'Mọi thứ từ Infinity Saga đến Multiverse Saga đã dẫn đến đây. Liệu bộ phim có thể cứu vãn "mệt mỏi siêu anh hùng" và lấy lại ngai vàng của Marvel?',
-    coverImage: 'https://image.tmdb.org/t/p/w1280/9SSEUrSqhljBMzRe4aBTh17rUaC.jpg',
-    category: 'Dự báo phim',
-    genre: ['Siêu anh hùng', 'Hành động', 'Khoa học viễn tưởng'],
-    rating: null,
-    author: 'Văn Khoa',
-    authorAvatar: 'VK',
-    publishedAt: '2024-05-01',
-    readTime: '6 phút đọc',
-    tags: ['Avengers', 'Marvel', 'Secret Wars', 'MCU'],
-    linkedMovieId: 1,
-  },
-  {
-    id: 5,
-    title: 'Godzilla x Kong: Ưu và nhược điểm của bom tấn đầu hè 2024',
-    slug: 'review-godzilla-kong',
-    excerpt:
-      'Màn đấu giữa hai quái thú huyền thoại tiếp tục gây bão phòng vé. Hành động mãn nhãn nhưng cốt truyện vẫn là điểm yếu dai dẳng của thương hiệu MonsterVerse.',
-    coverImage: 'https://image.tmdb.org/t/p/w1280/bQ2ywkchIGDtGys3cP5agtL0EBq.jpg',
-    category: 'Review phim',
-    genre: ['Quái vật', 'Hành động', 'Phiêu lưu'],
-    rating: 7.4,
-    author: 'Minh Tuấn',
-    authorAvatar: 'MT',
-    publishedAt: '2024-03-29',
-    readTime: '5 phút đọc',
-    tags: ['Godzilla', 'Kong', 'MonsterVerse', 'Bom tấn'],
-    linkedMovieId: 2,
-  },
-  {
-    id: 6,
-    title: 'Killers of the Flower Moon – Di sản trầm hùng của Scorsese',
-    slug: 'review-killers-flower-moon',
-    excerpt:
-      'Ở tuổi 80, Martin Scorsese vẫn chứng minh mình là đạo diễn vĩ đại nhất còn hoạt động với tuyệt phẩm 3.5 tiếng về tội ác được che giấu trong lịch sử người Mỹ bản địa.',
-    coverImage: 'https://image.tmdb.org/t/p/w1280/dB6Krk806zeqd0YNp2ngQ9zXteH.jpg',
-    category: 'Review phim',
-    genre: ['Lịch sử', 'Tội phạm', 'Kịch tính'],
-    rating: 8.9,
-    author: 'Thu Hằng',
-    authorAvatar: 'TH',
-    publishedAt: '2023-10-20',
-    readTime: '9 phút đọc',
-    tags: ['Scorsese', 'DiCaprio', 'Oscar', 'Killers'],
-    linkedMovieId: null,
-  },
-  {
-    id: 7,
-    title: '🎉 Siêu ưu đãi dịp lễ 30/4 – 1/5: Giảm đến 30% giá vé + tặng voucher độc quyền',
-    slug: 'khuyen-mai-30-4',
-    excerpt:
-      'Chào mừng Ngày Giải Phóng Miền Nam và Ngày Quốc Tế Lao Động! CinemaBook tặng ngay voucher giảm giá và ưu đãi đặc biệt dành cho tất cả thành viên trong dịp nghỉ lễ vàng này.',
-    coverImage: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1280&q=80',
-    category: 'Khuyến mãi',
-    genre: ['Ưu đãi', 'Dịp lễ'],
-    rating: null,
-    author: 'Ban Marketing',
-    authorAvatar: 'BM',
-    publishedAt: '2026-04-28',
-    readTime: '3 phút đọc',
-    tags: ['30/4', '1/5', 'Khuyến mãi', 'Voucher'],
-    linkedMovieId: null,
-    voucherIds: ['V001', 'V005'],
-    promotionContent: `Nhân dịp kỷ niệm Ngày Giải Phóng Miền Nam (30/4) và Ngày Quốc Tế Lao Động (1/5), CinemaBook trân trọng gửi đến quý khán giả chương trình ưu đãi đặc biệt.\n\nƯu đãi 1 — Giảm 30% giá vé: Áp dụng cho tất cả suất chiếu từ 30/04 đến 02/05/2026. Tối đa giảm 100.000đ/giao dịch, đơn tối thiểu 100.000đ. Nhận mã WELCOME30 miễn phí bên dưới!\n\nƯu đãi 2 — Voucher Gold độc quyền: Giảm thêm 25% dành riêng cho thành viên Gold và Platinum. Đổi bằng 300 điểm thưởng — xem bên dưới để đổi ngay!\n\nĐiều khoản: Mỗi tài khoản sử dụng tối đa 1 lần/voucher. Không áp dụng cho vé đã đặt trước ngày 30/04. CinemaBook có quyền thay đổi điều khoản.`,
-  },
-  {
-    id: 8,
-    title: '☀️ Khuyến mãi mùa hè 2026: Giảm 20% & Combo bỏng nước miễn phí',
-    slug: 'khuyen-mai-mua-he-2026',
-    excerpt:
-      'Mùa hè sôi động đã đến! Đặt vé xem phim tại CinemaBook từ tháng 6 đến tháng 7/2026 để nhận ngay ưu đãi giảm 20% cùng combo bỏng nước miễn phí cho hai người.',
-    coverImage: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=1280&q=80',
-    category: 'Khuyến mãi',
-    genre: ['Ưu đãi', 'Mùa hè'],
-    rating: null,
-    author: 'Ban Marketing',
-    authorAvatar: 'BM',
-    publishedAt: '2026-05-10',
-    readTime: '3 phút đọc',
-    tags: ['Mùa hè', 'Combo', 'Voucher', 'Giảm giá'],
-    linkedMovieId: null,
-    voucherIds: ['V002', 'V004'],
-    promotionContent: `Hè về rồi! Hãy để CinemaBook làm cho mùa hè của bạn thêm phần sôi động và tiết kiệm.\n\nƯu đãi 1 — Giảm 20% tất cả vé phim: Áp dụng từ 01/06/2026 đến 31/07/2026. Tối đa giảm 80.000đ/giao dịch, đơn tối thiểu 150.000đ. Mã SUMMER20 — Nhận miễn phí ngay bên dưới!\n\nƯu đãi 2 — VIP50K giảm thêm 50.000đ: Dành cho thành viên từ hạng Silver trở lên. Đổi bằng 500 điểm thưởng. Có thể kết hợp cùng SUMMER20.\n\nCách tích điểm nhanh: Mỗi 10.000đ chi tiêu = 1 điểm. Chia sẻ ứng dụng = +50 điểm. Đánh giá phim sau khi xem = +10 điểm.`,
-  },
-];
+// ─── Helpers ────────────────────────────────────────────────────────
+function fmtDate(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('vi-VN');
+}
 
-const CATEGORIES = ['Tất cả', 'Review phim', 'Dự báo phim', 'Khuyến mãi'];
+function estimateReadTime(content) {
+  if (!content) return '1 phút đọc';
+  const words = content.replace(/<[^>]*>/g, '').split(/\s+/).length;
+  const mins = Math.max(1, Math.ceil(words / 200));
+  return `${mins} phút đọc`;
+}
 
-const categoryColor = {
+// Heuristic: phát hiện category từ nội dung tin
+export function detectCategory(news) {
+  const text = ((news.title || '') + ' ' + (news.content || '')).toLowerCase();
+  if (text.includes('khuyến mãi') || text.includes('giảm giá') || text.includes('ưu đãi') || text.includes('voucher')) return 'Khuyến mãi';
+  if (text.includes('review') || text.includes('đánh giá')) return 'Review phim';
+  if (text.includes('dự báo') || text.includes('ra mắt') || text.includes('sắp chiếu')) return 'Dự báo phim';
+  return 'Tin tức';
+}
+
+export const categoryColor = {
   'Review phim': 'bg-primary/20 text-primary border-primary/30',
   'Dự báo phim': 'bg-accent/20 text-accent border-accent/30',
-  'Khuyến mãi': 'bg-green-500/20 text-green-400 border-green-500/30',
+  'Khuyến mãi':  'bg-green-500/20 text-green-400 border-green-500/30',
+  'Tin tức':     'bg-blue-500/20 text-blue-400 border-blue-500/30',
 };
 
-function StarRating({ value }) {
-  const full = Math.floor(value);
-  const half = value - full >= 0.5;
+const CATEGORIES = ['Tất cả', 'Tin tức', 'Review phim', 'Dự báo phim', 'Khuyến mãi'];
+
+// ─── Skeleton Card ───────────────────────────────────────────────────
+function SkeletonCard() {
   return (
-    <div className="flex items-center gap-0.5">
-      {[...Array(5)].map((_, i) => (
-        <svg key={i} className={`w-3.5 h-3.5 ${i < full ? 'text-primary' : i === full && half ? 'text-primary/60' : 'text-cinema-border'}`} fill="currentColor" viewBox="0 0 20 20">
-          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-        </svg>
-      ))}
+    <div className="bg-cinema-card border border-cinema-border rounded-2xl overflow-hidden animate-pulse">
+      <div className="aspect-[16/9] bg-cinema-surface" />
+      <div className="p-5 space-y-3">
+        <div className="h-3 bg-cinema-surface rounded w-1/4" />
+        <div className="h-4 bg-cinema-surface rounded w-3/4" />
+        <div className="h-3 bg-cinema-surface rounded w-full" />
+        <div className="h-3 bg-cinema-surface rounded w-2/3" />
+      </div>
     </div>
   );
 }
 
+// ─── Article Card ────────────────────────────────────────────────────
 function ArticleCard({ article, index }) {
+  const category = detectCategory(article);
+  const excerpt = article.content
+    ? article.content.replace(/<[^>]*>/g, '').slice(0, 160) + '...'
+    : '';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.07 }}
+      transition={{ duration: 0.4, delay: index * 0.06 }}
     >
       <Link to={`/news/${article.id}`} className="group block h-full">
         <div className="h-full bg-cinema-card border border-cinema-border rounded-2xl overflow-hidden hover:border-primary/40 hover:shadow-card-hover transition-all duration-300 flex flex-col">
           {/* Cover */}
           <div className="relative overflow-hidden aspect-[16/9]">
             <img
-              src={article.coverImage}
+              src={article.imageUrl || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=640&q=80'}
               alt={article.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              onError={e => { e.target.src = 'https://via.placeholder.com/640x360/1a1a2e/e5b85c?text=CinemaBook'; }}
+              onError={e => { e.target.src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=640&q=80'; }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-cinema-black/80 via-transparent to-transparent" />
-            {/* Category badge */}
-            <span className={`absolute top-3 left-3 text-[11px] font-semibold px-2.5 py-1 rounded-full border backdrop-blur-sm ${categoryColor[article.category] || 'bg-white/10 text-white border-white/20'}`}>
-              {article.category}
+            <span className={`absolute top-3 left-3 text-[11px] font-semibold px-2.5 py-1 rounded-full border backdrop-blur-sm ${categoryColor[category] || 'bg-white/10 text-white border-white/20'}`}>
+              {category}
             </span>
-            {/* Rating */}
-            {article.rating && (
-              <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-cinema-black/70 backdrop-blur-sm px-2.5 py-1 rounded-full border border-cinema-border">
-                <svg className="w-3.5 h-3.5 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-                <span className="text-primary font-bold text-xs">{article.rating}</span>
-              </div>
-            )}
           </div>
 
           {/* Content */}
           <div className="p-5 flex flex-col flex-1">
-            {/* Genres */}
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {article.genre.slice(0, 2).map(g => (
-                <span key={g} className="text-[10px] px-2 py-0.5 rounded-full bg-cinema-surface border border-cinema-border text-cinema-muted">
-                  {g}
-                </span>
-              ))}
-            </div>
-
             <h2 className="font-heading font-bold text-white text-base leading-snug mb-2 group-hover:text-primary transition-colors line-clamp-2">
               {article.title}
             </h2>
             <p className="text-cinema-muted text-sm leading-relaxed line-clamp-2 flex-1 mb-4">
-              {article.excerpt}
+              {excerpt}
             </p>
-
             {/* Footer */}
             <div className="flex items-center justify-between pt-3 border-t border-cinema-border/50">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-gradient-gold flex items-center justify-center text-cinema-black font-bold text-[10px]">
-                  {article.authorAvatar}
-                </div>
-                <div>
-                  <p className="text-white text-xs font-medium">{article.author}</p>
-                  <p className="text-cinema-muted text-[10px]">{new Date(article.publishedAt).toLocaleDateString('vi-VN')}</p>
-                </div>
-              </div>
+              <p className="text-cinema-muted text-[10px]">📅 {fmtDate(article.createDate)}</p>
               <span className="text-cinema-muted text-[11px] flex items-center gap-1">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {article.readTime}
+                {estimateReadTime(article.content)}
               </span>
             </div>
           </div>
@@ -243,82 +103,114 @@ function ArticleCard({ article, index }) {
   );
 }
 
+// ─── Main ────────────────────────────────────────────────────────────
 export default function News() {
+  const [articles, setArticles]             = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState(null);
   const [activeCategory, setActiveCategory] = useState('Tất cả');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [suggestions, setSuggestions] = useState([]);
-  const searchRef = useRef(null);
+  const [searchQuery, setSearchQuery]       = useState('');
+  const [suggestions, setSuggestions]       = useState([]);
 
-  const allSuggestions = useMemo(() => {
-    const titles = NEWS_ARTICLES.map(a => a.title);
-    const tags   = [...new Set(NEWS_ARTICLES.flatMap(a => a.tags || []))];
-    const authors = [...new Set(NEWS_ARTICLES.map(a => a.author))];
-    return [...titles, ...tags, ...authors];
-  }, []);
+  // Pagination
+  const [page, setPage]               = useState(0);
+  const [totalPages, setTotalPages]   = useState(0);
+  const PAGE_SIZE = 12;
 
-  const handleSearchChange = (val) => {
-    setSearchQuery(val);
-    if (val.trim().length < 2) { setSuggestions([]); return; }
-    setSuggestions(allSuggestions.filter(s => s.toLowerCase().includes(val.toLowerCase())).slice(0, 6));
-  };
+  const searchRef  = useRef(null);
+  const debounceRef = useRef(null);
 
+  // Fetch news
+  const fetchNews = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await newsService.getAll({ page, size: PAGE_SIZE, sort: 'id,desc' });
+      const content = data?.content ?? data ?? [];
+      setArticles(Array.isArray(content) ? content : []);
+      setTotalPages(data?.totalPages ?? 1);
+    } catch {
+      setError('Không thể tải tin tức. Vui lòng thử lại!');
+      setArticles([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [page]);
+
+  useEffect(() => { fetchNews(); }, [fetchNews]);
+  useEffect(() => { setPage(0); }, [activeCategory]);
+
+  // Close suggestions on outside click
   useEffect(() => {
     const handler = e => { if (searchRef.current && !searchRef.current.contains(e.target)) setSuggestions([]); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const filtered = NEWS_ARTICLES.filter(a => {
-    const matchCat = activeCategory === 'Tất cả' || a.category === activeCategory;
-    const matchSearch = !searchQuery || a.title.toLowerCase().includes(searchQuery.toLowerCase()) || a.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
+  const handleSearchChange = (val) => {
+    setSearchQuery(val);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      if (val.trim().length < 2) { setSuggestions([]); return; }
+      setSuggestions(articles.map(a => a.title).filter(t => t.toLowerCase().includes(val.toLowerCase())).slice(0, 6));
+    }, 300);
+  };
+
+  // Client-side filter: category + search
+  const filtered = articles.filter(a => {
+    const cat = detectCategory(a);
+    const matchCat = activeCategory === 'Tất cả' || cat === activeCategory;
+    const matchSearch = !searchQuery ||
+      a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (a.content || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchSearch;
   });
 
-  const featured = NEWS_ARTICLES[1]; // Oppenheimer as featured
+  const featured = articles[0];
 
   return (
     <div className="min-h-screen bg-cinema-black">
       {/* Hero Banner */}
       <div className="relative h-[420px] overflow-hidden">
-        <img
-          src={featured.coverImage}
-          alt={featured.title}
-          className="w-full h-full object-cover"
-          onError={e => { e.target.src = 'https://via.placeholder.com/1280x420/1a1a2e/e5b85c?text=CinemaBook'; }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-cinema-black/80 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 px-6 pb-10 max-w-7xl mx-auto">
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <span className={`inline-block text-xs font-semibold px-3 py-1 rounded-full border mb-4 ${categoryColor[featured.category]}`}>
-              ✨ Bài viết nổi bật
-            </span>
-            <h1 className="font-heading font-bold text-white text-3xl md:text-4xl max-w-2xl leading-tight mb-3">
-              {featured.title}
-            </h1>
-            <p className="text-cinema-muted max-w-xl leading-relaxed mb-5 text-sm">{featured.excerpt}</p>
-            <div className="flex items-center gap-4">
-              <Link
-                to={`/news/${featured.id}`}
-                className="btn-primary px-6 py-2.5 text-sm inline-flex items-center gap-2"
-              >
-                Đọc ngay
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </Link>
-              <div className="flex items-center gap-2 text-cinema-muted text-sm">
-                <StarRating value={featured.rating / 2} />
-                <span className="font-bold text-primary">{featured.rating}/10</span>
-              </div>
+        {featured ? (
+          <>
+            <img
+              src={featured.imageUrl || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1280&q=80'}
+              alt={featured.title}
+              className="w-full h-full object-cover"
+              onError={e => { e.target.src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1280&q=80'; }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-cinema-black via-cinema-black/60 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-cinema-black/80 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 px-6 pb-10 max-w-7xl mx-auto">
+              <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+                <span className={`inline-block text-xs font-semibold px-3 py-1 rounded-full border mb-4 ${categoryColor[detectCategory(featured)]}`}>
+                  ✨ Bài viết mới nhất
+                </span>
+                <h1 className="font-heading font-bold text-white text-3xl md:text-4xl max-w-2xl leading-tight mb-3 line-clamp-2">
+                  {featured.title}
+                </h1>
+                <p className="text-cinema-muted max-w-xl leading-relaxed mb-5 text-sm line-clamp-2">
+                  {featured.content?.replace(/<[^>]*>/g, '').slice(0, 180)}...
+                </p>
+                <Link to={`/news/${featured.id}`} className="btn-primary px-6 py-2.5 text-sm inline-flex items-center gap-2">
+                  Đọc ngay
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </Link>
+              </motion.div>
             </div>
-          </motion.div>
-        </div>
+          </>
+        ) : (
+          // Loading hero
+          <div className="absolute inset-0 bg-cinema-dark animate-pulse" />
+        )}
       </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-10">
-        {/* Filter + Search bar */}
+        {/* Filter + Search */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map(cat => (
@@ -330,9 +222,7 @@ export default function News() {
                     ? 'bg-primary text-cinema-black border-primary'
                     : 'bg-cinema-surface text-cinema-muted border-cinema-border hover:border-primary/40 hover:text-primary'
                 }`}
-              >
-                {cat}
-              </button>
+              >{cat}</button>
             ))}
           </div>
           <div className="relative" ref={searchRef}>
@@ -370,10 +260,23 @@ export default function News() {
           <h2 className="font-heading font-bold text-white text-xl">
             {activeCategory === 'Tất cả' ? 'Tất cả bài viết' : activeCategory}
           </h2>
-          <span className="text-cinema-muted text-sm">({filtered.length} bài)</span>
+          {!loading && <span className="text-cinema-muted text-sm">({filtered.length} bài)</span>}
         </div>
 
-        {filtered.length === 0 ? (
+        {/* Error */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-red-400 text-sm mb-6 flex items-center gap-2">
+            ⚠️ {error}
+            <button onClick={fetchNews} className="ml-auto underline text-xs">Thử lại</button>
+          </div>
+        )}
+
+        {/* Grid */}
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-20 text-cinema-muted">
             <span className="text-5xl block mb-4">📭</span>
             Không tìm thấy bài viết nào
@@ -383,6 +286,31 @@ export default function News() {
             {filtered.map((article, i) => (
               <ArticleCard key={article.id} article={article} index={i} />
             ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-10">
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-4 py-2 rounded-lg text-sm text-cinema-muted hover:text-white disabled:opacity-30 border border-cinema-border hover:border-primary/40 transition-all"
+            >← Trước</button>
+            {[...Array(Math.min(5, totalPages))].map((_, i) => {
+              const startPage = Math.max(0, Math.min(page - 2, totalPages - 5));
+              const p = startPage + i;
+              return (
+                <button key={p} onClick={() => setPage(p)}
+                  className={`w-9 h-9 rounded-lg text-sm font-medium transition-all ${p === page ? 'bg-primary text-cinema-black' : 'text-cinema-muted hover:text-white border border-cinema-border hover:border-primary/40'}`}
+                >{p + 1}</button>
+              );
+            })}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="px-4 py-2 rounded-lg text-sm text-cinema-muted hover:text-white disabled:opacity-30 border border-cinema-border hover:border-primary/40 transition-all"
+            >Sau →</button>
           </div>
         )}
       </div>

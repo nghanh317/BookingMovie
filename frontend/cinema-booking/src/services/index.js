@@ -9,3 +9,7 @@ export { default as cinemaService } from './cinemaService';
 export { default as bookingService } from './bookingService';
 export { default as accountService } from './accountService';
 export { default as favoriteService } from './favoriteService';
+export { default as newsService } from './newsService';
+export { default as seatLockService } from './seatLockService';
+
+

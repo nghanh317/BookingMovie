@@ -1,81 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import reviewService from '../../services/reviewService';
 import useAuthStore from '../../store/authStore';
 import useFavoriteStore from '../../store/favoriteStore';
 import useNotificationStore from '../../store/notificationStore';
-import { MOVIES } from '../../constants/mockData';
+import accountService from '../../services/accountService';
+import ticketService from '../../services/ticketService';
+import movieService from '../../services/movieService';
 import MovieCard from '../../components/movie/MovieCard';
 import { RANKS, POINT_EARN_EXAMPLES, getRankByPoints, getRankProgress } from '../../constants/rankingConfig';
 
-// Mock booking history data
-const MOCK_BOOKINGS = [
-  {
-    id: 'CB2F4A9K',
-    movie: 'Avengers: Secret Wars',
-    poster: 'https://images.unsplash.com/photo-1635805737707-575885ab0820?w=120&q=80',
-    cinema: 'CGV Vincom Center',
-    date: '2026-03-15',
-    time: '19:00',
-    type: 'IMAX',
-    hall: 'IMAX Hall',
-    seats: ['E5', 'E6'],
-    total: 260000,
-    status: 'completed',
-  },
-  {
-    id: 'CB8B1XPZ',
-    movie: 'Godzilla vs. Kong',
-    poster: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=120&q=80',
-    cinema: 'Lotte Cinema Landmark',
-    date: '2026-03-20',
-    time: '15:30',
-    type: '3D',
-    hall: 'Hall A',
-    seats: ['C3', 'C4', 'C5'],
-    total: 390000,
-    status: 'upcoming',
-  },
-  {
-    id: 'CB3K7RNM',
-    movie: 'Venom: The Last Dance',
-    poster: 'https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=120&q=80',
-    cinema: 'CGV Vincom Center',
-    date: '2026-02-20',
-    time: '21:30',
-    type: '2D',
-    hall: 'Cinema 3',
-    seats: ['F7'],
-    total: 79250,
-    status: 'completed',
-  },
-  {
-    id: 'CB9L2WQX',
-    movie: 'Spider-Man: Beyond the Spider-Verse',
-    poster: 'https://images.unsplash.com/photo-1559163499-413811fb2344?w=120&q=80',
-    cinema: 'BHD Star Cineplex',
-    date: '2026-04-05',
-    time: '10:00',
-    type: '2D',
-    hall: 'Cinema 2',
-    seats: ['B4', 'B5'],
-    total: 157500,
-    status: 'upcoming',
-  },
-];
 
-const MOCK_USER = {
-  name: 'Nguyễn Văn An',
-  email: 'nguyenvanan@email.com',
-  phone: '0912345678',
-  avatar: null,
-  joinDate: '2024-09-01',
-  totalBookings: 12,
-  totalSpent: 1450000,
-  memberLevel: 'Gold',
-  points: 2450,
-};
+
 
 const STATUS_CONFIG = {
   upcoming: { label: 'Sắp tới', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
@@ -176,19 +112,102 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState(tabParam || 'overview');
   const [filterStatus, setFilterStatus] = useState('all');
   const [editMode, setEditMode] = useState(false);
-  const [userData, setUserData] = useState(MOCK_USER);
-  const [formData, setFormData] = useState({ ...MOCK_USER });
-  const [ownedVouchers, setOwnedVouchers] = useState([
-    { id: '1', code: 'GOLD20', desc: 'Giảm 20% cho lần đặt vé tiếp theo', exp: '31/03/2026', color: 'border-primary/40 bg-primary/5' },
-    { id: '2', code: 'WEEKEND15', desc: 'Giảm 15% vào cuối tuần', exp: '15/04/2026', color: 'border-blue-500/40 bg-blue-500/5' },
-    { id: '3', code: 'POPCORNFREE', desc: 'Tặng 1 bắp ngọt lớn khi mua 2 vé', exp: '20/04/2026', color: 'border-green-500/40 bg-green-500/5' },
-  ]);
+
+  // Real data state
+  const [userData, setUserData] = useState(null);
+  const [formData, setFormData] = useState({});
+  const [bookings, setBookings] = useState([]);
+  const [allMovies, setAllMovies] = useState([]);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+
+  const [ownedVouchers, setOwnedVouchers] = useState([]);
 
   const redeemableOffers = [
     { id: 'r1', code: 'POINT50K', title: 'Voucher 50.000đ', points: 500, desc: 'Giảm trực tiếp 50k vào tổng hóa đơn', color: 'border-orange-500/40 bg-orange-500/5' },
     { id: 'r2', code: 'FREE2D', title: 'Vé xem phim 2D', points: 1000, desc: 'Đổi 1 vé xem phim 2D miễn phí', color: 'border-blue-500/40 bg-blue-500/5' },
     { id: 'r3', code: 'VIPCOMBO', title: 'Combo Bắp Nước VIP', points: 800, desc: '2 nước lớn + 1 bắp phô mai lớn', color: 'border-primary/40 bg-primary/5' },
   ];
+
+  // Fetch user info
+  useEffect(() => {
+    const userId = user?.id || user?.userId;
+    if (!userId) { setProfileLoading(false); return; }
+    accountService.getById(userId)
+      .then(data => {
+        const info = {
+          name: data.fullName || data.userName || 'Người dùng',
+          email: data.email || '',
+          phone: data.phone || '',
+          joinDate: data.createDate ? new Date(data.createDate).toISOString().split('T')[0] : '',
+          points: 0, // điểm tích lũy — tính từ tickets nếu cần
+          totalBookings: 0,
+          totalSpent: 0,
+        };
+        setUserData(info);
+        setFormData(info);
+      })
+      .catch(() => {
+        // Fallback từ user trong store
+        const info = {
+          name: user?.fullName || user?.userName || 'Người dùng',
+          email: user?.email || '',
+          phone: user?.phone || '',
+          joinDate: '',
+          points: 0,
+          totalBookings: 0,
+          totalSpent: 0,
+        };
+        setUserData(info);
+        setFormData(info);
+      })
+      .finally(() => setProfileLoading(false));
+  }, [user]);
+
+  // Fetch tickets của user
+  useEffect(() => {
+    const userId = user?.id || user?.userId;
+    if (!userId) { setBookingsLoading(false); return; }
+    ticketService.getAll({ accountId: userId, size: 200 })
+      .then(res => {
+        const list = Array.isArray(res?.content) ? res.content
+          : Array.isArray(res?.data?.content) ? res.data.content
+          : Array.isArray(res) ? res : [];
+        // Normalize ticket → BookingCard format
+        const normalized = list.map(t => {
+          const now = new Date();
+          const ticketDate = t.ticketsDate ? new Date(t.ticketsDate) : null;
+          const isUpcoming = ticketDate && ticketDate > now;
+          const seatLabels = (t.seats || []).map(s => `${s.seatsRow || ''}${s.seatsNumber || ''}`).filter(Boolean);
+          return {
+            id: t.ticketsCode || `#${t.id}`,
+            ticketId: t.id,
+            movie: t.note || 'Vé xem phim',  // TicketDTO không có movieName; dùng note hoặc để trống
+            poster: null,
+            cinema: '',
+            date: ticketDate ? ticketDate.toISOString().split('T')[0] : '',
+            time: ticketDate ? ticketDate.toTimeString().slice(0, 5) : '',
+            type: '',
+            seats: seatLabels,
+            total: parseFloat(t.finalAmount || t.totalAmount || 0),
+            status: t.paymentStatus === 'PAID' ? (isUpcoming ? 'upcoming' : 'completed') : 'pending',
+            rawPaymentStatus: t.paymentStatus,
+          };
+        });
+        setBookings(normalized);
+        // Cập nhật stats
+        const paid = normalized.filter(t => t.rawPaymentStatus === 'PAID');
+        const totalSpent = paid.reduce((sum, t) => sum + t.total, 0);
+        setUserData(prev => prev ? { ...prev, totalBookings: paid.length, totalSpent, points: Math.floor(totalSpent / 10000) } : prev);
+      })
+      .catch(err => console.error('[Profile] fetch tickets error:', err.message))
+      .finally(() => setBookingsLoading(false));
+  }, [user]);
+
+  // Fetch all movies (for favorites tab)
+  useEffect(() => {
+    movieService.getAll().then(data => setAllMovies(Array.isArray(data) ? data : [])).catch(() => {});
+  }, []);
 
   // Review Modal state
   const [reviewModal, setReviewModal] = useState({ open: false, booking: null });
@@ -197,21 +216,29 @@ export default function Profile() {
   const [showPointsTable, setShowPointsTable] = useState(false);
 
   const filteredBookings = filterStatus === 'all'
-    ? MOCK_BOOKINGS.filter(b => b.status !== 'cancelled')
-    : MOCK_BOOKINGS.filter(b => b.status === filterStatus && b.status !== 'cancelled');
+    ? bookings.filter(b => b.status !== 'cancelled')
+    : bookings.filter(b => b.status === filterStatus && b.status !== 'cancelled');
 
   useEffect(() => {
-    if (tabParam) {
-      setActiveTab(tabParam);
-    }
+    if (tabParam) setActiveTab(tabParam);
   }, [tabParam]);
 
-  // Cuộn lên đầu trang mỗi khi chuyển đổi activeTab
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [activeTab]);
+  useEffect(() => { window.scrollTo(0, 0); }, [activeTab]);
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
+    const userId = user?.id || user?.userId;
+    if (userId) {
+      try {
+        await accountService.update(userId, {
+          fullName: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+        });
+        addNotification({ type: 'success', title: 'Cập nhật thành công', message: 'Thông tin cá nhân đã được lưu.' });
+      } catch {
+        addNotification({ type: 'error', title: 'Lỗi', message: 'Không thể cập nhật thông tin.' });
+      }
+    }
     setUserData({ ...formData });
     setEditMode(false);
   };
@@ -225,18 +252,6 @@ export default function Profile() {
   const handleSubmitReview = (e) => {
     e.preventDefault();
     if (!reviewForm.rating || !reviewForm.comment.trim()) return;
-    
-    // Simulate API call and save to reviewService
-    reviewService.create({
-      // Vì booking.movie là chuỗi, ta fake movieId (thực tế cần ID của phim từ history)
-      movieId: 1, // Mock
-      userId: user?.id || user?.userId || 0,
-      userName: user?.fullName || user?.userName || userData.name,
-      userInitials: 'MB',
-      rating: reviewForm.rating,
-      comment: reviewForm.comment,
-    });
-
     setTimeout(() => {
       setReviewSuccess(true);
       setTimeout(() => {
@@ -258,6 +273,15 @@ export default function Profile() {
     ]);
     addNotification({ type: 'success', title: 'Đổi ưu đãi thành công', message: `Bạn đã đổi thành công ${offer.title} với ${offer.points} điểm.` });
   };
+
+  // Loading skeleton khi chưa có userData
+  if (profileLoading || !userData) {
+    return (
+      <div className="min-h-screen py-8 flex items-center justify-center">
+        <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-8">
@@ -347,16 +371,19 @@ export default function Profile() {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {MOCK_BOOKINGS.slice(0, 2).map(b => (
+                  {bookingsLoading ? (
+                    <p className="text-cinema-muted text-xs animate-pulse text-center py-4">Đang tải lịch sử vé...</p>
+                  ) : bookings.length === 0 ? (
+                    <p className="text-cinema-muted text-xs text-center py-4">Chưa có vé nào.</p>
+                  ) : bookings.slice(0, 2).map(b => (
                     <div key={b.id} className="flex gap-3 items-center">
-                      <img src={b.poster} alt={b.movie} className="w-10 h-14 object-cover rounded-lg flex-shrink-0"
-                        onError={e => { e.target.src = 'https://placehold.co/60x84/1E1E2C/A0A0B4'; }} />
+                      <div className="w-10 h-14 flex-shrink-0 rounded-lg bg-cinema-dark border border-cinema-border flex items-center justify-center text-2xl">🎟️</div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-medium truncate">{b.movie}</p>
-                        <p className="text-cinema-muted text-xs">{new Date(b.date).toLocaleDateString('vi-VN')}</p>
+                        <p className="text-white text-sm font-medium truncate">{b.id}</p>
+                        <p className="text-cinema-muted text-xs">{b.date || 'N/A'} · {b.total.toLocaleString('vi-VN')}đ</p>
                       </div>
-                      <span className={`badge border text-xs ${STATUS_CONFIG[b.status].color}`}>
-                        {STATUS_CONFIG[b.status].label}
+                      <span className={`badge border text-xs ${STATUS_CONFIG[b.status]?.color || 'bg-cinema-border/30 text-cinema-muted'}`}>
+                        {STATUS_CONFIG[b.status]?.label || b.status}
                       </span>
                     </div>
                   ))}
@@ -434,7 +461,12 @@ export default function Profile() {
 
               {/* Booking list */}
               <div className="space-y-3">
-                {filteredBookings.length > 0 ? (
+                {bookingsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+                    <span className="text-cinema-muted ml-3 text-sm">Đang tải vé...</span>
+                  </div>
+                ) : filteredBookings.length > 0 ? (
                   filteredBookings.map(b => <BookingCard key={b.id} booking={b} onRate={handleOpenReview} />)
                 ) : (
                   <div className="text-center py-16">
@@ -457,7 +489,7 @@ export default function Profile() {
             >
               {favorites.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {MOVIES.filter(m => favorites.includes(m.id)).map((movie, index) => (
+                  {allMovies.filter(m => favorites.includes(m.id)).map((movie, index) => (
                     <MovieCard key={movie.id} movie={movie} index={index} />
                   ))}
                 </div>
@@ -714,6 +746,19 @@ export default function Profile() {
                     </div>
                   ))}
                 </div>
+
+                {/* Ngày tạo — readonly */}
+                {userData.joinDate && (
+                  <div className="mt-4 pt-4 border-t border-cinema-border/50">
+                    <label className="block text-cinema-muted text-xs mb-1.5">📅 Ngày tạo tài khoản</label>
+                    <p className="text-white py-3 px-4 bg-cinema-surface rounded-lg border border-cinema-border text-sm flex items-center gap-2">
+                      {new Date(userData.joinDate).toLocaleDateString('vi-VN', {
+                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                      })}
+                      <span className="text-cinema-muted text-xs ml-auto">Không thể thay đổi</span>
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Change Password */}

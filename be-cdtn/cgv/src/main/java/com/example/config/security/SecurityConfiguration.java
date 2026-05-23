@@ -1,4 +1,4 @@
-package com.example.config.security;
+﻿package com.example.config.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -46,7 +46,7 @@ public class SecurityConfiguration {
 				.cors(withDefaults())
 				.csrf((csrf) -> csrf.disable())
 				.authorizeHttpRequests((requests) -> requests
-						// Chatbot AI - ưu tiên cao nhất
+						// Chatbot AI - Æ°u tiÃªn cao nháº¥t
 						.requestMatchers("/api/v1/ai/**").permitAll()
 						.requestMatchers("/api/v1/accounts/**").permitAll()
 						// Movie
@@ -100,6 +100,15 @@ public class SecurityConfiguration {
 						.requestMatchers("/api/v1/auth/**").permitAll()
 						.requestMatchers("/api/v1/tickets/**").permitAll()
 						.requestMatchers("/api/v1/payments/**").permitAll()
+						// SEAT LOCKS - GET public (ai cũng xem được ghế đang giữ), POST/DELETE cần login
+						.requestMatchers(HttpMethod.GET, "/api/v1/seat-locks/**").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/seat-locks/**").hasAnyAuthority("USER", "ADMIN")
+						.requestMatchers(HttpMethod.DELETE, "/api/v1/seat-locks/**").hasAnyAuthority("USER", "ADMIN")
+						// NEWS - public read, admin write
+						.requestMatchers(HttpMethod.GET, "/api/v1/news/**").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/news/**").hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasAuthority("ADMIN")
+						.requestMatchers(HttpMethod.DELETE, "/api/v1/news/**").hasAuthority("ADMIN")
 						.requestMatchers("/error").permitAll()
 						.requestMatchers("/api/v1/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -127,3 +136,5 @@ public class SecurityConfiguration {
 		return new BCryptPasswordEncoder();
 	}
 }
+
+
