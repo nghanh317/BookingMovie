@@ -6,4 +6,5 @@ import lombok.Data;
 public class MovieReviewFilterForm {
 
 	private Byte rating;
+	private Integer movieId;
 }

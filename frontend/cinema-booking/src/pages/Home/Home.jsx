@@ -174,30 +174,34 @@ export default function Home() {
       setStats(prev => ({ ...prev, cinemas: data.length > 0 ? `${data.length}+` : '0' }));
     }).catch(() => {});
 
-    // Fetch số vé PAID — chỉ cần totalElements từ page
-    ticketService.getAll({ size: 1, paymentStatus: 'PAID' }).then(res => {
-      const total = res?.totalElements ?? res?.total ?? null;
-      if (total !== null) {
-        const display = total >= 1000
-          ? `${(total / 1000).toFixed(0)}K+`
-          : total > 0 ? `${total}+` : '0';
-        setStats(prev => ({ ...prev, tickets: display }));
-      }
+    // Fetch số vé PAID
+    ticketService.getAll({ size: 1000, paymentStatus: 'PAID' }).then(res => {
+      let content = [];
+      if (Array.isArray(res?.content)) content = res.content;
+      else if (Array.isArray(res?.data?.content)) content = res.data.content;
+      else if (Array.isArray(res?.data)) content = res.data;
+      else if (Array.isArray(res)) content = res;
+
+      // Tính tổng số lượng ghế đã đặt từ tất cả vé PAID
+      const total = content.reduce((sum, ticket) => sum + (ticket.seats ? ticket.seats.length : 0), 0);
+      const display = total > 0 ? total.toLocaleString() : '0';
+      setStats(prev => ({ ...prev, tickets: display }));
     }).catch(() => {});
 
     // Fetch rating TB từ movie-reviews
     api.get('/v1/movie-reviews', { params: { size: 1000, page: 0 } }).then(res => {
-      console.log('[Home] movie-reviews raw:', res.data);
-      // Backend trả Page<MovieReviewDTO>: { content: [], totalElements: N, ... }
       let reviews = [];
       if (Array.isArray(res.data?.content)) reviews = res.data.content;
+      else if (Array.isArray(res.data?.data?.content)) reviews = res.data.data.content;
+      else if (Array.isArray(res.data?.data)) reviews = res.data.data;
       else if (Array.isArray(res.data)) reviews = res.data;
 
       if (reviews.length > 0) {
         const validRatings = reviews.map(r => r.rating).filter(r => typeof r === 'number' && r > 0);
         if (validRatings.length > 0) {
           const avg = validRatings.reduce((sum, r) => sum + r, 0) / validRatings.length;
-          setStats(prev => ({ ...prev, rating: avg.toFixed(1) }));
+          // Làm tròn đúng như database
+          setStats(prev => ({ ...prev, rating: Math.round(avg * 10) / 10 }));
         } else {
           setStats(prev => ({ ...prev, rating: '—' }));
         }
@@ -205,7 +209,7 @@ export default function Home() {
         setStats(prev => ({ ...prev, rating: '—' }));
       }
     }).catch(err => {
-      console.error('[Home] movie-reviews error:', err.response?.status, err.message);
+      console.error('[Home] movie-reviews error:', err?.response?.status, err?.message);
       setStats(prev => ({ ...prev, rating: '—' }));
     });
 

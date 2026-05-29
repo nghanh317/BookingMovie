@@ -24,6 +24,10 @@ public class MovieReviewSpecification {
 		where = where.and(ratingSpe);
 	}
 	
+	if (filterform.getMovieId() != null) {
+		CustomSpecification movieSpe = new CustomSpecification("movieId", filterform.getMovieId());
+		where = where.and(movieSpe);
+	}
 	
 	return where;
 	}
@@ -47,6 +51,11 @@ public class MovieReviewSpecification {
 		if ( field.equalsIgnoreCase("rating")) {
 			return criteriaBuilder.equal(root.get("rating"), value);
 		}
+		
+		if (field.equalsIgnoreCase("movieId")) {
+			return criteriaBuilder.equal(root.get("movie").get("id"), value);
+		}
+		
 		return null;
 		}
 		

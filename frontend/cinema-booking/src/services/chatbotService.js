@@ -17,7 +17,8 @@ const chatbotService = {
    */
   chat: async (prompt) => {
     const res = await api.post('/v1/ai/chat', { prompt });
-    return res.data;
+    const data = res.data?.data || res.data;
+    return data.response || data;
   },
 };
 

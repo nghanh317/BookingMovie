@@ -34,6 +34,18 @@ public class MovieReviewService implements IMovieReviewService{
 	@Autowired
 	private ModelMapper modelMapper;
 	
+	@Autowired
+	private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+	@jakarta.annotation.PostConstruct
+	public void dropUniqueIndex() {
+		try {
+			jdbcTemplate.execute("ALTER TABLE movie_reviews DROP INDEX account_id_2");
+		} catch (Exception e) {
+			// Ignore if index doesn't exist
+		}
+	}
+
 	@Override
 	public Page<MovieReviewDTO> getAllMovieReview(Pageable pageable, MovieReviewFilterForm filterform) {
 		Specification<MovieReviews> where = MovieReviewSpecification.buildWhere(filterform);
@@ -53,17 +65,30 @@ public class MovieReviewService implements IMovieReviewService{
 			throw new IllegalStateException("Bạn cần mua vé xem phim này trước khi đánh giá.");
 		}
 
-		MovieReviews createReview = new MovieReviews(form.getRating(), form.getComment());
+		java.util.Optional<MovieReviews> existingOpt = form.getTicketId() != null 
+				? movieReviewRepository.findByTicketId(form.getTicketId()) 
+				: java.util.Optional.empty();
 		
-		Accounts account = new Accounts();
-		account.setId(form.getAccountId());
-		createReview.setAccount(account);
-		
-		Movies movies = new Movies();
-		movies.setId(form.getMovieId());
-		createReview.setMovie(movies);
-		
-		movieReviewRepository.save(createReview);
+		if (existingOpt.isPresent()) {
+			MovieReviews existingReview = existingOpt.get();
+			existingReview.setRating(form.getRating());
+			existingReview.setComment(form.getComment());
+			movieReviewRepository.save(existingReview);
+		} else {
+			MovieReviews createReview = new MovieReviews(form.getRating(), form.getComment());
+			
+			Accounts account = new Accounts();
+			account.setId(form.getAccountId());
+			createReview.setAccount(account);
+			
+			Movies movies = new Movies();
+			movies.setId(form.getMovieId());
+			createReview.setMovie(movies);
+			
+			createReview.setTicketId(form.getTicketId());
+			
+			movieReviewRepository.save(createReview);
+		}
 	}
 
 	@Override

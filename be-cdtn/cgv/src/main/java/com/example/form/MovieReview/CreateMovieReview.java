@@ -12,4 +12,6 @@ public class CreateMovieReview {
 	private Double rating;
 	
 	private String comment;
+	
+	private Integer ticketId;
 }

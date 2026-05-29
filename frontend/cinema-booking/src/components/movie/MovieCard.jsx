@@ -1,18 +1,47 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AGE_RATINGS } from '../../constants/mockData';
 import useFavoriteStore from '../../store/favoriteStore';
 import useNotificationStore from '../../store/notificationStore';
+import api from '../../services/api';
 
 export default function MovieCard({ movie, index = 0 }) {
   const { isFavorite, toggleFavorite } = useFavoriteStore();
   const { addNotification } = useNotificationStore();
   const favorite = isFavorite(movie.id);
-  const rating = movie.rating;
+  
+  const [rating, setRating] = useState(movie.rating || 0);
+
+  useEffect(() => {
+    if (movie.id) {
+      api.get('/v1/movie-reviews', { params: { movieId: movie.id, size: 100 } })
+        .then(res => {
+          let data = [];
+          if (Array.isArray(res.data)) data = res.data;
+          else if (Array.isArray(res.data?.data)) data = res.data.data;
+          else if (Array.isArray(res.data?.content)) data = res.data.content;
+          else if (Array.isArray(res.data?.data?.content)) data = res.data.data.content;
+
+          if (data.length > 0) {
+            const validRatings = data.map(r => r.rating).filter(r => typeof r === 'number' && r > 0);
+            if (validRatings.length > 0) {
+               const avg = validRatings.reduce((sum, r) => sum + r, 0) / validRatings.length;
+               setRating(avg);
+            }
+          }
+        })
+        .catch(err => {
+          // Ignore error, keep default rating
+        });
+    }
+  }, [movie.id]);
+
   const ratingColor =
-    rating >= 8 ? 'text-green-400' :
-    rating >= 6.5 ? 'text-primary' :
+    rating >= 4 ? 'text-green-400' :
+    rating >= 3 ? 'text-primary' :
     'text-cinema-muted';
+
 
   const ageInfo = AGE_RATINGS[movie.ageRating];
 

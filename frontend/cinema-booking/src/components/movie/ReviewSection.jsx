@@ -4,13 +4,14 @@ import { Link } from 'react-router-dom';
 import reviewService, { formatReviewDate } from '../../services/reviewService';
 import useAuthStore from '../../store/authStore';
 import { checkContent } from '../../utils/contentFilter';
+import api from '../../services/api';
 
 /** Thanh sao đánh giá tương tác */
 function StarInput({ value, onChange }) {
   const [hovered, setHovered] = useState(0);
   return (
     <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
+      {[1, 2, 3, 4, 5].map((star) => (
         <button
           key={star}
           type="button"
@@ -21,7 +22,7 @@ function StarInput({ value, onChange }) {
           aria-label={`${star} sao`}
         >
           <svg
-            className={`w-5 h-5 transition-colors duration-150 ${
+            className={`w-6 h-6 transition-colors duration-150 ${
               (hovered || value) >= star ? 'text-primary' : 'text-cinema-border'
             }`}
             fill="currentColor"
@@ -32,7 +33,7 @@ function StarInput({ value, onChange }) {
         </button>
       ))}
       <span className="ml-2 text-white font-semibold text-sm">
-        {hovered || value ? `${hovered || value}/10` : ''}
+        {hovered || value ? `${hovered || value}/5` : ''}
       </span>
     </div>
   );
@@ -47,12 +48,12 @@ function StarDisplay({ rating }) {
 function RatingBadge({ rating }) {
   if (!rating) return null;
   const color =
-    rating >= 8 ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-    rating >= 5 ? 'bg-primary/20 text-primary border-primary/30' :
+    rating >= 4 ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+    rating >= 3 ? 'bg-primary/20 text-primary border-primary/30' :
     'bg-cinema-surface text-cinema-muted border-cinema-border';
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-lg border text-sm font-bold ${color}`}>
-      {rating}/10
+      {rating}/5
     </span>
   );
 }
@@ -68,22 +69,48 @@ export default function ReviewSection({ movieId }) {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [contentError, setContentError] = useState('');
 
-  const loadReviews = () => {
-    const data = reviewService.getByMovieId(movieId);
-    setReviews(data);
-    setAvgRating(reviewService.getAverageRating(movieId));
+  const [formRating, setFormRating] = useState(5);
+
+  const loadReviews = async () => {
+    try {
+      const res = await api.get('/v1/movie-reviews', { params: { movieId, size: 100 } });
+      let data = [];
+      if (Array.isArray(res.data)) data = res.data;
+      else if (Array.isArray(res.data?.data)) data = res.data.data;
+      else if (Array.isArray(res.data?.content)) data = res.data.content;
+      else if (Array.isArray(res.data?.data?.content)) data = res.data.data.content;
+
+      const mapped = data.map(r => ({
+        id: r.id,
+        userId: r.accountId,
+        userName: r.accountFullName || 'Khán giả',
+        userInitials: (r.accountFullName || 'K G').split(' ').map((n) => n[0]).slice(-2).join('').toUpperCase(),
+        rating: r.rating || 5, // backend trả về rating
+        comment: r.comment,
+        createdAt: r.createDate || new Date().toISOString(),
+        helpful: 0
+      }));
+      setReviews(mapped);
+      if (mapped.length > 0) {
+        setAvgRating(mapped.reduce((sum, r) => sum + r.rating, 0) / mapped.length);
+      } else {
+        setAvgRating(0);
+      }
+    } catch (err) {
+      console.error('Failed to load reviews:', err);
+    }
   };
 
   useEffect(() => {
     loadReviews();
     if (isLoggedIn && user) {
-      setCanReviewInfo(reviewService.canReview(user.id || user.userId, movieId));
+      setCanReviewInfo({ canReview: true, reason: '' });
     } else {
       setCanReviewInfo({ canReview: false, reason: 'Bạn cần đăng nhập để đánh giá phim.' });
     }
   }, [movieId, isLoggedIn, user]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formComment.trim()) return;
 
@@ -97,16 +124,11 @@ export default function ReviewSection({ movieId }) {
 
     setSubmitting(true);
     try {
-      const displayName = user?.fullName || user?.userName || 'Người dùng';
-      const initials = displayName.split(' ').map((n) => n[0]).slice(-2).join('').toUpperCase();
-
-      reviewService.create({
-        movieId,
-        userId: user?.id || user?.userId || 0,
-        userName: displayName,
-        userInitials: initials,
-        rating: 0,
-        comment: formComment,
+      await api.post('/v1/movie-reviews', {
+        accountId: user?.id || user?.userId,
+        movieId: movieId,
+        rating: formRating,
+        comment: formComment
       });
 
       setSubmitSuccess(true);
@@ -115,9 +137,9 @@ export default function ReviewSection({ movieId }) {
       setContentError('');
       loadReviews();
 
-      setCanReviewInfo(reviewService.canReview(user?.id || user?.userId, movieId));
-
       setTimeout(() => setSubmitSuccess(false), 3000);
+    } catch (err) {
+      setContentError(err.response?.data?.message || 'Có lỗi xảy ra khi gửi đánh giá.');
     } finally {
       setSubmitting(false);
     }
@@ -186,7 +208,12 @@ export default function ReviewSection({ movieId }) {
                 ✍️ Viết Bình Luận Của Bạn
               </h3>
 
-
+              <div className="mb-5">
+                <label className="block text-cinema-muted text-sm mb-2 font-medium">
+                  Điểm đánh giá <span className="text-red-400">*</span>
+                </label>
+                <StarInput value={formRating} onChange={setFormRating} />
+              </div>
 
               {/* Content error */}
               {contentError && (
@@ -274,7 +301,7 @@ export default function ReviewSection({ movieId }) {
                 {avgRating}
               </div>
             </div>
-            <div className="text-cinema-muted text-sm mt-2">trên thang điểm 10</div>
+            <div className="text-cinema-muted text-sm mt-2">trên thang điểm 5</div>
             <div className="text-cinema-muted text-xs mt-3">{reviews.length} lượt đánh giá</div>
           </div>
         </div>

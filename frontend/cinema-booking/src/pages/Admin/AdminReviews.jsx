@@ -1,15 +1,15 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MOVIES, REVIEWS } from '../../constants/mockData';
+import api from '../../services/api';
 import useNotificationStore from '../../store/notificationStore';
 
 function StarBar({ rating }) {
   return (
     <div className="flex items-center gap-0.5">
-      {[1,2,3,4,5,6,7,8,9,10].map(i => (
-        <div key={i} className={`h-1.5 w-2.5 rounded-sm ${i <= rating ? 'bg-primary' : 'bg-cinema-border'}`} />
+      {[1,2,3,4,5].map(i => (
+        <div key={i} className={`h-1.5 w-3.5 rounded-sm ${i <= rating ? 'bg-primary' : 'bg-cinema-border'}`} />
       ))}
-      <span className="text-primary text-xs font-bold ml-1">{rating}/10</span>
+      <span className="text-primary text-xs font-bold ml-1">{rating}/5</span>
     </div>
   );
 }
@@ -48,14 +48,16 @@ function ReviewCard({ review, onHide, onDelete, hidden }) {
       <StarBar rating={review.rating} />
       <p className="text-cinema-muted text-xs mt-1.5 leading-relaxed line-clamp-3">{review.comment}</p>
       <div className="flex items-center gap-2 mt-1.5">
-        <span className="text-cinema-muted text-[10px]">👍 {review.helpful} người thấy hữu ích</span>
+        <span className="text-cinema-muted text-[10px]">👍 {review.helpful || 0} người thấy hữu ích</span>
       </div>
     </div>
   );
 }
 
 export default function AdminReviews() {
-  const [reviews, setReviews]       = useState(REVIEWS);
+  const [reviews, setReviews]       = useState([]);
+  const [movies, setMovies]         = useState([]);
+  const [loading, setLoading]       = useState(true);
   const [hiddenIds, setHiddenIds]   = useState(new Set());
   const [search, setSearch]         = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -63,12 +65,56 @@ export default function AdminReviews() {
   const searchRef = useRef(null);
   const { addNotification } = useNotificationStore();
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [moviesRes, reviewsRes] = await Promise.all([
+          api.get('/v1/movies', { params: { size: 1000 } }),
+          api.get('/v1/movie-reviews', { params: { size: 1000 } })
+        ]);
+        
+        let moviesData = [];
+        if (Array.isArray(moviesRes.data)) moviesData = moviesRes.data;
+        else if (Array.isArray(moviesRes.data?.data)) moviesData = moviesRes.data.data;
+        else if (Array.isArray(moviesRes.data?.content)) moviesData = moviesRes.data.content;
+        else if (Array.isArray(moviesRes.data?.data?.content)) moviesData = moviesRes.data.data.content;
+        setMovies(moviesData);
+
+        let reviewsData = [];
+        if (Array.isArray(reviewsRes.data)) reviewsData = reviewsRes.data;
+        else if (Array.isArray(reviewsRes.data?.data)) reviewsData = reviewsRes.data.data;
+        else if (Array.isArray(reviewsRes.data?.content)) reviewsData = reviewsRes.data.content;
+        else if (Array.isArray(reviewsRes.data?.data?.content)) reviewsData = reviewsRes.data.data.content;
+        
+        const mappedReviews = reviewsData.map(r => ({
+          id: r.id,
+          movieId: r.movieId,
+          userId: r.accountId,
+          userName: r.accountFullName || 'Khán giả',
+          userInitials: (r.accountFullName || 'K G').split(' ').map(n => n[0]).slice(-2).join('').toUpperCase(),
+          rating: r.rating || 5,
+          comment: r.comment,
+          createdAt: r.createDate || new Date().toISOString(),
+          helpful: 0
+        }));
+        setReviews(mappedReviews);
+      } catch (error) {
+        console.error('Lỗi khi tải dữ liệu:', error);
+        addNotification({ title: 'Lỗi', message: 'Không thể tải danh sách đánh giá', type: 'error', isAdmin: true });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
   // Autocomplete
   const allSuggestions = useMemo(() => {
-    const titles  = MOVIES.map(m => m.title);
+    const titles  = movies.map(m => m.title);
     const users   = [...new Set(reviews.map(r => r.userName))];
     return [...titles, ...users];
-  }, [reviews]);
+  }, [reviews, movies]);
 
   const handleSearchChange = (val) => {
     setSearch(val);
@@ -87,12 +133,12 @@ export default function AdminReviews() {
     if (!search.trim()) return reviews;
     const q = search.toLowerCase();
     return reviews.filter(r => {
-      const movie = MOVIES.find(m => m.id === r.movieId);
+      const movie = movies.find(m => m.id === r.movieId);
       return (movie?.title || '').toLowerCase().includes(q)
         || r.userName.toLowerCase().includes(q)
         || r.comment.toLowerCase().includes(q);
     });
-  }, [reviews, search]);
+  }, [reviews, search, movies]);
 
   // Group by movie
   const grouped = useMemo(() => {
@@ -113,23 +159,39 @@ export default function AdminReviews() {
     });
   };
 
-  const handleDelete = (id) => {
-    const r = reviews.find(x => x.id === id);
-    const movie = MOVIES.find(m => m.id === r?.movieId);
-    setReviews(prev => prev.filter(x => x.id !== id));
-    // Gửi thông báo đến người dùng (user-facing notification)
-    addNotification({
-      title: 'Đánh giá đã bị xóa',
-      message: `Đánh giá của bạn về phim "${movie?.title || ''}" đã bị xóa bởi quản trị viên do vi phạm chính sách cộng đồng.`,
-      type: 'warn',
-      isAdmin: false, // hiển thị phía user
-    });
-    addNotification({
-      title: 'Đã xóa đánh giá',
-      message: `Xóa đánh giá của ${r?.userName} về "${movie?.title}"`,
-      type: 'success',
-      isAdmin: true,
-    });
+  const handleDelete = async (id) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa đánh giá này vĩnh viễn?")) return;
+    
+    try {
+      await api.delete(`/v1/movie-reviews/${id}`);
+      
+      const r = reviews.find(x => x.id === id);
+      const movie = movies.find(m => m.id === r?.movieId);
+      
+      setReviews(prev => prev.filter(x => x.id !== id));
+      
+      // Gửi thông báo đến người dùng (user-facing notification)
+      addNotification({
+        title: 'Đánh giá đã bị xóa',
+        message: `Đánh giá của bạn về phim "${movie?.title || ''}" đã bị xóa bởi quản trị viên do vi phạm chính sách cộng đồng.`,
+        type: 'warn',
+        isAdmin: false, // hiển thị phía user
+      });
+      addNotification({
+        title: 'Đã xóa đánh giá',
+        message: `Xóa đánh giá của ${r?.userName || 'Khán giả'} về "${movie?.title || 'phim'}"`,
+        type: 'success',
+        isAdmin: true,
+      });
+    } catch (error) {
+      console.error("Lỗi khi xóa đánh giá:", error);
+      addNotification({
+        title: 'Lỗi',
+        message: 'Không thể xóa đánh giá này. Vui lòng thử lại.',
+        type: 'error',
+        isAdmin: true,
+      });
+    }
   };
 
   const toggleExpand = (movieId) => {
@@ -196,7 +258,11 @@ export default function AdminReviews() {
       </div>
 
       {/* Grouped by movie */}
-      {Object.keys(grouped).length === 0 ? (
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+        </div>
+      ) : Object.keys(grouped).length === 0 ? (
         <div className="text-center py-16 text-cinema-muted">
           <div className="text-4xl mb-3">💬</div>
           <p>Không tìm thấy đánh giá nào</p>
@@ -204,7 +270,7 @@ export default function AdminReviews() {
       ) : (
         <div className="space-y-6">
           {Object.entries(grouped).map(([movieId, movieReviews]) => {
-            const movie     = MOVIES.find(m => m.id === +movieId);
+            const movie     = movies.find(m => m.id === +movieId);
             const avgRating = (movieReviews.reduce((s, r) => s + r.rating, 0) / movieReviews.length).toFixed(1);
             const expanded  = expandedMovies[movieId];
             const displayed = expanded ? movieReviews : movieReviews.slice(0, PREVIEW_COUNT);
@@ -217,6 +283,7 @@ export default function AdminReviews() {
                     src={movie?.poster}
                     alt={movie?.title}
                     className="w-10 h-14 object-cover rounded flex-shrink-0"
+                    referrerPolicy="no-referrer"
                     onError={e => { e.target.src = 'https://placehold.co/50x70/1E1E2C/A0A0B4'; }}
                   />
                   <div className="flex-1 min-w-0">

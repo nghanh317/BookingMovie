@@ -299,6 +299,7 @@ export default function AdminMovies() {
                     <div className="flex items-center gap-3">
                       <img src={movie.poster} alt={movie.title}
                         className="w-10 h-14 object-cover rounded flex-shrink-0"
+                        referrerPolicy="no-referrer"
                         onError={e => { e.target.src = 'https://placehold.co/50x70/1E1E2C/A0A0B4'; }} />
                       <div>
                         <p className="text-white text-sm font-medium leading-snug max-w-[160px] truncate">{movie.title}</p>

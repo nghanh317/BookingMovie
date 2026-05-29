@@ -11,6 +11,9 @@ public class MovieReviewDTO {
 	
 	private Integer accountId;
 	
+	private String accountFullName;
+
+	
 	private Integer movieId;
 	
 	private Double rating;

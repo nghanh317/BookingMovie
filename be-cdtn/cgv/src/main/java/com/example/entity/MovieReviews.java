@@ -57,6 +57,9 @@ private Double rating;
 @Column (name = "comment")
 private String comment;
 
+@Column (name = "ticket_id")
+private Integer ticketId;
+
 @Column (name = "create_at")
 @Temporal (TemporalType.TIMESTAMP)
 @CreationTimestamp

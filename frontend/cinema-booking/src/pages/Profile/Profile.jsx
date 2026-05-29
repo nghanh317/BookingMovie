@@ -9,6 +9,7 @@ import ticketService from '../../services/ticketService';
 import movieService from '../../services/movieService';
 import MovieCard from '../../components/movie/MovieCard';
 import { RANKS, POINT_EARN_EXAMPLES, getRankByPoints, getRankProgress } from '../../constants/rankingConfig';
+import api from '../../services/api';
 
 
 
@@ -203,6 +204,7 @@ export default function Profile() {
           return {
             id: t.ticketsCode || `#${t.id}`,
             ticketId: t.id,
+            movieId: t.movieId,
             movie: t.movieName || t.note || 'Vé xem phim',
             poster: t.posterUrl || null,
             cinema: '',
@@ -270,16 +272,52 @@ export default function Profile() {
     setReviewSuccess(false);
   };
 
-  const handleSubmitReview = (e) => {
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (!reviewForm.rating || !reviewForm.comment.trim()) return;
-    setTimeout(() => {
+    const userId = user?.id || user?.userId;
+    let movieId = reviewModal.booking?.movieId;
+
+    if (!movieId) {
+      // Fallback: Tìm ID phim trong danh sách phim dựa trên tên phim
+      const matchedMovie = allMovies?.find(m => 
+        reviewModal.booking?.movie && m.title && 
+        (reviewModal.booking.movie === m.title || reviewModal.booking.movie.includes(m.title))
+      );
+      movieId = matchedMovie?.id;
+    }
+
+    if (!userId) {
+      addNotification({ type: 'error', title: 'Lỗi', message: 'Vui lòng đăng nhập để đánh giá.' });
+      return;
+    }
+    
+    if (!movieId) {
+      addNotification({ type: 'error', title: 'Lỗi', message: 'Không tìm thấy thông tin phim của vé này. Backend có thể chưa được khởi động lại.' });
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      await api.post('/v1/movie-reviews', {
+        accountId: userId,
+        movieId: movieId,
+        ticketId: reviewModal.booking?.ticketId,
+        rating: reviewForm.rating,
+        comment: reviewForm.comment
+      });
       setReviewSuccess(true);
       setTimeout(() => {
         setReviewModal({ open: false, booking: null });
         setReviewSuccess(false);
       }, 2000);
-    }, 500);
+    } catch (err) {
+      addNotification({ type: 'error', title: 'Lỗi', message: err.response?.data?.message || 'Có lỗi xảy ra khi gửi đánh giá.' });
+    } finally {
+      setSubmittingReview(false);
+    }
   };
 
   const handleRedeem = (offer) => {
@@ -903,10 +941,15 @@ export default function Profile() {
 
                   <button
                     type="submit"
-                    disabled={!reviewForm.rating || !reviewForm.comment.trim()}
-                    className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!reviewForm.rating || !reviewForm.comment.trim() || submittingReview}
+                    className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   >
-                    Gửi đánh giá
+                    {submittingReview ? (
+                      <>
+                        <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                        Đang gửi...
+                      </>
+                    ) : 'Gửi đánh giá'}
                   </button>
                 </form>
               )}

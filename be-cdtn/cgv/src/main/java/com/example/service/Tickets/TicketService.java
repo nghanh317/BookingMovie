@@ -82,6 +82,7 @@ public class TicketService implements ITicketService{
 		if (ticket.getSlots() != null && ticket.getSlots().getMovies() != null) {
 			dto.setMovieName(ticket.getSlots().getMovies().getTitle());
 			dto.setPosterUrl(ticket.getSlots().getMovies().getPosterUrl());
+			dto.setMovieId(ticket.getSlots().getMovies().getId());
 		}
 		dto.setTicketsCode(ticket.getTicketsCode());
 		dto.setQrCodeUrl(ticket.getQrCodeUrl());
