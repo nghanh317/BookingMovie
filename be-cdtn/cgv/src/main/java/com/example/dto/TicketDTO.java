@@ -46,6 +46,12 @@ public class TicketDTO {
 	private PaymentStatus paymentStatus;
 
 	private Status status;
+	
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private String movieName;
+	
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private String posterUrl;
 
 	private String note;
 	

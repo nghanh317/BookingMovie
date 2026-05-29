@@ -20,6 +20,7 @@ import Cinemas from './pages/Cinema/Cinemas';
 import TopMovies from './pages/TopMovies/TopMovies';
 import News from './pages/News/News';
 import NewsDetail from './pages/News/NewsDetail';
+import PaymentResult from './pages/Payment/PaymentResult';
 
 // Support pages
 import FAQ from './pages/Support/FAQ';
@@ -63,6 +64,7 @@ function App() {
         <Route path="/refund-policy" element={<Layout><RefundPolicy /></Layout>} />
         <Route path="/terms" element={<Layout><Terms /></Layout>} />
         <Route path="/privacy" element={<Layout><Privacy /></Layout>} />
+        <Route path="/payment-result" element={<Layout><PaymentResult /></Layout>} />
 
         {/* ── Protected: đăng nhập mới vào được ────────── */}
         <Route path="/booking/:movieId" element={

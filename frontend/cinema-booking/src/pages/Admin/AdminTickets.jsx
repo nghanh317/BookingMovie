@@ -6,7 +6,17 @@ import ticketService from '../../services/ticketService';
 
 function fmtDate(dateStr) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
+  let d;
+  if (typeof dateStr === 'string' && dateStr.includes('-') && dateStr.split('-')[0].length === 2) {
+    const [datePart, timePart] = dateStr.split(' ');
+    const [dd, mm, yyyy] = datePart.split('-');
+    d = new Date(`${yyyy}-${mm}-${dd}T${timePart || '00:00:00'}`);
+  } else {
+    d = new Date(dateStr);
+  }
+  
+  if (isNaN(d.getTime())) return dateStr;
+  
   return d.toLocaleString('vi-VN', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
@@ -287,7 +297,7 @@ export default function AdminTickets() {
       if (statusFilter)  params.status = statusFilter;
       // accountId search by keyword — backend supports accountId filter; for name search we pass keyword if backend supports
       const data = await ticketService.getAll(params);
-      const content = data?.content ?? data ?? [];
+      const content = data?.content ?? data?.data ?? data ?? [];
       setTickets(Array.isArray(content) ? content : []);
       setTotalPages(data?.totalPages ?? 1);
       setTotalElements(data?.totalElements ?? content.length);

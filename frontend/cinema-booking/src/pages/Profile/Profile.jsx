@@ -16,6 +16,8 @@ import { RANKS, POINT_EARN_EXAMPLES, getRankByPoints, getRankProgress } from '..
 const STATUS_CONFIG = {
   upcoming: { label: 'Sắp tới', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
   completed: { label: 'Đã xem', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+  pending: { label: 'Chờ thanh toán', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+  cancelled: { label: 'Đã hủy', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
 };
 
 function Avatar({ name, size = 'lg' }) {
@@ -28,8 +30,17 @@ function Avatar({ name, size = 'lg' }) {
   );
 }
 
-function BookingCard({ booking, onRate }) {
-  const status = STATUS_CONFIG[booking.status];
+function BookingCard({ booking, onRate, allMovies }) {
+  const status = STATUS_CONFIG[booking.status] || { label: booking.status, color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
+  
+  // Find matching movie by checking if booking note includes movie title
+  const matchedMovie = allMovies?.find(m => 
+    booking.movie && m.title && booking.movie.toLowerCase().includes(m.title.toLowerCase())
+  );
+  
+  const posterUrl = matchedMovie?.poster || booking.poster || `https://placehold.co/80x120/1E1E2C/A0A0B4?text=${encodeURIComponent('No Poster')}`;
+  const displayTitle = matchedMovie?.title || booking.movie;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -37,15 +48,15 @@ function BookingCard({ booking, onRate }) {
       className="card p-4 flex gap-4 hover:border-cinema-muted/50 transition-colors"
     >
       {/* Poster */}
-      <div className="flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden">
-        <img src={booking.poster} alt={booking.movie} className="w-full h-full object-cover"
+      <div className="flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden bg-cinema-surface flex items-center justify-center">
+        <img src={posterUrl} alt={displayTitle} className="w-full h-full object-cover"
           onError={e => { e.target.src = 'https://placehold.co/80x120/1E1E2C/A0A0B4'; }} />
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 flex-wrap">
-          <h4 className="font-heading font-bold text-white text-sm leading-snug truncate">{booking.movie}</h4>
+          <h4 className="font-heading font-bold text-white text-sm leading-snug truncate">{displayTitle}</h4>
           <span className={`badge border text-xs font-semibold flex-shrink-0 ${status.color}`}>{status.label}</span>
         </div>
         <div className="mt-1.5 space-y-0.5 text-xs text-cinema-muted">
@@ -172,18 +183,28 @@ export default function Profile() {
       .then(res => {
         const list = Array.isArray(res?.content) ? res.content
           : Array.isArray(res?.data?.content) ? res.data.content
+          : Array.isArray(res?.data) ? res.data
           : Array.isArray(res) ? res : [];
         // Normalize ticket → BookingCard format
         const normalized = list.map(t => {
           const now = new Date();
-          const ticketDate = t.ticketsDate ? new Date(t.ticketsDate) : null;
+          let ticketDate = null;
+          if (t.ticketsDate) {
+            if (typeof t.ticketsDate === 'string' && t.ticketsDate.includes('-') && t.ticketsDate.split('-')[0].length === 2) {
+              const [datePart, timePart] = t.ticketsDate.split(' ');
+              const [dd, mm, yyyy] = datePart.split('-');
+              ticketDate = new Date(`${yyyy}-${mm}-${dd}T${timePart || '00:00:00'}`);
+            } else {
+              ticketDate = new Date(t.ticketsDate);
+            }
+          }
           const isUpcoming = ticketDate && ticketDate > now;
           const seatLabels = (t.seats || []).map(s => `${s.seatsRow || ''}${s.seatsNumber || ''}`).filter(Boolean);
           return {
             id: t.ticketsCode || `#${t.id}`,
             ticketId: t.id,
-            movie: t.note || 'Vé xem phim',  // TicketDTO không có movieName; dùng note hoặc để trống
-            poster: null,
+            movie: t.movieName || t.note || 'Vé xem phim',
+            poster: t.posterUrl || null,
             cinema: '',
             date: ticketDate ? ticketDate.toISOString().split('T')[0] : '',
             time: ticketDate ? ticketDate.toTimeString().slice(0, 5) : '',
@@ -467,7 +488,7 @@ export default function Profile() {
                     <span className="text-cinema-muted ml-3 text-sm">Đang tải vé...</span>
                   </div>
                 ) : filteredBookings.length > 0 ? (
-                  filteredBookings.map(b => <BookingCard key={b.id} booking={b} onRate={handleOpenReview} />)
+                  filteredBookings.map(b => <BookingCard key={b.id} booking={b} onRate={handleOpenReview} allMovies={allMovies} />)
                 ) : (
                   <div className="text-center py-16">
                     <div className="text-5xl mb-3">🎟️</div>

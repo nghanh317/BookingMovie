@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PAYMENT_METHODS } from '../../constants/mockData';
 import useAuthStore from '../../store/authStore';
 import { sendBookingConfirmEmail } from '../../services/emailService';
+import ticketService from '../../services/ticketService';
+import payosService from '../../services/payosService';
 
 function StepIndicator({ current }) {
   const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
@@ -109,7 +111,7 @@ export default function Checkout() {
 
   const { user } = useAuthStore();
 
-  const [paymentMethod, setPaymentMethod] = useState('momo');
+  const [paymentMethod, setPaymentMethod] = useState('payos');
   // ✅ Tự động điền thông tin từ tài khoản đang đăng nhập
   const [form, setForm] = useState({
     name: user?.fullName || user?.name || '',
@@ -151,37 +153,76 @@ export default function Checkout() {
       setErrors(errs);
       return;
     }
+    
     setProcessing(true);
-    await new Promise(r => setTimeout(r, 2000)); // Simulate payment processing
-    setProcessing(false);
 
-    const bookingCode = 'CB' + Math.random().toString(36).slice(2, 8).toUpperCase();
-    const newBooking = {
-      code: bookingCode,
-      movie: movie.title,
-      seats: seats.join(', '),
-      snacks: snacks.length > 0 ? snacks.map(s => `${s.icon} ${s.name} ×${s.quantity}`).join(', ') : null,
-      total: grandTotal.toLocaleString('vi-VN') + 'đ',
-    };
-    setBooking(newBooking);
-    setSuccess(true);
-
-    // Gửi email xác nhận đặt vé
     try {
-      await sendBookingConfirmEmail({
-        to_name:      form.name,
-        to_email:     form.email,
-        booking_code: bookingCode,
-        movie_title:  movie.title,
-        cinema_name:  cinema?.name || 'Chưa xác định',
-        showtime:     showtime
-          ? `${new Date(showtime.date).toLocaleDateString('vi-VN')} – ${showtime.time}`
-          : 'Chưa xác định',
-        seats:  seats.join(', '),
-        total:  grandTotal.toLocaleString('vi-VN') + 'đ',
-      });
-    } catch (err) {
-      console.warn('Không thể gửi email xác nhận:', err);
+      if (paymentMethod === 'payos') {
+        // LUỒNG THANH TOÁN THẬT QUA PAYOS
+        const ticketPayload = {
+          accountsId: user?.id || user?.accountsId || 1,
+          slotsId: showtime?.id || location.state?.showtimeId,
+          discountAmount: 0,
+          note: `Thanh toán vé ${movie.title} qua PayOS`,
+          seats: seats.map(s => ({ seatId: s.id })),
+          products: snacks.map(s => ({ productId: s.id, quantity: s.quantity }))
+        };
+
+        console.log('[Checkout] Đang tạo vé thật:', ticketPayload);
+        const createdTicket = await ticketService.create(ticketPayload);
+        console.log('[Checkout] Tạo vé thành công:', createdTicket);
+
+        if (!createdTicket || !createdTicket.id) {
+          throw new Error('Không nhận được thông tin vé sau khi tạo!');
+        }
+
+        // Tạo link thanh toán PayOS
+        console.log('[Checkout] Đang tạo link thanh toán PayOS cho vé ID:', createdTicket.id);
+        const checkoutUrl = await payosService.createPaymentLink(createdTicket.id);
+        
+        if (checkoutUrl) {
+          // Chuyển hướng sang cổng thanh toán quét QR PayOS
+          window.location.href = checkoutUrl;
+        } else {
+          throw new Error('Không tạo được link thanh toán PayOS!');
+        }
+      } else {
+        // CÁC PHƯƠNG THỨC KHÁC (GIẢ LẬP NHƯ CŨ)
+        await new Promise(r => setTimeout(r, 1500));
+        const bookingCode = 'CB' + Math.random().toString(36).slice(2, 8).toUpperCase();
+        const newBooking = {
+          code: bookingCode,
+          movie: movie.title,
+          seats: seats.map(s => s.label).join(', '),
+          snacks: snacks.length > 0 ? snacks.map(s => `${s.icon} ${s.name} ×${s.quantity}`).join(', ') : null,
+          total: grandTotal.toLocaleString('vi-VN') + 'đ',
+        };
+        setBooking(newBooking);
+        setSuccess(true);
+
+        // Gửi email xác nhận đặt vé
+        try {
+          await sendBookingConfirmEmail({
+            to_name:      form.name,
+            to_email:     form.email,
+            booking_code: bookingCode,
+            movie_title:  movie.title,
+            cinema_name:  cinema?.name || 'Chưa xác định',
+            showtime:     showtime
+              ? `${new Date(showtime.date).toLocaleDateString('vi-VN')} – ${showtime.time}`
+              : 'Chưa xác định',
+            seats:  seats.map(s => s.label).join(', '),
+            total:  grandTotal.toLocaleString('vi-VN') + 'đ',
+          });
+        } catch (err) {
+          console.warn('Không thể gửi email xác nhận:', err);
+        }
+      }
+    } catch (error) {
+      console.error('[Checkout] Lỗi khi thanh toán:', error);
+      alert('Đã xảy ra lỗi trong quá trình đặt vé và thanh toán: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -237,9 +278,21 @@ export default function Checkout() {
             <div className="card p-6">
               <h2 className="font-heading font-bold text-white text-lg mb-4">Phương Thức Thanh Toán</h2>
               <div className="grid grid-cols-2 gap-3">
-                {PAYMENT_METHODS.map(method => {
+                {[
+                  { id: 'payos', label: 'Quét mã VietQR (PayOS)', desc: 'Tạo mã QR chuyển khoản nhanh' },
+                  ...PAYMENT_METHODS
+                ].map(method => {
                   const isSelected = paymentMethod === method.id;
                   const logos = {
+                    payos: (
+                      <svg viewBox="0 0 140 40" className="h-8 w-auto" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="140" height="40" rx="8" fill="#0052FF"/>
+                        <rect x="10" y="8" width="24" height="24" rx="6" fill="white" />
+                        <rect x="15" y="13" width="14" height="14" rx="2" fill="#0052FF" />
+                        <rect x="18" y="16" width="8" height="8" fill="white" />
+                        <text x="44" y="25" fill="white" fontSize="13" fontWeight="bold" fontFamily="Arial, sans-serif">VietQR PayOS</text>
+                      </svg>
+                    ),
                     momo: (
                       <svg viewBox="0 0 120 40" className="h-8 w-auto" xmlns="http://www.w3.org/2000/svg">
                         <rect width="120" height="40" rx="8" fill="#AE2070"/>
@@ -365,7 +418,7 @@ export default function Checkout() {
               <div className="space-y-2 text-sm mb-4 pb-4 border-b border-cinema-border">
                 <div className="flex justify-between">
                   <span className="text-cinema-muted">Ghế ({seats.length})</span>
-                  <span className="text-white">{seats.join(', ')}</span>
+                  <span className="text-white">{seats.map(s => s.label).join(', ')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-cinema-muted">Tiền vé</span>

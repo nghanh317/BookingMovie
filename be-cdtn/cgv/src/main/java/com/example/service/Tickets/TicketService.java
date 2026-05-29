@@ -79,6 +79,10 @@ public class TicketService implements ITicketService{
 		dto.setAccountsId(ticket.getAccounts().getId());
 		dto.setAccountsFullName(ticket.getAccounts().getFullName());
 		dto.setSlotsId(ticket.getSlots().getId());
+		if (ticket.getSlots() != null && ticket.getSlots().getMovies() != null) {
+			dto.setMovieName(ticket.getSlots().getMovies().getTitle());
+			dto.setPosterUrl(ticket.getSlots().getMovies().getPosterUrl());
+		}
 		dto.setTicketsCode(ticket.getTicketsCode());
 		dto.setQrCodeUrl(ticket.getQrCodeUrl());
 		dto.setQrCodeData(ticket.getQrCodeData());
@@ -159,7 +163,7 @@ public class TicketService implements ITicketService{
 	
 	@Override
 	@Transactional
-	public void createTicket(CreateTicketForm form) {
+	public Tickets createTicket(CreateTicketForm form) {
 		Slots slot = slotRepository.findById(form.getSlotsId())
 			.orElseThrow(() -> new RuntimeException("Không tìm thấy suất chiếu"));
 		
@@ -344,6 +348,7 @@ public class TicketService implements ITicketService{
 
 		slot.setEmptySeats(slot.getEmptySeats() - numberOfSeatsToBook);
 		slotRepository.save(slot);
+		return ticket;
 	}
 	
 	@Override

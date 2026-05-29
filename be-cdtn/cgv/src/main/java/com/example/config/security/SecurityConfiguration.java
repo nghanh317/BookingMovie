@@ -1,4 +1,4 @@
-﻿package com.example.config.security;
+package com.example.config.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -71,7 +71,7 @@ public class SecurityConfiguration {
 						.requestMatchers(HttpMethod.POST, "/api/v1/rooms/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/rooms/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.DELETE, "/api/v1/rooms/**").hasAuthority("ADMIN")
-						//SLOTS
+						// SLOTS
 						.requestMatchers(HttpMethod.GET, "/api/v1/slots/**", "/api/v1/slots").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/slots/**", "/api/v1/slots").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/slots/**", "/api/v1/slots").hasAuthority("ADMIN")
@@ -81,17 +81,17 @@ public class SecurityConfiguration {
 						.requestMatchers(HttpMethod.POST, "/api/v1/products/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/products/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.DELETE, "/api/v1/products/**").hasAuthority("ADMIN")
-						//MOVIE REVIEW
+						// MOVIE REVIEW
 						.requestMatchers(HttpMethod.GET, "/api/v1/movie-reviews/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/movie-reviews/**").hasAuthority("USER")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/movie-reviews/**").hasAuthority("USER")
 						.requestMatchers(HttpMethod.DELETE, "/api/v1/movie-reviews/**").hasAuthority("USER")
-						//CINEMA REVIEW
+						// CINEMA REVIEW
 						.requestMatchers(HttpMethod.GET, "/api/v1/cinema-reviews/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/cinema-reviews/**").hasAuthority("USER")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/cinema-reviews/**").hasAuthority("USER")
 						.requestMatchers(HttpMethod.DELETE, "/api/v1/cinema-reviews/**").hasAuthority("USER")
-						//SEAT
+						// SEAT
 						.requestMatchers(HttpMethod.GET, "/api/v1/seats/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/seats/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/seats/**").hasAuthority("ADMIN")
@@ -100,7 +100,8 @@ public class SecurityConfiguration {
 						.requestMatchers("/api/v1/auth/**").permitAll()
 						.requestMatchers("/api/v1/tickets/**").permitAll()
 						.requestMatchers("/api/v1/payments/**").permitAll()
-						// SEAT LOCKS - GET public (ai cũng xem được ghế đang giữ), POST/DELETE cần login
+						// SEAT LOCKS - GET public (ai cũng xem được ghế đang giữ), POST/DELETE cần
+						// login
 						.requestMatchers(HttpMethod.GET, "/api/v1/seat-locks/**").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/seat-locks/**").hasAnyAuthority("USER", "ADMIN")
 						.requestMatchers(HttpMethod.DELETE, "/api/v1/seat-locks/**").hasAnyAuthority("USER", "ADMIN")
@@ -109,6 +110,9 @@ public class SecurityConfiguration {
 						.requestMatchers(HttpMethod.POST, "/api/v1/news/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.PUT, "/api/v1/news/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.DELETE, "/api/v1/news/**").hasAuthority("ADMIN")
+						// PAYOS - tạo link cần login, webhook public (PayOS server gọi vào)
+						.requestMatchers(HttpMethod.POST, "/api/v1/payos/create-link").hasAnyAuthority("USER", "ADMIN")
+						.requestMatchers("/api/v1/webhook/**").permitAll()
 						.requestMatchers("/error").permitAll()
 						.requestMatchers("/api/v1/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -136,5 +140,3 @@ public class SecurityConfiguration {
 		return new BCryptPasswordEncoder();
 	}
 }
-
-

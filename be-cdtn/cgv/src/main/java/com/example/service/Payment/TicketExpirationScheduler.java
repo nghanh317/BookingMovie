@@ -14,8 +14,13 @@ import com.example.repository.SlotRepository;
 import com.example.repository.TicketRepository;
 
 /**
- * Scheduler tự động hủy các vé chưa thanh toán sau 10 phút.
- * Chạy mỗi 5 phút để dọn dẹp.
+ * LUỒNG 3: Dọn dẹp và đồng bộ dữ liệu (Cronjob)
+ *
+ * Chạy mỗi 1 phút, tìm các vé PENDING + UNPAID đã quá 10 phút:
+ *   1. Gọi PayOS xem thực tế đã thanh toán chưa (tránh mất webhook)
+ *   2. Nếu PayOS báo PAID  → cập nhật DB thành PAID + CONFIRMED
+ *   3. Nếu PayOS báo khác  → hủy vé, hoàn ghế trống
+ *
  * Cần @EnableScheduling trong CgvApplication.java
  */
 @Component
@@ -27,34 +32,41 @@ public class TicketExpirationScheduler {
     @Autowired
     private SlotRepository slotRepository;
 
-    @Scheduled(fixedDelay = 5 * 60 * 1000) // Chạy mỗi 5 phút
+    @Autowired
+    private PayOSService payOSService;
+
+    @Scheduled(fixedDelay = 60 * 1000) // Chạy mỗi 1 phút
     @Transactional
     public void cancelExpiredTickets() {
-        // Tìm tất cả vé UNPAID + PENDING đã tạo hơn 10 phút trước
+        // Vé UNPAID + PENDING đã quá 10 phút
         Date cutoff = new Date(System.currentTimeMillis() - 10 * 60 * 1000);
         List<Tickets> expiredTickets = ticketRepository.findExpiredUnpaidTickets(cutoff);
 
-        if (expiredTickets.isEmpty()) {
-            return;
-        }
+        if (expiredTickets.isEmpty()) return;
+
+        int synced = 0, cancelled = 0;
 
         for (Tickets ticket : expiredTickets) {
-            ticket.setStatus(Tickets.Status.CANCELLED);
-            ticketRepository.save(ticket);
+            // BƯỚC 1: Gọi PayOS kiểm tra trạng thái thực tế
+            // (tránh trường hợp rớt mạng khiến webhook không đến)
+            payOSService.syncTicketStatusFromPayOS(ticket.getId());
 
-            // Hoàn lại ghế trống cho suất chiếu
-            Slots slot = ticket.getSlots();
-            if (slot != null && ticket.getBookingSeats() != null) {
-                long count = ticket.getBookingSeats().stream()
-                    .filter(bs -> bs.getIsDeleted() == null || !bs.getIsDeleted())
-                    .count();
-                if (count > 0) {
-                    slot.setEmptySeats(slot.getEmptySeats() + (int) count);
-                    slotRepository.save(slot);
-                }
+            // Reload lại từ DB sau khi sync
+            Tickets updated = ticketRepository.findById(ticket.getId()).orElse(null);
+            if (updated == null) continue;
+
+            if (updated.getPaymentStatus() == Tickets.PaymentStatus.PAID) {
+                // PayOS xác nhận đã thanh toán → giữ nguyên
+                synced++;
+                continue;
             }
+
+            // BƯỚC 2: Thực sự chưa thanh toán → hủy và hoàn ghế
+            payOSService.cancelTicketAndReleaseSeats(updated);
+            cancelled++;
         }
 
-        System.out.println("[TicketScheduler] Auto-cancelled " + expiredTickets.size() + " expired tickets.");
+        System.out.printf("[TicketScheduler] Đã xử lý %d vé hết hạn: %d sync từ PayOS → PAID, %d đã hủy.%n",
+                expiredTickets.size(), synced, cancelled);
     }
 }

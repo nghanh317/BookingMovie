@@ -35,8 +35,9 @@ public class TicketController {
 	}
 	
 	@PostMapping
-	public void createTicket (@RequestBody  CreateTicketForm form) {
-		ticketService.createTicket(form);
+	public org.springframework.http.ResponseEntity<?> createTicket (@RequestBody CreateTicketForm form) {
+		com.example.entity.Tickets ticket = ticketService.createTicket(form);
+		return org.springframework.http.ResponseEntity.ok(ticket);
 	}
 	@PutMapping ("/{id}")
 	public void updateTicket (@PathVariable Integer id, @RequestBody UpdateTicketForm form) {

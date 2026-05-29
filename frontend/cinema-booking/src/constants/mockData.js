@@ -1,24 +1,3 @@
-// ── Danh sách tỉnh / thành phố ────────────────────────────
-export const PROVINCES = [
-  'Hồ Chí Minh',
-  'Hà Nội',
-  'Đà Nẵng',
-  'Cần Thơ',
-  'Hải Phòng',
-  'Bình Dương',
-  'Đồng Nai',
-  'Khánh Hòa',
-  'Nghệ An',
-  'Thừa Thiên Huế',
-];
-
-// ── Helper tính ngày tương đối so với hôm nay ─────────────
-function daysFromNow(n) {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split('T')[0];
-}
-
 // Mock data - Movies
 export const MOVIES = [
   {
@@ -138,173 +117,112 @@ export const CINEMAS = [
     name: "CGV Vincom Center",
     address: "72 Lê Thánh Tôn, Q.1, TP.HCM",
     city: "Hồ Chí Minh",
-    province: "Hồ Chí Minh",
     image: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=400",
     screens: 8,
     rating: 4.5,
-    status: 'active',
   },
   {
     id: 2,
     name: "Lotte Cinema Landmark",
     address: "72A Nguyễn Thị Minh Khai, Q.3, TP.HCM",
     city: "Hồ Chí Minh",
-    province: "Hồ Chí Minh",
     image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400",
     screens: 10,
     rating: 4.7,
-    status: 'active',
   },
   {
     id: 3,
     name: "BHD Star Cineplex",
     address: "Bitexco Financial Tower, Q.1, TP.HCM",
     city: "Hồ Chí Minh",
-    province: "Hồ Chí Minh",
     image: "https://images.unsplash.com/photo-1560109947-543149eceb16?w=400",
     screens: 6,
     rating: 4.3,
-    status: 'active',
   },
   {
     id: 4,
     name: "CGV Vincom Bà Triệu",
     address: "191 Bà Triệu, Hai Bà Trưng, Hà Nội",
     city: "Hà Nội",
-    province: "Hà Nội",
     image: "https://images.unsplash.com/photo-1535016120720-40c646be5580?w=400",
     screens: 8,
     rating: 4.6,
-    status: 'active',
   },
-  {
-    id: 5,
-    name: "Galaxy Cinema Đà Nẵng",
-    address: "257 Hùng Vương, Thanh Khê, Đà Nẵng",
-    city: "Đà Nẵng",
-    province: "Đà Nẵng",
-    image: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=400",
-    screens: 5,
-    rating: 4.4,
-    status: 'active',
-  },
-  {
-    id: 6,
-    name: "Lotte Cinema Cần Thơ",
-    address: "Trung tâm TM Vincom Xuân Khánh, Cần Thơ",
-    city: "Cần Thơ",
-    province: "Cần Thơ",
-    image: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400",
-    screens: 6,
-    rating: 4.2,
-    status: 'active',
-  },
-];
-
-// Mock data - Cinema Rooms
-export const CINEMA_ROOMS = [
-  // CGV Vincom Center (cinemaId: 1) – 5 phòng
-  { id: 1,  cinemaId: 1, name: 'Cinema 1', format: '2D',   totalSeats: 120, seatPrices: { standard: 75000, vip: 110000, couple: 200000 } },
-  { id: 2,  cinemaId: 1, name: 'Cinema 2', format: '3D',   totalSeats: 80,  seatPrices: { standard: 90000, vip: 130000, couple: 230000 } },
-  { id: 3,  cinemaId: 1, name: 'IMAX',     format: 'IMAX', totalSeats: 150, seatPrices: { standard: 130000, vip: 180000, couple: 320000 } },
-  { id: 4,  cinemaId: 1, name: 'Cinema 3', format: '2D',   totalSeats: 100, seatPrices: { standard: 75000, vip: 110000, couple: 200000 } },
-  { id: 5,  cinemaId: 1, name: 'Cinema 4', format: '3D',   totalSeats: 90,  seatPrices: { standard: 90000, vip: 130000, couple: 230000 } },
-  // Lotte Cinema Landmark (cinemaId: 2) – 4 phòng
-  { id: 6,  cinemaId: 2, name: 'Hall A',   format: '2D',   totalSeats: 100, seatPrices: { standard: 80000, vip: 120000, couple: 210000 } },
-  { id: 7,  cinemaId: 2, name: 'Hall B',   format: '3D',   totalSeats: 90,  seatPrices: { standard: 95000, vip: 140000, couple: 250000 } },
-  { id: 8,  cinemaId: 2, name: 'Hall C',   format: 'IMAX', totalSeats: 140, seatPrices: { standard: 140000, vip: 190000, couple: 340000 } },
-  { id: 9,  cinemaId: 2, name: 'Hall D',   format: '2D',   totalSeats: 110, seatPrices: { standard: 80000, vip: 120000, couple: 210000 } },
-  // BHD Star Cineplex (cinemaId: 3) – 3 phòng
-  { id: 10, cinemaId: 3, name: 'Screen 1', format: '2D',   totalSeats: 80,  seatPrices: { standard: 75000, vip: 115000, couple: 205000 } },
-  { id: 11, cinemaId: 3, name: 'Screen 2', format: '3D',   totalSeats: 70,  seatPrices: { standard: 90000, vip: 135000, couple: 240000 } },
-  { id: 12, cinemaId: 3, name: 'Screen 3', format: 'IMAX', totalSeats: 120, seatPrices: { standard: 130000, vip: 175000, couple: 310000 } },
-  // CGV Vincom Bà Triệu (cinemaId: 4) – 3 phòng
-  { id: 13, cinemaId: 4, name: 'Room 1',   format: '2D',   totalSeats: 90,  seatPrices: { standard: 80000, vip: 120000, couple: 215000 } },
-  { id: 14, cinemaId: 4, name: 'Room 2',   format: '3D',   totalSeats: 80,  seatPrices: { standard: 95000, vip: 140000, couple: 250000 } },
-  { id: 15, cinemaId: 4, name: 'Room IMAX',format: 'IMAX', totalSeats: 130, seatPrices: { standard: 135000, vip: 180000, couple: 320000 } },
-  // Galaxy Cinema Đà Nẵng (cinemaId: 5) – 3 phòng
-  { id: 16, cinemaId: 5, name: 'Phòng 1',  format: '2D',   totalSeats: 80,  seatPrices: { standard: 70000, vip: 105000, couple: 190000 } },
-  { id: 17, cinemaId: 5, name: 'Phòng 2',  format: '3D',   totalSeats: 70,  seatPrices: { standard: 85000, vip: 125000, couple: 225000 } },
-  { id: 18, cinemaId: 5, name: 'Phòng 3',  format: '2D',   totalSeats: 60,  seatPrices: { standard: 70000, vip: 105000, couple: 190000 } },
-  // Lotte Cinema Cần Thơ (cinemaId: 6) – 3 phòng
-  { id: 19, cinemaId: 6, name: 'Phòng A',  format: '2D',   totalSeats: 80,  seatPrices: { standard: 70000, vip: 105000, couple: 185000 } },
-  { id: 20, cinemaId: 6, name: 'Phòng B',  format: '3D',   totalSeats: 70,  seatPrices: { standard: 85000, vip: 125000, couple: 220000 } },
-  { id: 21, cinemaId: 6, name: 'Phòng VIP',format: '2D',   totalSeats: 50,  seatPrices: { standard: 90000, vip: 140000, couple: 250000 } },
 ];
 
 // Mock data - Showtimes
 export const SHOWTIMES = [
   // ── Avengers: Secret Wars (movieId: 1) ──────────────────
   // Hôm nay: 11/04/2026
-  { id: 1,  movieId: 1, cinemaId: 1, date: daysFromNow(0), time: "09:30", hall: "Cinema 1", type: "2D",   availableSeats: 45 },
-  { id: 2,  movieId: 1, cinemaId: 1, date: daysFromNow(0), time: "12:00", hall: "Cinema 2", type: "3D",   availableSeats: 30 },
-  { id: 3,  movieId: 1, cinemaId: 1, date: daysFromNow(0), time: "15:30", hall: "Cinema 1", type: "2D",   availableSeats: 60 },
-  { id: 4,  movieId: 1, cinemaId: 1, date: daysFromNow(0), time: "19:00", hall: "IMAX",     type: "IMAX", availableSeats: 10 },
-  { id: 5,  movieId: 1, cinemaId: 1, date: daysFromNow(0), time: "21:30", hall: "Cinema 3", type: "2D",   availableSeats: 55 },
+  { id: 1,  movieId: 1, cinemaId: 1, date: "2026-04-11", time: "09:30", hall: "Cinema 1", type: "2D",   availableSeats: 45 },
+  { id: 2,  movieId: 1, cinemaId: 1, date: "2026-04-11", time: "12:00", hall: "Cinema 2", type: "3D",   availableSeats: 30 },
+  { id: 3,  movieId: 1, cinemaId: 1, date: "2026-04-11", time: "15:30", hall: "Cinema 1", type: "2D",   availableSeats: 60 },
+  { id: 4,  movieId: 1, cinemaId: 1, date: "2026-04-11", time: "19:00", hall: "IMAX",     type: "IMAX", availableSeats: 10 },
+  { id: 5,  movieId: 1, cinemaId: 1, date: "2026-04-11", time: "21:30", hall: "Cinema 3", type: "2D",   availableSeats: 55 },
   // Ngày mai: 12/04/2026
-  { id: 6,  movieId: 1, cinemaId: 1, date: daysFromNow(1), time: "10:00", hall: "Cinema 2", type: "3D",   availableSeats: 70 },
-  { id: 7,  movieId: 1, cinemaId: 1, date: daysFromNow(1), time: "14:30", hall: "IMAX",     type: "IMAX", availableSeats: 25 },
-  { id: 8,  movieId: 1, cinemaId: 1, date: daysFromNow(1), time: "18:00", hall: "Cinema 1", type: "2D",   availableSeats: 50 },
-  { id: 9,  movieId: 1, cinemaId: 1, date: daysFromNow(1), time: "21:00", hall: "Cinema 3", type: "3D",   availableSeats: 40 },
+  { id: 6,  movieId: 1, cinemaId: 1, date: "2026-04-12", time: "10:00", hall: "Cinema 2", type: "3D",   availableSeats: 70 },
+  { id: 7,  movieId: 1, cinemaId: 1, date: "2026-04-12", time: "14:30", hall: "IMAX",     type: "IMAX", availableSeats: 25 },
+  { id: 8,  movieId: 1, cinemaId: 1, date: "2026-04-12", time: "18:00", hall: "Cinema 1", type: "2D",   availableSeats: 50 },
+  { id: 9,  movieId: 1, cinemaId: 1, date: "2026-04-12", time: "21:00", hall: "Cinema 3", type: "3D",   availableSeats: 40 },
   // 13/04:
-  { id: 10, movieId: 1, cinemaId: 2, date: daysFromNow(2), time: "11:00", hall: "Hall A",   type: "2D",   availableSeats: 65 },
-  { id: 11, movieId: 1, cinemaId: 2, date: daysFromNow(2), time: "15:00", hall: "Hall B",   type: "3D",   availableSeats: 48 },
-  { id: 12, movieId: 1, cinemaId: 2, date: daysFromNow(2), time: "19:30", hall: "Hall A",   type: "IMAX", availableSeats: 18 },
+  { id: 10, movieId: 1, cinemaId: 2, date: "2026-04-13", time: "11:00", hall: "Hall A",   type: "2D",   availableSeats: 65 },
+  { id: 11, movieId: 1, cinemaId: 2, date: "2026-04-13", time: "15:00", hall: "Hall B",   type: "3D",   availableSeats: 48 },
+  { id: 12, movieId: 1, cinemaId: 2, date: "2026-04-13", time: "19:30", hall: "Hall A",   type: "IMAX", availableSeats: 18 },
   // 14/04:
-  { id: 13, movieId: 1, cinemaId: 3, date: daysFromNow(3), time: "09:00", hall: "Screen 1", type: "2D",   availableSeats: 72 },
-  { id: 14, movieId: 1, cinemaId: 3, date: daysFromNow(3), time: "13:30", hall: "Screen 2", type: "3D",   availableSeats: 35 },
-  { id: 15, movieId: 1, cinemaId: 3, date: daysFromNow(3), time: "20:00", hall: "Screen 1", type: "2D",   availableSeats: 60 },
+  { id: 13, movieId: 1, cinemaId: 3, date: "2026-04-14", time: "09:00", hall: "Screen 1", type: "2D",   availableSeats: 72 },
+  { id: 14, movieId: 1, cinemaId: 3, date: "2026-04-14", time: "13:30", hall: "Screen 2", type: "3D",   availableSeats: 35 },
+  { id: 15, movieId: 1, cinemaId: 3, date: "2026-04-14", time: "20:00", hall: "Screen 1", type: "2D",   availableSeats: 60 },
 
   // ── Godzilla vs Kong (movieId: 2) ────────────────────────
-  { id: 20, movieId: 2, cinemaId: 1, date: daysFromNow(0), time: "10:00", hall: "Cinema 2", type: "2D",   availableSeats: 70 },
-  { id: 21, movieId: 2, cinemaId: 1, date: daysFromNow(0), time: "14:00", hall: "Cinema 4", type: "3D",   availableSeats: 40 },
-  { id: 22, movieId: 2, cinemaId: 1, date: daysFromNow(0), time: "18:00", hall: "IMAX",     type: "IMAX", availableSeats: 20 },
-  { id: 23, movieId: 2, cinemaId: 1, date: daysFromNow(0), time: "21:15", hall: "Cinema 2", type: "3D",   availableSeats: 55 },
-  { id: 24, movieId: 2, cinemaId: 2, date: daysFromNow(1), time: "11:30", hall: "Hall B",   type: "2D",   availableSeats: 80 },
-  { id: 25, movieId: 2, cinemaId: 2, date: daysFromNow(1), time: "16:00", hall: "Hall A",   type: "IMAX", availableSeats: 22 },
-  { id: 26, movieId: 2, cinemaId: 2, date: daysFromNow(1), time: "20:30", hall: "Hall B",   type: "3D",   availableSeats: 38 },
-  { id: 27, movieId: 2, cinemaId: 4, date: daysFromNow(2), time: "10:30", hall: "Room 1",   type: "2D",   availableSeats: 60 },
-  { id: 28, movieId: 2, cinemaId: 4, date: daysFromNow(2), time: "15:30", hall: "Room 2",   type: "3D",   availableSeats: 45 },
-  { id: 29, movieId: 2, cinemaId: 4, date: daysFromNow(3), time: "19:00", hall: "Room 1",   type: "IMAX", availableSeats: 15 },
+  { id: 20, movieId: 2, cinemaId: 1, date: "2026-04-11", time: "10:00", hall: "Cinema 2", type: "2D",   availableSeats: 70 },
+  { id: 21, movieId: 2, cinemaId: 1, date: "2026-04-11", time: "14:00", hall: "Cinema 4", type: "3D",   availableSeats: 40 },
+  { id: 22, movieId: 2, cinemaId: 1, date: "2026-04-11", time: "18:00", hall: "IMAX",     type: "IMAX", availableSeats: 20 },
+  { id: 23, movieId: 2, cinemaId: 1, date: "2026-04-11", time: "21:15", hall: "Cinema 2", type: "3D",   availableSeats: 55 },
+  { id: 24, movieId: 2, cinemaId: 2, date: "2026-04-12", time: "11:30", hall: "Hall B",   type: "2D",   availableSeats: 80 },
+  { id: 25, movieId: 2, cinemaId: 2, date: "2026-04-12", time: "16:00", hall: "Hall A",   type: "IMAX", availableSeats: 22 },
+  { id: 26, movieId: 2, cinemaId: 2, date: "2026-04-12", time: "20:30", hall: "Hall B",   type: "3D",   availableSeats: 38 },
+  { id: 27, movieId: 2, cinemaId: 4, date: "2026-04-13", time: "10:30", hall: "Room 1",   type: "2D",   availableSeats: 60 },
+  { id: 28, movieId: 2, cinemaId: 4, date: "2026-04-13", time: "15:30", hall: "Room 2",   type: "3D",   availableSeats: 45 },
+  { id: 29, movieId: 2, cinemaId: 4, date: "2026-04-14", time: "19:00", hall: "Room 1",   type: "IMAX", availableSeats: 15 },
 
   // ── Venom: The Last Dance (movieId: 6) ─────────────────
-  { id: 40, movieId: 6, cinemaId: 1, date: daysFromNow(0), time: "11:00", hall: "Cinema 3", type: "2D",   availableSeats: 80 },
-  { id: 41, movieId: 6, cinemaId: 1, date: daysFromNow(0), time: "15:00", hall: "Cinema 4", type: "3D",   availableSeats: 50 },
-  { id: 42, movieId: 6, cinemaId: 1, date: daysFromNow(0), time: "19:30", hall: "Cinema 3", type: "2D",   availableSeats: 65 },
-  { id: 43, movieId: 6, cinemaId: 2, date: daysFromNow(1), time: "09:30", hall: "Hall A",   type: "2D",   availableSeats: 78 },
-  { id: 44, movieId: 6, cinemaId: 2, date: daysFromNow(1), time: "14:00", hall: "Hall B",   type: "3D",   availableSeats: 42 },
-  { id: 45, movieId: 6, cinemaId: 2, date: daysFromNow(1), time: "18:30", hall: "Hall A",   type: "2D",   availableSeats: 58 },
-  { id: 46, movieId: 6, cinemaId: 3, date: daysFromNow(2), time: "12:00", hall: "Screen 2", type: "3D",   availableSeats: 30 },
-  { id: 47, movieId: 6, cinemaId: 3, date: daysFromNow(2), time: "17:00", hall: "Screen 1", type: "2D",   availableSeats: 55 },
-  { id: 48, movieId: 6, cinemaId: 4, date: daysFromNow(3), time: "20:00", hall: "Room 2",   type: "3D",   availableSeats: 40 },
+  { id: 40, movieId: 6, cinemaId: 1, date: "2026-04-11", time: "11:00", hall: "Cinema 3", type: "2D",   availableSeats: 80 },
+  { id: 41, movieId: 6, cinemaId: 1, date: "2026-04-11", time: "15:00", hall: "Cinema 4", type: "3D",   availableSeats: 50 },
+  { id: 42, movieId: 6, cinemaId: 1, date: "2026-04-11", time: "19:30", hall: "Cinema 3", type: "2D",   availableSeats: 65 },
+  { id: 43, movieId: 6, cinemaId: 2, date: "2026-04-12", time: "09:30", hall: "Hall A",   type: "2D",   availableSeats: 78 },
+  { id: 44, movieId: 6, cinemaId: 2, date: "2026-04-12", time: "14:00", hall: "Hall B",   type: "3D",   availableSeats: 42 },
+  { id: 45, movieId: 6, cinemaId: 2, date: "2026-04-12", time: "18:30", hall: "Hall A",   type: "2D",   availableSeats: 58 },
+  { id: 46, movieId: 6, cinemaId: 3, date: "2026-04-13", time: "12:00", hall: "Screen 2", type: "3D",   availableSeats: 30 },
+  { id: 47, movieId: 6, cinemaId: 3, date: "2026-04-13", time: "17:00", hall: "Screen 1", type: "2D",   availableSeats: 55 },
+  { id: 48, movieId: 6, cinemaId: 4, date: "2026-04-14", time: "20:00", hall: "Room 2",   type: "3D",   availableSeats: 40 },
 
   // ── Dune: Phần Ba (movieId: 3) ───────────────────────────
-  { id: 50, movieId: 3, cinemaId: 1, date: daysFromNow(0), time: "13:00", hall: "Cinema 1", type: "2D",   availableSeats: 55 },
-  { id: 51, movieId: 3, cinemaId: 1, date: daysFromNow(0), time: "17:30", hall: "IMAX",     type: "IMAX", availableSeats: 28 },
-  { id: 52, movieId: 3, cinemaId: 2, date: daysFromNow(1), time: "10:00", hall: "Hall A",   type: "2D",   availableSeats: 62 },
-  { id: 53, movieId: 3, cinemaId: 2, date: daysFromNow(1), time: "15:00", hall: "Hall B",   type: "3D",   availableSeats: 44 },
-  { id: 54, movieId: 3, cinemaId: 3, date: daysFromNow(2), time: "19:00", hall: "Screen 1", type: "IMAX", availableSeats: 20 },
+  { id: 50, movieId: 3, cinemaId: 1, date: "2026-04-11", time: "13:00", hall: "Cinema 1", type: "2D",   availableSeats: 55 },
+  { id: 51, movieId: 3, cinemaId: 1, date: "2026-04-11", time: "17:30", hall: "IMAX",     type: "IMAX", availableSeats: 28 },
+  { id: 52, movieId: 3, cinemaId: 2, date: "2026-04-12", time: "10:00", hall: "Hall A",   type: "2D",   availableSeats: 62 },
+  { id: 53, movieId: 3, cinemaId: 2, date: "2026-04-12", time: "15:00", hall: "Hall B",   type: "3D",   availableSeats: 44 },
+  { id: 54, movieId: 3, cinemaId: 3, date: "2026-04-13", time: "19:00", hall: "Screen 1", type: "IMAX", availableSeats: 20 },
 
   // ── Lật Mặt 8 (movieId: 4) ──────────────────────────────
-  { id: 60, movieId: 4, cinemaId: 1, date: daysFromNow(0), time: "10:30", hall: "Cinema 4", type: "2D",   availableSeats: 75 },
-  { id: 61, movieId: 4, cinemaId: 1, date: daysFromNow(0), time: "14:00", hall: "Cinema 3", type: "2D",   availableSeats: 68 },
-  { id: 62, movieId: 4, cinemaId: 1, date: daysFromNow(0), time: "18:30", hall: "Cinema 4", type: "2D",   availableSeats: 50 },
-  { id: 63, movieId: 4, cinemaId: 1, date: daysFromNow(0), time: "21:00", hall: "Cinema 3", type: "2D",   availableSeats: 60 },
-  { id: 64, movieId: 4, cinemaId: 2, date: daysFromNow(1), time: "11:00", hall: "Hall B",   type: "2D",   availableSeats: 80 },
-  { id: 65, movieId: 4, cinemaId: 2, date: daysFromNow(1), time: "16:30", hall: "Hall A",   type: "2D",   availableSeats: 55 },
-  { id: 66, movieId: 4, cinemaId: 3, date: daysFromNow(2), time: "13:00", hall: "Screen 2", type: "2D",   availableSeats: 70 },
-  { id: 67, movieId: 4, cinemaId: 4, date: daysFromNow(3), time: "17:30", hall: "Room 1",   type: "2D",   availableSeats: 65 },
+  { id: 60, movieId: 4, cinemaId: 1, date: "2026-04-11", time: "10:30", hall: "Cinema 4", type: "2D",   availableSeats: 75 },
+  { id: 61, movieId: 4, cinemaId: 1, date: "2026-04-11", time: "14:00", hall: "Cinema 3", type: "2D",   availableSeats: 68 },
+  { id: 62, movieId: 4, cinemaId: 1, date: "2026-04-11", time: "18:30", hall: "Cinema 4", type: "2D",   availableSeats: 50 },
+  { id: 63, movieId: 4, cinemaId: 1, date: "2026-04-11", time: "21:00", hall: "Cinema 3", type: "2D",   availableSeats: 60 },
+  { id: 64, movieId: 4, cinemaId: 2, date: "2026-04-12", time: "11:00", hall: "Hall B",   type: "2D",   availableSeats: 80 },
+  { id: 65, movieId: 4, cinemaId: 2, date: "2026-04-12", time: "16:30", hall: "Hall A",   type: "2D",   availableSeats: 55 },
+  { id: 66, movieId: 4, cinemaId: 3, date: "2026-04-13", time: "13:00", hall: "Screen 2", type: "2D",   availableSeats: 70 },
+  { id: 67, movieId: 4, cinemaId: 4, date: "2026-04-14", time: "17:30", hall: "Room 1",   type: "2D",   availableSeats: 65 },
 
   // ── Spider-Man: Beyond the Spider-Verse (movieId: 5) ────
-  { id: 70, movieId: 5, cinemaId: 1, date: daysFromNow(0), time: "09:00", hall: "Cinema 2", type: "2D",   availableSeats: 72 },
-  { id: 71, movieId: 5, cinemaId: 1, date: daysFromNow(0), time: "13:30", hall: "Cinema 4", type: "3D",   availableSeats: 48 },
-  { id: 72, movieId: 5, cinemaId: 1, date: daysFromNow(0), time: "17:00", hall: "IMAX",     type: "IMAX", availableSeats: 30 },
-  { id: 73, movieId: 5, cinemaId: 1, date: daysFromNow(0), time: "20:30", hall: "Cinema 2", type: "3D",   availableSeats: 42 },
-  { id: 74, movieId: 5, cinemaId: 2, date: daysFromNow(1), time: "10:30", hall: "Hall A",   type: "2D",   availableSeats: 65 },
-  { id: 75, movieId: 5, cinemaId: 2, date: daysFromNow(1), time: "15:30", hall: "Hall B",   type: "3D",   availableSeats: 38 },
-  { id: 76, movieId: 5, cinemaId: 3, date: daysFromNow(2), time: "11:30", hall: "Screen 1", type: "IMAX", availableSeats: 22 },
-  { id: 77, movieId: 5, cinemaId: 3, date: daysFromNow(2), time: "16:00", hall: "Screen 2", type: "3D",   availableSeats: 50 },
-  { id: 78, movieId: 5, cinemaId: 4, date: daysFromNow(3), time: "14:00", hall: "Room 2",   type: "2D",   availableSeats: 60 },
+  { id: 70, movieId: 5, cinemaId: 1, date: "2026-04-11", time: "09:00", hall: "Cinema 2", type: "2D",   availableSeats: 72 },
+  { id: 71, movieId: 5, cinemaId: 1, date: "2026-04-11", time: "13:30", hall: "Cinema 4", type: "3D",   availableSeats: 48 },
+  { id: 72, movieId: 5, cinemaId: 1, date: "2026-04-11", time: "17:00", hall: "IMAX",     type: "IMAX", availableSeats: 30 },
+  { id: 73, movieId: 5, cinemaId: 1, date: "2026-04-11", time: "20:30", hall: "Cinema 2", type: "3D",   availableSeats: 42 },
+  { id: 74, movieId: 5, cinemaId: 2, date: "2026-04-12", time: "10:30", hall: "Hall A",   type: "2D",   availableSeats: 65 },
+  { id: 75, movieId: 5, cinemaId: 2, date: "2026-04-12", time: "15:30", hall: "Hall B",   type: "3D",   availableSeats: 38 },
+  { id: 76, movieId: 5, cinemaId: 3, date: "2026-04-13", time: "11:30", hall: "Screen 1", type: "IMAX", availableSeats: 22 },
+  { id: 77, movieId: 5, cinemaId: 3, date: "2026-04-13", time: "16:00", hall: "Screen 2", type: "3D",   availableSeats: 50 },
+  { id: 78, movieId: 5, cinemaId: 4, date: "2026-04-14", time: "14:00", hall: "Room 2",   type: "2D",   availableSeats: 60 },
 ];
 
 // Seat layout
@@ -339,12 +257,12 @@ export const PAYMENT_METHODS = [
 
 // Mock data - Vouchers (toàn hệ thống)
 export const VOUCHERS = [
-  { id: 'V001', code: 'WELCOME30', name: 'Chào mừng thành viên mới', type: 'percent', value: 30, maxDiscount: 100000, minOrder: 100000, desc: 'Giảm 30% cho lần đặt vé đầu tiên', startDate: '2026-01-01', expiry: '2026-12-31', stock: 999, usedCount: 152, usesPerUser: 1, active: true, isPublic: true, pointCost: 0 },
-  { id: 'V002', code: 'SUMMER20',  name: 'Ưu đãi mùa hè 2026',     type: 'percent', value: 20, maxDiscount: 80000,  minOrder: 150000, desc: 'Ưu đãi mùa hè – Giảm 20%',        startDate: '2026-06-01', expiry: '2026-07-31', stock: 500, usedCount: 38,  usesPerUser: 2, active: true, isPublic: true, pointCost: 0 },
-  { id: 'V003', code: 'FREESHIP',  name: 'Miễn phí dịch vụ',        type: 'fixed',   value: 15000, maxDiscount: 15000, minOrder: 0,    desc: 'Miễn phí phí dịch vụ',            startDate: '2026-04-01', expiry: '2026-06-30', stock: 200, usedCount: 0,   usesPerUser: 1, active: true, isPublic: true, pointCost: 0 },
-  { id: 'V004', code: 'VIP50K',    name: 'Đặc quyền VIP',           type: 'fixed',   value: 50000, maxDiscount: 50000, minOrder: 200000, desc: 'Giảm 50.000đ cho thành viên VIP', startDate: '2026-01-01', expiry: '2026-09-30', stock: 100, usedCount: 27,  usesPerUser: 3, active: true, isPublic: false, pointCost: 500 },
-  { id: 'V005', code: 'GOLD25',    name: 'Thành viên Gold',          type: 'percent', value: 25, maxDiscount: 120000, minOrder: 120000, desc: 'Đặc quyền thành viên Gold – 25%', startDate: '2026-03-01', expiry: '2026-10-31', stock: 150, usedCount: 0,   usesPerUser: 5, active: true, isPublic: false, pointCost: 300 },
-  { id: 'V006', code: 'COMBO15',   name: 'Combo bỏng nước',          type: 'percent', value: 15, maxDiscount: 50000,  minOrder: 80000,  desc: 'Giảm 15% khi đặt kèm bỏng nước', startDate: '2026-05-01', expiry: '2026-08-31', stock: 300, usedCount: 89,  usesPerUser: 2, active: false, isPublic: true, pointCost: 0 },
+  { id: 'V001', code: 'WELCOME30', type: 'percent', value: 30, minOrder: 100000, desc: 'Giảm 30% cho lần đặt vé đầu tiên', expiry: '2026-12-31', stock: 999, active: true, isPublic: true, pointCost: 0 },
+  { id: 'V002', code: 'SUMMER20',  type: 'percent', value: 20, minOrder: 150000, desc: 'Ưu đãi mùa hè – Giảm 20%',         expiry: '2026-07-31', stock: 500, active: true, isPublic: true, pointCost: 0 },
+  { id: 'V003', code: 'FREESHIP', type: 'fixed',   value: 15000, minOrder: 0,      desc: 'Miễn phí phí dịch vụ',             expiry: '2026-06-30', stock: 200, active: true, isPublic: true, pointCost: 0 },
+  { id: 'V004', code: 'VIP50K',   type: 'fixed',   value: 50000, minOrder: 200000, desc: 'Giảm 50.000đ cho thành viên VIP',  expiry: '2026-09-30', stock: 100, active: true, isPublic: false, pointCost: 500 },
+  { id: 'V005', code: 'GOLD25',   type: 'percent', value: 25, minOrder: 120000, desc: 'Đặc quyền thành viên Gold – 25%',  expiry: '2026-10-31', stock: 150, active: true, isPublic: false, pointCost: 300 },
+  { id: 'V006', code: 'COMBO15',  type: 'percent', value: 15, minOrder: 80000,  desc: 'Giảm 15% khi đặt kèm bỏng nước',  expiry: '2026-08-31', stock: 300, active: false, isPublic: true, pointCost: 0 },
 ];
 
 // Voucher của từng user (mock – key là userId)
