@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PAYMENT_METHODS } from '../../constants/mockData';
@@ -122,6 +123,83 @@ export default function Checkout() {
   const [processing, setProcessing] = useState(false);
   const [success, setSuccess] = useState(false);
   const [booking, setBooking] = useState(null);
+  const [payosData, setPayosData] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  const snackTotal = (snacks || []).reduce((sum, s) => sum + (s.subtotal || 0), 0);
+  const serviceFee = Math.round(((totalPrice || 0) + snackTotal) * 0.05);
+  const grandTotal = (totalPrice || 0) + snackTotal + serviceFee;
+
+  // 1. Countdown timer
+  useEffect(() => {
+    let timer;
+    if (payosData && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (timeLeft <= 0 && payosData) {
+      setPayosData(null);
+      alert('Đã hết thời gian thanh toán (10 phút). Giao dịch đã bị huỷ!');
+      navigate('/');
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [payosData, timeLeft, navigate]);
+
+  // 2. Polling kiểm tra trạng thái vé mỗi 3s
+  useEffect(() => {
+    let pollInterval;
+    if (payosData) {
+      pollInterval = setInterval(async () => {
+        try {
+          // Bỏ cache bằng cách thêm query string time thông qua tham số của getById
+          const ticket = await ticketService.getById(payosData.ticketId, { _t: Date.now() });
+          console.log('[Polling] Trạng thái vé hiện tại:', ticket?.paymentStatus);
+          
+          if (ticket && (ticket.paymentStatus === 'PAID' || ticket.status === 'CONFIRMED')) {
+            clearInterval(pollInterval);
+            setPayosData(null);
+            
+            // Đặt thành công
+            const newBooking = {
+              code: ticket.ticketsCode,
+              movie: movie?.title,
+              seats: (seats || []).map(s => s.label).join(', '),
+              snacks: snacks.length > 0 ? snacks.map(s => `${s.icon} ${s.name} ×${s.quantity}`).join(', ') : null,
+              total: grandTotal.toLocaleString('vi-VN') + 'đ',
+            };
+            setBooking(newBooking);
+            setSuccess(true);
+
+            // Gửi email xác nhận đặt vé (sau khi PayOS xác nhận)
+            try {
+              await sendBookingConfirmEmail({
+                to_name:      form.name,
+                to_email:     form.email,
+                booking_code: ticket.ticketsCode,
+                movie_title:  movie?.title || 'Phim',
+                cinema_name:  cinema?.name || 'Chưa xác định',
+                showtime:     showtime
+                  ? `${new Date(showtime.date).toLocaleDateString('vi-VN')} – ${showtime.time}`
+                  : 'Chưa xác định',
+                seats:  (seats || []).map(s => s.label).join(', '),
+                total:  grandTotal.toLocaleString('vi-VN') + 'đ',
+              });
+            } catch (err) {
+              console.warn('Không thể gửi email xác nhận:', err);
+            }
+          }
+        } catch (e) {
+          console.warn('Lỗi kiểm tra trạng thái vé:', e.message);
+        }
+      }, 3000);
+    }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [payosData, movie, seats, snacks, grandTotal, form, cinema, showtime]);
 
   if (!movie || !seats) {
     return (
@@ -133,10 +211,6 @@ export default function Checkout() {
       </div>
     );
   }
-
-  const snackTotal = snacks.reduce((sum, s) => sum + (s.subtotal || 0), 0);
-  const serviceFee = Math.round((totalPrice + snackTotal) * 0.05);
-  const grandTotal = totalPrice + snackTotal + serviceFee;
 
   const validate = () => {
     const errs = {};
@@ -176,15 +250,16 @@ export default function Checkout() {
           throw new Error('Không nhận được thông tin vé sau khi tạo!');
         }
 
-        // Tạo link thanh toán PayOS
-        console.log('[Checkout] Đang tạo link thanh toán PayOS cho vé ID:', createdTicket.id);
-        const checkoutUrl = await payosService.createPaymentLink(createdTicket.id);
+        // Tạo link thanh toán PayOS (Lấy dữ liệu QR)
+        console.log('[Checkout] Đang tạo thông tin QR PayOS cho vé ID:', createdTicket.id);
+        const payosResponse = await payosService.createPaymentLink(createdTicket.id);
         
-        if (checkoutUrl) {
-          // Chuyển hướng sang cổng thanh toán quét QR PayOS
-          window.location.href = checkoutUrl;
+        if (payosResponse && payosResponse.qrCode) {
+          // Hiện màn hình QR và bắt đầu đếm ngược 10p (600 giây)
+          setPayosData({ ...payosResponse, ticketId: createdTicket.id });
+          setTimeLeft(600);
         } else {
-          throw new Error('Không tạo được link thanh toán PayOS!');
+          throw new Error('Không tạo được mã QR thanh toán PayOS!');
         }
       } else {
         // CÁC PHƯƠNG THỨC KHÁC (GIẢ LẬP NHƯ CŨ)
@@ -225,6 +300,69 @@ export default function Checkout() {
       setProcessing(false);
     }
   };
+
+  if (payosData) {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+
+    return (
+      <div className="min-h-screen py-12 flex items-center justify-center relative">
+        <div className="absolute inset-0 bg-cinema-black/80 backdrop-blur-sm z-0"></div>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="card p-8 max-w-md w-full text-center relative z-10 border-primary/50 shadow-glow-gold"
+        >
+          <div className="flex justify-center mb-4">
+             <svg viewBox="0 0 140 40" className="h-10 w-auto" xmlns="http://www.w3.org/2000/svg">
+               <rect width="140" height="40" rx="8" fill="#0052FF"/>
+               <rect x="10" y="8" width="24" height="24" rx="6" fill="white" />
+               <rect x="15" y="13" width="14" height="14" rx="2" fill="#0052FF" />
+               <rect x="18" y="16" width="8" height="8" fill="white" />
+               <text x="44" y="25" fill="white" fontSize="13" fontWeight="bold" fontFamily="Arial, sans-serif">VietQR PayOS</text>
+             </svg>
+          </div>
+          <h2 className="font-heading font-bold text-2xl text-white mb-2">Thanh Toán Quét Mã QR</h2>
+          <p className="text-cinema-muted text-sm mb-6">Mở ứng dụng ngân hàng và quét mã dưới đây</p>
+          
+          <div className="bg-white p-3 rounded-2xl inline-block mb-6 shadow-xl">
+            <QRCodeCanvas value={payosData.qrCode} size={224} />
+          </div>
+
+          <div className="bg-cinema-surface rounded-xl p-4 mb-6 text-left border border-cinema-border/50">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-cinema-muted">Số tiền:</span>
+              <span className="text-primary font-bold text-xl">{payosData.amount.toLocaleString('vi-VN')} đ</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-cinema-muted">Nội dung:</span>
+              <span className="text-white font-medium text-right max-w-[200px] break-words">{payosData.description}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center justify-center gap-2 mb-6">
+            <p className="text-cinema-muted text-sm">Thời gian còn lại:</p>
+            <div className={`text-4xl font-mono font-bold ${timeLeft <= 60 ? 'text-red-500 animate-pulse' : 'text-primary'}`}>
+              {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-xs text-cinema-muted">
+                Hệ thống đang chờ bạn thanh toán...
+              </p>
+            </div>
+          </div>
+          
+          <button 
+            onClick={() => { setPayosData(null); navigate('/'); }}
+            className="text-cinema-muted hover:text-red-400 transition-colors underline text-sm"
+          >
+            Hủy thanh toán và quay về
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-8">

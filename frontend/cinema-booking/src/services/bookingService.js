@@ -49,6 +49,12 @@ const bookingService = {
     const res = await api.get(`/v1/bookingSeats/${id}`);
     return res.data;
   },
+
+  /** Lấy danh sách ID ghế đã đặt theo suất chiếu — GET /api/v1/bookingSeats/slot/{slotId} */
+  getBookedSeatsBySlot: async (slotId) => {
+    const res = await api.get(`/v1/bookingSeats/slot/${slotId}`);
+    return res.data;
+  },
 };
 
 export default bookingService;

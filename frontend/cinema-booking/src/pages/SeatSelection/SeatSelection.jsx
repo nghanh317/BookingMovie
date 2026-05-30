@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useAuthStore from '../../store/authStore';
 import seatService from '../../services/seatService';
 import seatLockService from '../../services/seatLockService';
+import bookingService from '../../services/bookingService';
 
 // ─── Seat type meta ───────────────────────────────────────────────────
 const SEAT_TYPE_META = {
@@ -94,6 +95,7 @@ export default function SeatSelection() {
 
   // ── State ──
   const [seats, setSeats]               = useState([]);
+  const [bookedIds, setBookedIds]       = useState(new Set());
   const [loadingSeats, setLoadingSeats] = useState(false);
   const [selected, setSelected]         = useState(new Set());
   const [lockedByOthers, setLockedByOthers] = useState({});
@@ -105,22 +107,27 @@ export default function SeatSelection() {
   const roomId     = showtime?.roomId;
   const accountId  = user?.id || user?.userId;
 
-  // ── Fetch ghế của phòng chiếu ──
+  // ── Fetch ghế của phòng chiếu và ghế đã đặt ──
   useEffect(() => {
     if (!roomId) return;
     setLoadingSeats(true);
-    seatService.getAll({ roomId, size: 500 })
-      .then(data => {
-        const list = Array.isArray(data) ? data : (data?.content || data?.data || []);
+    
+    Promise.all([
+      seatService.getAll({ roomId, size: 500 }),
+      showtimeId ? bookingService.getBookedSeatsBySlot(showtimeId).catch(() => []) : Promise.resolve([])
+    ])
+      .then(([seatData, bookedData]) => {
+        const list = Array.isArray(seatData) ? seatData : (seatData?.content || seatData?.data || []);
         list.sort((a, b) => {
           const r = (a.seatRow || '').localeCompare(b.seatRow || '');
           return r !== 0 ? r : (a.seatNumber || 0) - (b.seatNumber || 0);
         });
         setSeats(list);
+        setBookedIds(new Set(Array.isArray(bookedData) ? bookedData : []));
       })
       .catch(err => console.error('[SeatSelection] fetch seats:', err))
       .finally(() => setLoadingSeats(false));
-  }, [roomId]);
+  }, [roomId, showtimeId]);
 
   // ── Poll ghế đang bị khoá bởi người khác từ API ──
   const pollLockedSeats = useCallback(async () => {
@@ -179,10 +186,6 @@ export default function SeatSelection() {
     return acc;
   }, {});
   const rows = Object.keys(seatsByRow).sort();
-
-  const bookedIds = new Set(
-    seats.filter(s => s.status?.toString().toUpperCase() === 'BOOKED').map(s => s.id)
-  );
 
   const pricePerSeat = showtime?.price || 0;
   const selectedSeatObjects = seats.filter(s => selected.has(s.id));
@@ -333,8 +336,8 @@ export default function SeatSelection() {
 
                         let icon, btnClass;
                         if (isBooked) {
-                          icon = <span className="text-[13px] leading-none opacity-50">✕</span>;
-                          btnClass = 'cursor-not-allowed opacity-50 bg-cinema-border/20 border-cinema-border/20';
+                          icon = <span className="text-[18px] leading-none font-bold text-red-500/80">✕</span>;
+                          btnClass = 'cursor-not-allowed opacity-30 bg-cinema-border/5 border-cinema-border/10';
                         } else if (isLockedOther) {
                           icon = <span className="text-[14px] leading-none">🔒</span>;
                           btnClass = 'cursor-not-allowed bg-orange-500/15 border-orange-500/40';

@@ -35,4 +35,8 @@ public class BookingSeatController {
 		service.create(form);
 	}
 
+	@GetMapping("/slot/{slotId}")
+	public java.util.List<Integer> getBookedSeatsBySlot(@PathVariable Integer slotId) {
+		return service.getBookedSeatsBySlot(slotId);
+	}
 }

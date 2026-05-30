@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { MOVIES, CINEMAS, SHOWTIMES } from '../../constants/mockData';
+import ticketService from '../../services/ticketService';
+import movieService from '../../services/movieService';
+import api from '../../services/api';
 
 const STATS = [
   { label: 'Tổng phim', value: MOVIES.length, icon: '🎬', change: '+2 tháng này', color: 'border-blue-500/30 bg-blue-500/5' },
@@ -21,6 +24,15 @@ const RECENT_BOOKINGS = [
 const REVENUE_WEEKLY = [180, 220, 195, 310, 280, 410, 247];
 const DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const maxRevenue = Math.max(...REVENUE_WEEKLY);
+
+const formatTimeAgo = (dateStr) => {
+  if (!dateStr) return 'Gần đây';
+  const diff = Math.floor((new Date() - new Date(dateStr)) / 1000);
+  if (diff < 60) return 'Vừa xong';
+  if (diff < 3600) return Math.floor(diff / 60) + ' phút trước';
+  if (diff < 86400) return Math.floor(diff / 3600) + ' giờ trước';
+  return Math.floor(diff / 86400) + ' ngày trước';
+};
 
 // ── Pie chart data ─────────────────────────────────────────
 const PIE_DATA = [
@@ -98,6 +110,90 @@ function StatCard({ stat, index }) {
 
 export default function AdminDashboard() {
   const [chartType, setChartType] = useState('bar'); // 'bar' | 'pie'
+  const [topMovies, setTopMovies] = useState([]);
+  const [recentBookings, setRecentBookings] = useState([]);
+
+  useEffect(() => {
+    const fetchTopMovies = async () => {
+      try {
+        const [res, allMovies, reviewsRes] = await Promise.all([
+          ticketService.getAll({ size: 1000 }),
+          movieService.getAll(),
+          api.get('/v1/movie-reviews', { params: { size: 1000 } }).catch(() => ({ data: [] }))
+        ]);
+        const tickets = Array.isArray(res) ? res : res?.content || res?.data || [];
+        
+        // Xử lý danh sách Đặt vé gần đây
+        const sortedBookings = [...tickets].sort((a, b) => {
+          const dateA = new Date(a.ticketsDate || a.createDate || 0);
+          const dateB = new Date(b.ticketsDate || b.createDate || 0);
+          return dateB - dateA; // Mới nhất lên đầu
+        });
+        
+        const formattedBookings = sortedBookings.slice(0, 5).map(t => ({
+          id: t.ticketsCode || t.id,
+          user: t.accountsFullName || 'Khách vãng lai',
+          movie: t.movieName || 'N/A',
+          seats: t.seats ? t.seats.length : 0,
+          total: t.finalAmount || t.totalAmount || 0,
+          time: formatTimeAgo(t.ticketsDate || t.createDate)
+        }));
+        setRecentBookings(formattedBookings);
+        
+        let reviewsData = [];
+        if (reviewsRes && reviewsRes.data) {
+          if (Array.isArray(reviewsRes.data)) reviewsData = reviewsRes.data;
+          else if (Array.isArray(reviewsRes.data.data)) reviewsData = reviewsRes.data.data;
+          else if (Array.isArray(reviewsRes.data.content)) reviewsData = reviewsRes.data.content;
+          else if (Array.isArray(reviewsRes.data.data?.content)) reviewsData = reviewsRes.data.data.content;
+        }
+
+        const movieCounts = {};
+        
+        tickets.forEach(ticket => {
+          if (ticket.paymentStatus === 'PAID') {
+            const movieId = ticket.movieId;
+            if (movieId) {
+              if (!movieCounts[movieId]) {
+                const dbMovie = allMovies.find(m => m.id === movieId);
+                
+                // Tính trung bình đánh giá
+                const movieReviews = reviewsData.filter(r => r.movieId === movieId);
+                let avgRating = 0;
+                if (movieReviews.length > 0) {
+                  avgRating = parseFloat((movieReviews.reduce((sum, r) => sum + (r.rating || 5), 0) / movieReviews.length).toFixed(1));
+                }
+
+                movieCounts[movieId] = {
+                  id: movieId,
+                  title: ticket.movieName || 'Unknown',
+                  poster: ticket.posterUrl || '',
+                  ticketCount: 0,
+                  totalRevenue: 0,
+                  rating: avgRating
+                };
+              }
+              // Tính số vé cho mỗi lượt đặt
+              movieCounts[movieId].ticketCount += (ticket.seats?.length || 1);
+              // Cộng dồn doanh thu
+              movieCounts[movieId].totalRevenue += (ticket.finalAmount || ticket.totalAmount || 0);
+            }
+          }
+        });
+
+        // ĐỔI SORT THEO RATING thay vì doanh thu hay vé
+        const sortedMovies = Object.values(movieCounts)
+          .sort((a, b) => b.rating - a.rating)
+          .slice(0, 4);
+
+        setTopMovies(sortedMovies);
+      } catch (error) {
+        console.error("Lỗi khi lấy dữ liệu:", error);
+      }
+    };
+
+    fetchTopMovies();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -186,7 +282,7 @@ export default function AdminDashboard() {
         <div className="bg-cinema-surface rounded-xl border border-cinema-border p-5">
           <h3 className="font-heading font-bold text-white mb-4">Phim ăn khách nhất</h3>
           <div className="space-y-3">
-            {MOVIES.sort((a, b) => b.rating - a.rating).slice(0, 4).map((movie, i) => (
+            {topMovies.length > 0 ? topMovies.map((movie, i) => (
               <div key={movie.id} className="flex items-center gap-3">
                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                   i === 0 ? 'bg-primary text-cinema-black' :
@@ -198,16 +294,18 @@ export default function AdminDashboard() {
                   className="w-9 h-12 object-cover rounded flex-shrink-0"
                   onError={e => { e.target.src = 'https://placehold.co/50x70/1E1E2C/A0A0B4'; }} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-xs font-medium truncate">{movie.title}</p>
+                  <p className="text-white text-xs font-medium truncate" title={movie.title}>{movie.title}</p>
                   <div className="flex items-center gap-1 mt-0.5">
                     <svg className="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                    </svg>
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                      </svg>
                     <span className="text-primary text-xs font-semibold">{movie.rating}</span>
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <p className="text-cinema-muted text-xs">Chưa có dữ liệu đặt vé.</p>
+            )}
           </div>
         </div>
       </div>
@@ -228,7 +326,7 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-cinema-border/50">
-              {RECENT_BOOKINGS.map(b => (
+              {recentBookings.length > 0 ? recentBookings.map(b => (
                 <tr key={b.id} className="hover:bg-cinema-card/50 transition-colors">
                   <td className="px-4 py-3 text-primary font-mono text-xs font-bold">#{b.id}</td>
                   <td className="px-4 py-3 text-white text-sm">{b.user}</td>
@@ -237,7 +335,11 @@ export default function AdminDashboard() {
                   <td className="px-4 py-3 text-primary text-sm font-semibold">{b.total.toLocaleString('vi-VN')}đ</td>
                   <td className="px-4 py-3 text-cinema-muted text-xs">{b.time}</td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan="6" className="px-4 py-6 text-center text-cinema-muted text-sm">Chưa có vé nào được đặt.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

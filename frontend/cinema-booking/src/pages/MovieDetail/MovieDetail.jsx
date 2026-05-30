@@ -7,6 +7,7 @@ import MovieCard from '../../components/movie/MovieCard';
 import ReviewSection from '../../components/movie/ReviewSection';
 import useFavoriteStore from '../../store/favoriteStore';
 import useNotificationStore from '../../store/notificationStore';
+import api from '../../services/api';
 
 function StarRating({ rating }) {
   return (
@@ -28,14 +29,33 @@ export default function MovieDetail() {
 
   useEffect(() => {
     setLoading(true);
-    movieService.getById(id)
-      .then(data => {
-        setMovie(data);
-        if (data) {
+    Promise.all([
+      movieService.getById(id),
+      api.get('/v1/movie-reviews', { params: { movieId: id, size: 100 } }).catch(() => ({ data: [] }))
+    ])
+      .then(([movieData, reviewRes]) => {
+        if (movieData) {
+          // Calculate dynamic rating
+          let reviews = [];
+          if (Array.isArray(reviewRes.data)) reviews = reviewRes.data;
+          else if (Array.isArray(reviewRes.data?.data)) reviews = reviewRes.data.data;
+          else if (Array.isArray(reviewRes.data?.content)) reviews = reviewRes.data.content;
+          else if (Array.isArray(reviewRes.data?.data?.content)) reviews = reviewRes.data.data.content;
+          
+          let computedRating = 0;
+          if (reviews.length > 0) {
+            computedRating = (reviews.reduce((sum, r) => sum + (r.rating || 5), 0) / reviews.length).toFixed(1);
+          }
+          movieData.rating = computedRating;
+          
+          setMovie(movieData);
+          
           movieService.getAll().then(all => {
-            const related = all.filter(m => m.id !== data.id && m.genre.some(g => data.genre.includes(g))).slice(0, 6);
+            const related = all.filter(m => m.id !== movieData.id && m.genre.some(g => movieData.genre.includes(g))).slice(0, 6);
             setRelatedMovies(related);
           });
+        } else {
+          setMovie(null);
         }
       })
       .finally(() => setLoading(false));

@@ -1,7 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MOVIES, MOVIE_STATS, AGE_RATINGS } from '../../constants/mockData';
+import { AGE_RATINGS } from '../../constants/mockData';
+import movieService from '../../services/movieService';
+import ticketService from '../../services/ticketService';
+import api from '../../services/api';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -178,73 +181,132 @@ const TABS = [
 
 export default function TopMovies() {
   const [activeTab, setActiveTab] = useState('all');
+  const [apiMovies, setApiMovies] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Tạo statsMap để lookup nhanh
-  const statsMap = useMemo(() => {
-    return MOVIE_STATS.reduce((acc, s) => {
-      acc[s.movieId] = s;
-      return acc;
-    }, {});
+  useEffect(() => {
+    const fetchTopMoviesData = async () => {
+      setLoading(true);
+      try {
+        const [ticketsRes, moviesRes, reviewsRes] = await Promise.all([
+          ticketService.getAll({ size: 10000 }),
+          movieService.getAll(),
+          api.get('/v1/movie-reviews', { params: { size: 1000 } }).catch(() => ({ data: [] }))
+        ]);
+        
+        const tickets = Array.isArray(ticketsRes) ? ticketsRes : ticketsRes?.content || ticketsRes?.data || [];
+        const allMovies = moviesRes || [];
+        
+        let reviewsData = [];
+        if (reviewsRes && reviewsRes.data) {
+          if (Array.isArray(reviewsRes.data)) reviewsData = reviewsRes.data;
+          else if (Array.isArray(reviewsRes.data.data)) reviewsData = reviewsRes.data.data;
+          else if (Array.isArray(reviewsRes.data.content)) reviewsData = reviewsRes.data.content;
+          else if (Array.isArray(reviewsRes.data.data?.content)) reviewsData = reviewsRes.data.data.content;
+        }
+
+        const statsMap = {};
+        allMovies.forEach(m => {
+          // Tính trung bình đánh giá
+          const movieReviews = reviewsData.filter(r => r.movieId === m.id);
+          let avgRating = 0;
+          if (movieReviews.length > 0) {
+            avgRating = parseFloat((movieReviews.reduce((sum, r) => sum + (r.rating || 5), 0) / movieReviews.length).toFixed(1));
+          }
+          
+          statsMap[m.id] = {
+            ticketsSold: 0,
+            revenue: 0,
+            allTimeRevenue: 0,
+            rating: avgRating
+          };
+        });
+
+        tickets.forEach(ticket => {
+          if (ticket.paymentStatus === 'PAID' && ticket.movieId) {
+            if (statsMap[ticket.movieId]) {
+              statsMap[ticket.movieId].ticketsSold += (ticket.seats?.length || 1);
+              const amount = ticket.finalAmount || ticket.totalAmount || 0;
+              statsMap[ticket.movieId].revenue += amount;
+              statsMap[ticket.movieId].allTimeRevenue += amount;
+            }
+          }
+        });
+
+        const mergedMovies = allMovies.map(m => ({
+          ...m,
+          rating: statsMap[m.id]?.rating || 0,
+          stat: statsMap[m.id] || { ticketsSold: 0, revenue: 0, allTimeRevenue: 0 }
+        }));
+
+        setApiMovies(mergedMovies);
+      } catch (err) {
+        console.error("Lỗi tải API top phim:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTopMoviesData();
   }, []);
-
-  // Danh sách phim có stats
-  const moviesWithStats = useMemo(() => {
-    return MOVIES.map((m) => ({
-      ...m,
-      stat: statsMap[m.id] || { ticketsSold: 0, revenue: 0, allTimeRevenue: 0 },
-    }));
-  }, [statsMap]);
 
   // Top đang chiếu theo doanh thu
   const topNowShowing = useMemo(() =>
-    moviesWithStats
+    apiMovies
       .filter((m) => m.status === 'now_showing')
-      .sort((a, b) => b.stat.ticketsSold - a.stat.ticketsSold)
+      .sort((a, b) => b.stat.revenue - a.stat.revenue)
       .slice(0, 5),
-    [moviesWithStats]
+    [apiMovies]
   );
 
-  // Top tất cả phim theo rating
-  const topAllRating = useMemo(() =>
-    [...moviesWithStats].sort((a, b) => b.rating - a.rating).slice(0, 5),
-    [moviesWithStats]
+  // Top tất cả phim theo doanh thu (dùng thay cho rating)
+  const topAllRevenue = useMemo(() =>
+    [...apiMovies].sort((a, b) => b.stat.revenue - a.stat.revenue).slice(0, 5),
+    [apiMovies]
   );
 
   // Top mọi thời đại theo doanh thu
   const topAllTime = useMemo(() =>
-    [...moviesWithStats].sort((a, b) => b.stat.allTimeRevenue - a.stat.allTimeRevenue).slice(0, 5),
-    [moviesWithStats]
+    [...apiMovies].sort((a, b) => b.stat.allTimeRevenue - a.stat.allTimeRevenue).slice(0, 5),
+    [apiMovies]
   );
 
-  // Top tình cảm
+  // Top tình cảm theo doanh thu
   const topRomance = useMemo(() =>
-    moviesWithStats
+    apiMovies
       .filter((m) => m.genre.some((g) => ['Tình cảm', 'Hài', 'Gia đình'].includes(g)))
-      .sort((a, b) => b.rating - a.rating)
+      .sort((a, b) => b.stat.revenue - a.stat.revenue)
       .slice(0, 5),
-    [moviesWithStats]
+    [apiMovies]
   );
 
-  // Top hành động
+  // Top hành động theo doanh thu
   const topAction = useMemo(() =>
-    moviesWithStats
+    apiMovies
       .filter((m) => m.genre.some((g) => ['Hành động', 'Phiêu lưu'].includes(g)))
-      .sort((a, b) => b.stat.ticketsSold - a.stat.ticketsSold)
+      .sort((a, b) => b.stat.revenue - a.stat.revenue)
       .slice(0, 5),
-    [moviesWithStats]
+    [apiMovies]
   );
 
-  // Top hoạt hình
+  // Top hoạt hình theo doanh thu
   const topAnimated = useMemo(() =>
-    moviesWithStats
+    apiMovies
       .filter((m) => m.genre.includes('Hoạt hình'))
-      .sort((a, b) => b.rating - a.rating)
+      .sort((a, b) => b.stat.revenue - a.stat.revenue)
       .slice(0, 5),
-    [moviesWithStats]
+    [apiMovies]
   );
 
   // Số 1 hiện tại để hiển thị hero
-  const heroMovie = topNowShowing[0] || topAllRating[0];
+  const heroMovie = topNowShowing[0] || topAllRevenue[0];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -310,9 +372,9 @@ export default function TopMovies() {
         {activeTab === 'all' && (
           <div className="grid sm:grid-cols-3 gap-4 mb-10">
             {[
-              { rank: 1, movie: topNowShowing[0] || topAllRating[0], label: 'Phim Hot Nhất', icon: '🥇' },
-              { rank: 2, movie: topNowShowing[1] || topAllRating[1], label: 'Xếp Hạng 2', icon: '🥈' },
-              { rank: 3, movie: topNowShowing[2] || topAllRating[2], label: 'Xếp Hạng 3', icon: '🥉' },
+              { rank: 1, movie: topNowShowing[0] || topAllRevenue[0], label: 'Phim Hot Nhất', icon: '🥇' },
+              { rank: 2, movie: topNowShowing[1] || topAllRevenue[1], label: 'Xếp Hạng 2', icon: '🥈' },
+              { rank: 3, movie: topNowShowing[2] || topAllRevenue[2], label: 'Xếp Hạng 3', icon: '🥉' },
             ].map(({ rank, movie, label, icon }) => movie && (
               <motion.div
                 key={rank}
@@ -339,7 +401,7 @@ export default function TopMovies() {
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-primary text-xs font-semibold">⭐ {movie.rating}</span>
                       <span className="text-cinema-muted text-xs">
-                        {formatRevenue(statsMap[movie.id]?.revenue || 0)}
+                        {formatRevenue(movie.stat?.revenue || 0)}
                       </span>
                     </div>
                   </div>
@@ -360,7 +422,7 @@ export default function TopMovies() {
             title="Top Phim Đang Chiếu"
             icon="🔥"
             movies={topNowShowing}
-            statsMap={statsMap}
+            statsMap={apiMovies.reduce((acc, m) => ({ ...acc, [m.id]: m.stat }), {})}
             showRevenue
             showTickets
           />
@@ -371,7 +433,7 @@ export default function TopMovies() {
             title="Top Doanh Thu Cao Nhất"
             icon="💰"
             movies={topAllTime}
-            statsMap={statsMap}
+            statsMap={apiMovies.reduce((acc, m) => ({ ...acc, [m.id]: m.stat }), {})}
             showRevenue
           />
         )}
@@ -381,7 +443,7 @@ export default function TopMovies() {
             title="Top Phim Tình Cảm & Gia Đình"
             icon="💕"
             movies={topRomance}
-            statsMap={statsMap}
+            statsMap={apiMovies.reduce((acc, m) => ({ ...acc, [m.id]: m.stat }), {})}
             showTickets
           />
         )}
@@ -391,7 +453,7 @@ export default function TopMovies() {
             title="Top Phim Hành Động & Phiêu Lưu"
             icon="⚡"
             movies={topAction}
-            statsMap={statsMap}
+            statsMap={apiMovies.reduce((acc, m) => ({ ...acc, [m.id]: m.stat }), {})}
             showTickets
           />
         )}
@@ -400,8 +462,8 @@ export default function TopMovies() {
           <TopSection
             title="Top Phim Hoạt Hình"
             icon="🎨"
-            movies={topAnimated.length > 0 ? topAnimated : topAllRating.filter((m) => m.rating >= 7)}
-            statsMap={statsMap}
+            movies={topAnimated.length > 0 ? topAnimated : topAllRevenue.filter((m) => m.rating >= 7)}
+            statsMap={apiMovies.reduce((acc, m) => ({ ...acc, [m.id]: m.stat }), {})}
             showRevenue
           />
         )}

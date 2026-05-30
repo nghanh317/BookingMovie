@@ -11,7 +11,7 @@ const payosService = {
    */
   createPaymentLink: async (ticketId) => {
     const res = await api.post('/v1/payos/create-link', { ticketId });
-    return res.data.checkoutUrl;
+    return res.data;
   },
 
 };

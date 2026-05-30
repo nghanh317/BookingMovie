@@ -58,6 +58,11 @@ public class BookingSeatService implements IBookingSeatService{
 		bookingSeatRepository.save(bookingSeats);
 	}
 	
-	
-
+	@Override
+	public List<Integer> getBookedSeatsBySlot(Integer slotId) {
+		List<BookingSeats> booked = bookingSeatRepository.findByTickets_Slots_IdAndIsDeleted(slotId, false);
+		return booked.stream()
+			.map(bs -> bs.getSeats().getId())
+			.collect(java.util.stream.Collectors.toList());
+	}
 }

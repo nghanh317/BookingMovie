@@ -41,8 +41,8 @@ const ticketService = {
   },
 
   /** Chi tiết một vé — GET /api/v1/tickets/{id} */
-  getById: async (id) => {
-    const res = await api.get(`/v1/tickets/${id}`);
+  getById: async (id, params = {}) => {
+    const res = await api.get(`/v1/tickets/${id}`, { params });
     return res.data;
   },
 

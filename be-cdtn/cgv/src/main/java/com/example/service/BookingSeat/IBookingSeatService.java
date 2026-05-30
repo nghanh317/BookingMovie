@@ -14,5 +14,7 @@ public interface IBookingSeatService {
 	BookingSeatDTO getById (Integer id);
 	
 	void create(CreatBookingSeatForm form);
+	
+	java.util.List<Integer> getBookedSeatsBySlot(Integer slotId);
 
 }

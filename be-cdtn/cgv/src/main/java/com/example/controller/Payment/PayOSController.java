@@ -30,8 +30,8 @@ public class PayOSController {
             if (ticketId == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Thiếu ticketId"));
             }
-            String checkoutUrl = payOSService.createPaymentLink(ticketId);
-            return ResponseEntity.ok(Map.of("checkoutUrl", checkoutUrl));
+            vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse response = payOSService.createPaymentLink(ticketId);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

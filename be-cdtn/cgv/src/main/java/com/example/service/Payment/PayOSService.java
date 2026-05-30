@@ -73,7 +73,7 @@ public class PayOSService {
     // ─────────────────────────────────────────────────────────────
     // LUỒNG 1: Tạo link thanh toán PayOS
     // ─────────────────────────────────────────────────────────────
-    public String createPaymentLink(Integer ticketId) throws Exception {
+    public CreatePaymentLinkResponse createPaymentLink(Integer ticketId) throws Exception {
         Tickets ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy vé ID: " + ticketId));
 
@@ -108,7 +108,7 @@ public class PayOSService {
                 .build();
 
         CreatePaymentLinkResponse response = payOS.paymentRequests().create(request);
-        return response.getCheckoutUrl();
+        return response;
     }
 
     // ─────────────────────────────────────────────────────────────
