@@ -35,15 +35,15 @@ public class News implements Serializable{
 	@GeneratedValue (strategy = GenerationType.IDENTITY)
 	private Integer id;
 	
-	@Column ( name = "title", length = 200, nullable = false)
+	@Column ( name = "title", length = 1000, nullable = false)
 	@NonNull
 	private String title;
 	
-	@Column ( name = "content", nullable = false)
+	@Column ( name = "content", nullable = false, columnDefinition = "TEXT")
 	@NonNull
 	private String content;
 	
-	@Column (name = "image_url", length = 255)
+	@Column (name = "image_url", length = 2000)
 	private String imageUrl;
 	
 	@Column ( name = "create_at")

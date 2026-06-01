@@ -129,6 +129,22 @@ public class Movies implements Serializable{
 		}
 	}
 	
+	public Double getRating() {
+		if (reviews == null || reviews.isEmpty()) {
+			return 0.0;
+		}
+		double sum = 0;
+		int count = 0;
+		for (MovieReviews review : reviews) {
+			if (review.getRating() != null && (review.getIsDeleted() == null || !review.getIsDeleted())) {
+				sum += review.getRating();
+				count++;
+			}
+		}
+		if (count == 0) return 0.0;
+		return Math.round((sum / count) * 10.0) / 10.0;
+	}
+	
 	
 @Getter
 @NoArgsConstructor

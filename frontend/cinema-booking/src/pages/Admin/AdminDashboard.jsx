@@ -6,12 +6,7 @@ import ticketService from '../../services/ticketService';
 import movieService from '../../services/movieService';
 import api from '../../services/api';
 
-const STATS = [
-  { label: 'Tổng phim', value: MOVIES.length, icon: '🎬', change: '+2 tháng này', color: 'border-blue-500/30 bg-blue-500/5' },
-  { label: 'Rạp chiếu phim', value: CINEMAS.length, icon: '🏟️', change: 'Đang hoạt động', color: 'border-green-500/30 bg-green-500/5' },
-  { label: 'Vé đã bán hôm nay', value: 247, icon: '🎟️', change: '+18% so hôm qua', color: 'border-primary/30 bg-primary/5' },
-  { label: 'Doanh thu hôm nay', value: '24.7M', icon: '💰', change: '+12% so hôm qua', color: 'border-accent/30 bg-accent/5' },
-];
+// STATS is now dynamically loaded in component
 
 const RECENT_BOOKINGS = [
   { id: 'CB2F4A9K', user: 'Nguyễn Văn An', movie: 'Avengers: Secret Wars', seats: 2, total: 260000, time: '2 phút trước' },
@@ -21,27 +16,37 @@ const RECENT_BOOKINGS = [
   { id: 'CB7M3STV', user: 'Hoàng Văn Em', movie: 'Dune: Phần Ba', seats: 2, total: 220000, time: '2 giờ trước' },
 ];
 
-const REVENUE_WEEKLY = [180, 220, 195, 310, 280, 410, 247];
-const DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-const maxRevenue = Math.max(...REVENUE_WEEKLY);
+const safeParseDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  if (typeof dateStr === 'number' || dateStr instanceof Date) return new Date(dateStr);
+  
+  const defaultParsed = new Date(dateStr);
+  if (!isNaN(defaultParsed.getTime())) return defaultParsed;
+
+  try {
+    const [d, t] = String(dateStr).split(' ');
+    if (d) {
+      const parts = d.split('-');
+      if (parts.length === 3) {
+        const [dd, MM, yyyy] = parts;
+        const year = yyyy.startsWith('00') ? '20' + yyyy.slice(2) : yyyy;
+        const parsed = new Date(`${year}-${MM}-${dd}T${t || '00:00:00'}`);
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
+    }
+  } catch (e) {}
+  
+  return new Date(); // fallback safe
+};
 
 const formatTimeAgo = (dateStr) => {
   if (!dateStr) return 'Gần đây';
-  const diff = Math.floor((new Date() - new Date(dateStr)) / 1000);
+  const diff = Math.floor((new Date() - safeParseDate(dateStr)) / 1000);
   if (diff < 60) return 'Vừa xong';
   if (diff < 3600) return Math.floor(diff / 60) + ' phút trước';
   if (diff < 86400) return Math.floor(diff / 3600) + ' giờ trước';
   return Math.floor(diff / 86400) + ' ngày trước';
 };
-
-// ── Pie chart data ─────────────────────────────────────────
-const PIE_DATA = [
-  { label: 'Hành động',  value: 35, color: '#F5A623' },
-  { label: 'Hoạt hình',  value: 22, color: '#4A90E2' },
-  { label: 'Tình cảm',   value: 18, color: '#E84393' },
-  { label: 'Kinh dị',    value: 14, color: '#7B61FF' },
-  { label: 'Khác',       value: 11, color: '#50C878' },
-];
 
 function PieChart({ data }) {
   const total = data.reduce((s, d) => s + d.value, 0);
@@ -112,21 +117,36 @@ export default function AdminDashboard() {
   const [chartType, setChartType] = useState('bar'); // 'bar' | 'pie'
   const [topMovies, setTopMovies] = useState([]);
   const [recentBookings, setRecentBookings] = useState([]);
+  
+  const [statsData, setStatsData] = useState([
+    { label: 'Tổng phim', value: 0, icon: '🎬', change: 'Đang tải...', color: 'border-blue-500/30 bg-blue-500/5' },
+    { label: 'Rạp chiếu phim', value: 0, icon: '🏟️', change: 'Đang tải...', color: 'border-green-500/30 bg-green-500/5' },
+    { label: 'Vé đã bán hôm nay', value: 0, icon: '🎟️', change: 'Đang tải...', color: 'border-primary/30 bg-primary/5' },
+    { label: 'Doanh thu hôm nay', value: '0', icon: '💰', change: 'Đang tải...', color: 'border-accent/30 bg-accent/5' },
+  ]);
+
+  const [revenueChart, setRevenueChart] = useState([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  const [chartLabels, setChartLabels] = useState(['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12']);
+  const [pieData, setPieData] = useState([{ label: 'Chưa có dữ liệu', value: 100, color: '#50C878' }]);
+  const [totalAllTimeRevenue, setTotalAllTimeRevenue] = useState(0);
 
   useEffect(() => {
-    const fetchTopMovies = async () => {
+    let intervalId;
+
+    const fetchDashboardData = async () => {
       try {
-        const [res, allMovies, reviewsRes] = await Promise.all([
+        const [res, allMovies, reviewsRes, cinemasRes] = await Promise.all([
           ticketService.getAll({ size: 1000 }),
           movieService.getAll(),
-          api.get('/v1/movie-reviews', { params: { size: 1000 } }).catch(() => ({ data: [] }))
+          api.get('/v1/movie-reviews', { params: { size: 1000 } }).catch(() => ({ data: [] })),
+          api.get('/v1/cinemas').catch(() => ({ data: [] }))
         ]);
         const tickets = Array.isArray(res) ? res : res?.content || res?.data || [];
         
         // Xử lý danh sách Đặt vé gần đây
         const sortedBookings = [...tickets].sort((a, b) => {
-          const dateA = new Date(a.ticketsDate || a.createDate || 0);
-          const dateB = new Date(b.ticketsDate || b.createDate || 0);
+          const dateA = safeParseDate(a.ticketsDate || a.createDate || 0);
+          const dateB = safeParseDate(b.ticketsDate || b.createDate || 0);
           return dateB - dateA; // Mới nhất lên đầu
         });
         
@@ -150,8 +170,41 @@ export default function AdminDashboard() {
 
         const movieCounts = {};
         
+        const todayStr = new Date().toISOString().split('T')[0];
+        let todayTicketsCount = 0;
+        let todayRevenueAmount = 0;
+        
+        // Cấu trúc 12 tháng của năm hiện tại
+        const currentYear = new Date().getFullYear();
+        const yearMonths = [];
+        const mLabels = [];
+        for (let i = 1; i <= 12; i++) {
+          yearMonths.push({ month: i, revenue: 0 });
+          mLabels.push(`T${i}`);
+        }
+
+        const genreRevenue = {};
+        let allTimeRevenueAmount = 0;
+        
         tickets.forEach(ticket => {
           if (ticket.paymentStatus === 'PAID') {
+            const ticketDate = safeParseDate(ticket.ticketsDate || ticket.createDate || Date.now());
+            const ticketDateStr = ticketDate.toISOString().split('T')[0];
+            const amount = (ticket.finalAmount || ticket.totalAmount || 0);
+
+            allTimeRevenueAmount += amount;
+
+            if (ticketDateStr === todayStr) {
+              todayTicketsCount += (ticket.seats?.length || 1);
+              todayRevenueAmount += amount;
+            }
+
+            // Doanh thu theo tháng
+            if (ticketDate.getFullYear() === currentYear) {
+              const monthIndex = ticketDate.getMonth();
+              yearMonths[monthIndex].revenue += amount;
+            }
+
             const movieId = ticket.movieId;
             if (movieId) {
               if (!movieCounts[movieId]) {
@@ -176,10 +229,68 @@ export default function AdminDashboard() {
               // Tính số vé cho mỗi lượt đặt
               movieCounts[movieId].ticketCount += (ticket.seats?.length || 1);
               // Cộng dồn doanh thu
-              movieCounts[movieId].totalRevenue += (ticket.finalAmount || ticket.totalAmount || 0);
+              movieCounts[movieId].totalRevenue += amount;
+            }
+
+            // Tính doanh thu theo thể loại
+            if (movieId) {
+              const dbMovie = allMovies.find(m => m.id === movieId);
+              if (dbMovie && dbMovie.genre && dbMovie.genre.length > 0) {
+                const amountPerGenre = amount / dbMovie.genre.length;
+                dbMovie.genre.forEach(g => {
+                  if (!genreRevenue[g]) genreRevenue[g] = 0;
+                  genreRevenue[g] += amountPerGenre;
+                });
+              }
             }
           }
         });
+
+        let formattedRevenue = todayRevenueAmount.toLocaleString('vi-VN') + 'đ';
+        if (todayRevenueAmount >= 1e9) formattedRevenue = (todayRevenueAmount / 1e9).toFixed(1) + ' Tỷ';
+        else if (todayRevenueAmount >= 1e6) formattedRevenue = (todayRevenueAmount / 1e6).toFixed(1) + 'M';
+
+        let cinemasCount = 0;
+        if (cinemasRes && cinemasRes.data) {
+          cinemasCount = Array.isArray(cinemasRes.data) ? cinemasRes.data.length : (cinemasRes.data.content?.length || cinemasRes.data.data?.length || 0);
+        }
+
+        setStatsData([
+          { label: 'Tổng phim', value: allMovies.length, icon: '🎬', change: 'Đang chiếu & Sắp chiếu', color: 'border-blue-500/30 bg-blue-500/5' },
+          { label: 'Rạp chiếu phim', value: cinemasCount, icon: '🏟️', change: 'Đang hoạt động', color: 'border-green-500/30 bg-green-500/5' },
+          { label: 'Vé đã bán hôm nay', value: todayTicketsCount, icon: '🎟️', change: 'Realtime', color: 'border-primary/30 bg-primary/5' },
+          { label: 'Doanh thu hôm nay', value: formattedRevenue, icon: '💰', change: 'Realtime', color: 'border-accent/30 bg-accent/5' },
+        ]);
+
+        // Cập nhật biểu đồ doanh thu và thể loại
+        const PIE_COLORS = ['#F5A623', '#4A90E2', '#E84393', '#7B61FF', '#50C878'];
+        const sortedGenres = Object.entries(genreRevenue).sort((a, b) => b[1] - a[1]);
+        let formattedPieData = [];
+        let totalGenreRevenue = sortedGenres.reduce((sum, [k, v]) => sum + v, 0);
+
+        if (totalGenreRevenue > 0) {
+          const top4 = sortedGenres.slice(0, 4);
+          const others = sortedGenres.slice(4).reduce((sum, [k, v]) => sum + v, 0);
+          formattedPieData = top4.map(([label, val], idx) => ({
+            label,
+            value: Math.round((val / totalGenreRevenue) * 100),
+            color: PIE_COLORS[idx]
+          }));
+          if (others > 0) {
+            formattedPieData.push({
+              label: 'Khác',
+              value: Math.round((others / totalGenreRevenue) * 100),
+              color: PIE_COLORS[4]
+            });
+          }
+        } else {
+          formattedPieData = [{ label: 'Chưa có dữ liệu', value: 100, color: '#50C878' }];
+        }
+
+        const monthlyRevArr = yearMonths.map(m => Number((m.revenue / 1000000).toFixed(1)));
+        setRevenueChart(monthlyRevArr);
+        setChartLabels(mLabels);
+        setTotalAllTimeRevenue(allTimeRevenueAmount);
 
         // ĐỔI SORT THEO RATING thay vì doanh thu hay vé
         const sortedMovies = Object.values(movieCounts)
@@ -192,7 +303,15 @@ export default function AdminDashboard() {
       }
     };
 
-    fetchTopMovies();
+    // Lần đầu tiên gọi ngay lập tức
+    fetchDashboardData();
+
+    // Thiết lập polling cập nhật tự động mỗi 5 giây
+    intervalId = setInterval(() => {
+      fetchDashboardData();
+    }, 5000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   return (
@@ -213,7 +332,7 @@ export default function AdminDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {STATS.map((stat, i) => <StatCard key={stat.label} stat={stat} index={i} />)}
+        {statsData.map((stat, i) => <StatCard key={stat.label} stat={stat} index={i} />)}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
@@ -221,8 +340,12 @@ export default function AdminDashboard() {
         <div className="lg:col-span-2 bg-cinema-surface rounded-xl border border-cinema-border p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-heading font-bold text-white">Doanh thu 7 ngày qua</h3>
-              <span className="text-primary text-sm font-medium">1,842M tổng</span>
+              <h3 className="font-heading font-bold text-white">Tổng doanh thu</h3>
+              <span className="text-primary text-sm font-medium">
+                {totalAllTimeRevenue >= 1e9 
+                  ? (totalAllTimeRevenue / 1e9).toFixed(2) + ' Tỷ' 
+                  : (totalAllTimeRevenue / 1e6).toFixed(1) + 'M'} tổng
+              </span>
             </div>
             {/* Chart type toggle */}
             <div className="flex gap-1 bg-cinema-card rounded-lg p-1 border border-cinema-border">
@@ -256,25 +379,26 @@ export default function AdminDashboard() {
 
           {chartType === 'bar' ? (
             <div className="flex items-end gap-2 h-40">
-              {REVENUE_WEEKLY.map((val, i) => {
+              {revenueChart.map((val, i) => {
+                const maxRevenue = Math.max(...revenueChart, 1); // Tránh chia cho 0
                 const heightPct = (val / maxRevenue) * 100;
-                const isToday = i === REVENUE_WEEKLY.length - 1;
+                const isCurrentMonth = i === new Date().getMonth();
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-                    <span className="text-cinema-muted text-[10px]">{val}M</span>
+                    <span className="text-cinema-muted text-[10px]">{val > 0 ? val + 'M' : ''}</span>
                     <div className="w-full relative">
                       <div
-                        className={`w-full rounded-t-md transition-all duration-700 ${isToday ? 'bg-gradient-gold' : 'bg-cinema-card hover:bg-cinema-border'}`}
-                        style={{ height: `${heightPct * 0.9}px` }}
+                        className={`w-full rounded-t-md transition-all duration-700 ${isCurrentMonth ? 'bg-gradient-gold' : 'bg-cinema-card hover:bg-cinema-border'}`}
+                        style={{ height: `${Math.max(heightPct * 0.9, 2)}px` }} // tối thiểu 2px để nhìn thấy
                       />
                     </div>
-                    <span className={`text-[10px] font-medium ${isToday ? 'text-primary' : 'text-cinema-muted'}`}>{DAYS[i]}</span>
+                    <span className={`text-[10px] font-medium ${isCurrentMonth ? 'text-primary' : 'text-cinema-muted'}`}>{chartLabels[i]}</span>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <PieChart data={PIE_DATA} />
+            <PieChart data={pieData} />
           )}
         </div>
 

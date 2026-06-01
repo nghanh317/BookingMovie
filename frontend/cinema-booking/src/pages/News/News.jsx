@@ -16,12 +16,29 @@ function estimateReadTime(content) {
   return `${mins} phút đọc`;
 }
 
+// Lọc sạch các thẻ HTML và HTML-encoded, đặc biệt là thẻ category ẩn
+export function getCleanExcerpt(content, length = 160) {
+  if (!content) return '';
+  let clean = content
+    .replace(/&lt;span.*?&gt;\[.*?\]&lt;\/span&gt;/gi, '') // Xoá span ẩn bị encode
+    .replace(/<span.*?>\[.*?\]<\/span>/gi, '')         // Xoá span ẩn bình thường
+    .replace(/<[^>]*>/g, '')                           // Xoá HTML thông thường
+    .replace(/&lt;[^&]*&gt;/gi, '')                    // Xoá HTML bị encode
+    .trim();
+  
+  // Xoá nốt chuỗi text thô nếu còn sót ở đầu
+  clean = clean.replace(/^\[(Tin tức|Review phim|Dự báo phim|Khuyến mãi)\]\s*/i, '');
+  
+  if (clean.length <= length) return clean;
+  return clean.slice(0, length) + '...';
+}
+
 // Heuristic: phát hiện category từ nội dung tin
 export function detectCategory(news) {
   const text = ((news.title || '') + ' ' + (news.content || '')).toLowerCase();
-  if (text.includes('khuyến mãi') || text.includes('giảm giá') || text.includes('ưu đãi') || text.includes('voucher')) return 'Khuyến mãi';
-  if (text.includes('review') || text.includes('đánh giá')) return 'Review phim';
-  if (text.includes('dự báo') || text.includes('ra mắt') || text.includes('sắp chiếu')) return 'Dự báo phim';
+  if (text.includes('[khuyến mãi]') || text.includes('khuyến mãi') || text.includes('giảm giá') || text.includes('ưu đãi') || text.includes('voucher')) return 'Khuyến mãi';
+  if (text.includes('[review phim]') || text.includes('review') || text.includes('đánh giá')) return 'Review phim';
+  if (text.includes('[dự báo phim]') || text.includes('dự báo') || text.includes('ra mắt') || text.includes('sắp chiếu')) return 'Dự báo phim';
   return 'Tin tức';
 }
 
@@ -52,9 +69,7 @@ function SkeletonCard() {
 // ─── Article Card ────────────────────────────────────────────────────
 function ArticleCard({ article, index }) {
   const category = detectCategory(article);
-  const excerpt = article.content
-    ? article.content.replace(/<[^>]*>/g, '').slice(0, 160) + '...'
-    : '';
+  const excerpt = getCleanExcerpt(article.content, 160);
 
   return (
     <motion.div
@@ -125,10 +140,30 @@ export default function News() {
     setLoading(true);
     setError(null);
     try {
-      const data = await newsService.getAll({ page, size: PAGE_SIZE, sort: 'id,desc' });
-      const content = data?.content ?? data ?? [];
-      setArticles(Array.isArray(content) ? content : []);
-      setTotalPages(data?.totalPages ?? 1);
+      const resData = await newsService.getAll({ page, size: PAGE_SIZE, sort: 'id,desc' });
+      
+      // Trích xuất an toàn bất kể backend bọc qua mấy lớp (ApiResponse)
+      let content = [];
+      let totalPages = 1;
+
+      if (resData) {
+        if (Array.isArray(resData)) {
+          content = resData;
+        } else if (resData.content && Array.isArray(resData.content)) {
+          content = resData.content;
+          totalPages = resData.totalPages || 1;
+        } else if (resData.data) {
+          if (Array.isArray(resData.data)) {
+            content = resData.data;
+          } else if (resData.data.content && Array.isArray(resData.data.content)) {
+            content = resData.data.content;
+            totalPages = resData.data.totalPages || 1;
+          }
+        }
+      }
+
+      setArticles(content);
+      setTotalPages(totalPages);
     } catch {
       setError('Không thể tải tin tức. Vui lòng thử lại!');
       setArticles([]);
@@ -158,10 +193,11 @@ export default function News() {
 
   // Client-side filter: category + search
   const filtered = articles.filter(a => {
+    if (a.isDeleted === true || a.isDeleted === 1 || a.isDeleted === 'true') return false;
     const cat = detectCategory(a);
     const matchCat = activeCategory === 'Tất cả' || cat === activeCategory;
     const matchSearch = !searchQuery ||
-      a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (a.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (a.content || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchCat && matchSearch;
   });
@@ -191,7 +227,7 @@ export default function News() {
                   {featured.title}
                 </h1>
                 <p className="text-cinema-muted max-w-xl leading-relaxed mb-5 text-sm line-clamp-2">
-                  {featured.content?.replace(/<[^>]*>/g, '').slice(0, 180)}...
+                  {getCleanExcerpt(featured.content, 180)}
                 </p>
                 <Link to={`/news/${featured.id}`} className="btn-primary px-6 py-2.5 text-sm inline-flex items-center gap-2">
                   Đọc ngay

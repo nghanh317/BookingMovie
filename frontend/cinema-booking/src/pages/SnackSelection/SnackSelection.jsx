@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import productService from '../../services/productService';
+import promotionService from '../../services/promotionService';
 
 const HOLD_MINUTES = 10; // Thời gian giữ ghế (phút)
 
@@ -46,59 +47,6 @@ function StepIndicator({ current }) {
   );
 }
 
-// ─── Countdown Timer ────────────────────────────────────────
-function CountdownTimer({ expiresAt, onExpired }) {
-  const calcMs = () => Math.max(0, new Date(expiresAt) - Date.now());
-  const [ms, setMs] = useState(() => calcMs());
-
-  useEffect(() => {
-    const initial = calcMs();
-    setMs(initial);
-    if (initial <= 0) { onExpired?.(); return; }
-    const iv = setInterval(() => {
-      setMs(prev => {
-        const next = prev - 1000;
-        if (next <= 0) { clearInterval(iv); onExpired?.(); return 0; }
-        return next;
-      });
-    }, 1000);
-    return () => clearInterval(iv);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expiresAt]);
-
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  const pct     = ms / (HOLD_MINUTES * 60000);
-  const isUrgent = ms < 60000;
-
-  return (
-    <div className={`rounded-xl border p-3 text-center transition-all ${
-      isUrgent
-        ? 'bg-red-500/10 border-red-500/30 animate-pulse'
-        : 'bg-primary/10 border-primary/30'
-    }`}>
-      <p className="text-xs text-cinema-muted mb-1">⏱ Thời gian giữ ghế còn lại</p>
-      <p className={`font-heading font-bold text-3xl tabular-nums ${
-        isUrgent ? 'text-red-400' : 'text-primary'
-      }`}>
-        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-      </p>
-      {/* Progress bar */}
-      <div className="mt-2 h-1 bg-cinema-border rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-1000 ${
-            isUrgent ? 'bg-red-400' : 'bg-primary'
-          }`}
-          style={{ width: `${Math.round(pct * 100)}%` }}
-        />
-      </div>
-      <p className="text-xs text-cinema-muted mt-1.5">
-        {isUrgent ? '⚠️ Sắp hết! Hoàn tất thanh toán ngay' : 'Hoàn tất trước khi hết hạn'}
-      </p>
-    </div>
-  );
-}
-
 function QuantityControl({ value, onChange }) {
   return (
     <div className="flex items-center gap-2">
@@ -135,31 +83,48 @@ export default function SnackSelection() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [quantities, setQuantities] = useState({});
+  const [vouchers, setVouchers] = useState([]);
+  const [selectedVoucher, setSelectedVoucher] = useState(null);
+  const [showVoucherDropdown, setShowVoucherDropdown] = useState(false);
 
-  // Fetch products từ API
+  // Fetch products và vouchers từ API
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
-        const res = await productService.getAll({ size: 200 });
+        const [resProducts, resPromotions] = await Promise.all([
+          productService.getAll({ size: 200 }),
+          promotionService.getAll({ size: 100 })
+        ]);
+        
         let items = [];
-        if (res?.content) items = res.content;
-        else if (res?.data?.content) items = res.data.content;
-        else if (Array.isArray(res?.data)) items = res.data;
-        else if (Array.isArray(res)) items = res;
+        if (resProducts?.content) items = resProducts.content;
+        else if (resProducts?.data?.content) items = resProducts.data.content;
+        else if (Array.isArray(resProducts?.data)) items = resProducts.data;
+        else if (Array.isArray(resProducts)) items = resProducts;
 
         setProducts(items);
-        // Khởi tạo quantities với mỗi id = 0
         const initial = {};
         items.forEach(p => { initial[p.id] = 0; });
         setQuantities(initial);
+
+        let promoItems = [];
+        if (resPromotions?.content) promoItems = resPromotions.content;
+        else if (resPromotions?.data?.content) promoItems = resPromotions.data.content;
+        else if (Array.isArray(resPromotions?.data)) promoItems = resPromotions.data;
+        else if (Array.isArray(resPromotions)) promoItems = resPromotions;
+
+        const validVouchers = promoItems.filter(v => v.status === 'ACTIVE');
+        setVouchers(validVouchers);
+
       } catch (err) {
-        console.error('[SnackSelection] fetch products error:', err.message);
+        console.error('[SnackSelection] fetch data error:', err.message);
         setProducts([]);
+        setVouchers([]);
       } finally {
         setLoading(false);
       }
     };
-    fetchProducts();
+    fetchData();
   }, []);
 
   if (!movie || !seats) {
@@ -193,15 +158,32 @@ export default function SnackSelection() {
 
   const snackTotal = selectedSnacks.reduce((sum, s) => sum + s.subtotal, 0);
 
+  const subTotalAmount = totalPrice + snackTotal;
+  
+  let discountAmount = 0;
+  if (selectedVoucher) {
+    if (subTotalAmount >= (selectedVoucher.minOrderAmount || 0)) {
+      if (selectedVoucher.discountType === 'PERCENTAGE') {
+        discountAmount = subTotalAmount * (selectedVoucher.discountValue / 100);
+        if (selectedVoucher.maxDiscountAmount) {
+          discountAmount = Math.min(discountAmount, selectedVoucher.maxDiscountAmount);
+        }
+      } else {
+        discountAmount = selectedVoucher.discountValue;
+      }
+    }
+  }
+  const finalTotal = Math.max(0, subTotalAmount - discountAmount);
+
   const handleSkip = () => {
     navigate(`/booking/${movieId}/checkout`, {
-      state: { movie, showtime, cinema, seats, totalPrice, snacks: [], lockExpiresAt: expiresAtRef.current },
+      state: { movie, showtime, cinema, seats, totalPrice, snacks: [], selectedVoucher, lockExpiresAt: expiresAtRef.current },
     });
   };
 
   const handleContinue = () => {
     navigate(`/booking/${movieId}/checkout`, {
-      state: { movie, showtime, cinema, seats, totalPrice, snacks: selectedSnacks, lockExpiresAt: expiresAtRef.current },
+      state: { movie, showtime, cinema, seats, totalPrice, snacks: selectedSnacks, selectedVoucher, lockExpiresAt: expiresAtRef.current },
     });
   };
 
@@ -309,12 +291,6 @@ export default function SnackSelection() {
           <div className="lg:col-span-1">
             <div className="card p-5 sticky top-24 space-y-4">
 
-              {/* ⏱ COUNTDOWN — hiển đầu tiên, nổi bật */}
-              <CountdownTimer
-                expiresAt={expiresAtRef.current}
-                onExpired={handleExpired}
-              />
-
               <h3 className="font-heading font-bold text-white">Tóm tắt đơn</h3>
 
               {/* Movie info */}
@@ -358,11 +334,95 @@ export default function SnackSelection() {
                 </div>
               )}
 
-              <div className="flex justify-between items-center border-t border-cinema-border pt-3 mb-5">
-                <span className="text-white font-bold">Tạm tính</span>
-                <span className="text-primary font-heading font-extrabold text-xl">
-                  {(totalPrice + snackTotal).toLocaleString('vi-VN')}đ
-                </span>
+              {/* Voucher Selection */}
+              <div className="border-t border-cinema-border pt-4 mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-white font-semibold text-sm">🎟 Khuyến mãi</span>
+                  {selectedVoucher && (
+                    <button 
+                      onClick={() => setSelectedVoucher(null)}
+                      className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      Bỏ chọn
+                    </button>
+                  )}
+                </div>
+                
+                {vouchers.length === 0 ? (
+                  <p className="text-cinema-muted text-xs">Không có khuyến mãi khả dụng</p>
+                ) : (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowVoucherDropdown(!showVoucherDropdown)}
+                      className="w-full flex items-center justify-between p-3 rounded-xl border border-cinema-border bg-cinema-dark hover:border-primary/50 transition-all text-sm"
+                    >
+                      <span className={selectedVoucher ? "text-primary font-bold" : "text-cinema-muted"}>
+                        {selectedVoucher ? selectedVoucher.promotionName : "Chọn khuyến mãi..."}
+                      </span>
+                      <span className="text-xs">▼</span>
+                    </button>
+
+                    <AnimatePresence>
+                      {showVoucherDropdown && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute top-full left-0 right-0 mt-2 bg-cinema-card border border-cinema-border rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto"
+                        >
+                          {vouchers.map(v => {
+                            const isEligible = subTotalAmount >= (v.minOrderAmount || 0);
+                            return (
+                              <button
+                                key={v.id}
+                                disabled={!isEligible}
+                                onClick={() => {
+                                  setSelectedVoucher(v);
+                                  setShowVoucherDropdown(false);
+                                }}
+                                className={`w-full text-left p-3 border-b border-cinema-border last:border-0 transition-colors ${
+                                  !isEligible ? 'opacity-50 cursor-not-allowed bg-cinema-surface/30' : 'hover:bg-cinema-surface'
+                                }`}
+                              >
+                                <div className="flex justify-between items-start mb-1">
+                                  <span className={`font-semibold text-sm ${!isEligible ? 'text-cinema-muted' : 'text-white'}`}>
+                                    {v.promotionName}
+                                  </span>
+                                  <span className="text-primary font-bold text-xs bg-primary/10 px-2 py-0.5 rounded">
+                                    {v.discountType === 'PERCENTAGE' ? `-${v.discountValue}%` : `-${v.discountValue.toLocaleString('vi-VN')}đ`}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-cinema-muted">
+                                  {v.minOrderAmount ? `Đơn tối thiểu ${(v.minOrderAmount).toLocaleString('vi-VN')}đ` : 'Áp dụng mọi đơn'}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </div>
+
+              {/* Total Calculation */}
+              <div className="space-y-2 border-t border-cinema-border pt-4 mb-5">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-cinema-muted">Tổng cộng</span>
+                  <span className="text-white font-medium">{subTotalAmount.toLocaleString('vi-VN')}đ</span>
+                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-cinema-muted">Giảm giá</span>
+                    <span className="text-red-400 font-bold">-{discountAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-end pt-2">
+                  <span className="text-white font-bold">Tạm tính</span>
+                  <span className="text-primary font-heading font-extrabold text-2xl leading-none">
+                    {finalTotal.toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
               </div>
 
               <button onClick={handleContinue} className="w-full btn-primary py-3 text-sm font-bold mb-2">

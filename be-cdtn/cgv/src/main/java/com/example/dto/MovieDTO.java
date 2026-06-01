@@ -31,6 +31,8 @@ public class MovieDTO {
 	    
 	private String trailerUrl;
 	
+	private Double rating;
+	
 	private Status status;
 	
 	private AgeRating ageRating;

@@ -280,11 +280,11 @@ export default function AdminReviews() {
                 {/* Movie header */}
                 <div className="flex items-center gap-4 p-4 border-b border-cinema-border bg-cinema-dark">
                   <img
-                    src={movie?.poster}
-                    alt={movie?.title}
+                    src={movie?.posterUrl || movie?.poster || 'https://placehold.co/50x70/1E1E2C/A0A0B4'}
+                    alt={movie?.title || 'Phim'}
                     className="w-10 h-14 object-cover rounded flex-shrink-0"
                     referrerPolicy="no-referrer"
-                    onError={e => { e.target.src = 'https://placehold.co/50x70/1E1E2C/A0A0B4'; }}
+                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/50x70/1E1E2C/A0A0B4'; }}
                   />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-heading font-bold text-white text-sm truncate">{movie?.title}</h3>

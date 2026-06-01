@@ -3,18 +3,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MOVIES, VOUCHERS } from '../../constants/mockData';
 import useNotificationStore from '../../store/notificationStore';
 import newsService from '../../services/newsService';
+import movieService from '../../services/movieService';
 
 // ── Tabs giống phía user ─────────────────────────────────────
 const TABS = [
   { key: 'review',  label: 'Review Phim',   icon: '🎬', category: 'Review phim' },
   { key: 'preview', label: 'Dự Báo Phim',   icon: '🔮', category: 'Dự báo phim' },
   { key: 'promo',   label: 'Khuyến Mãi',    icon: '🎉', category: 'Khuyến mãi' },
+  { key: 'news',    label: 'Tin Tức',       icon: '📰', category: 'Tin tức' },
 ];
 
 const CATEGORY_COLOR = {
   'Review phim': 'bg-primary/20 text-primary border-primary/30',
   'Dự báo phim': 'bg-accent/20 text-accent border-accent/30',
   'Khuyến mãi':  'bg-green-500/20 text-green-400 border-green-500/30',
+  'Tin tức':     'bg-blue-500/20 text-blue-400 border-blue-500/30',
 };
 
 function fmtDate(iso) {
@@ -23,7 +26,7 @@ function fmtDate(iso) {
 }
 
 // ── Modal tạo/sửa bài viết ───────────────────────────────────
-function ArticleModal({ mode, article, tab, onClose, onSave }) {
+function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [] }) {
   const tabMeta   = TABS.find(t => t.key === tab);
   const isPromo   = tab === 'promo';
   const isPreview = tab === 'preview';
@@ -199,7 +202,7 @@ function ArticleModal({ mode, article, tab, onClose, onSave }) {
               <div>
                 <label className="text-cinema-muted text-xs mb-1 block cursor-pointer">Liên kết phim (Dự báo)</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
-                  {MOVIES.map(m => {
+                  {dbMovies.map(m => {
                     const ids = Array.isArray(form.linkedMovieIds) 
                       ? form.linkedMovieIds 
                       : (typeof form.linkedMovieIds === 'string' ? form.linkedMovieIds.split(',').map(s => s.trim()).filter(Boolean) : []);
@@ -229,7 +232,7 @@ function ArticleModal({ mode, article, tab, onClose, onSave }) {
                 <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor="linkedMovieId">Liên kết phim</label>
                 <select id="linkedMovieId" className="input-field cursor-pointer w-full" value={form.linkedMovieId} onChange={e => {
                   const val = e.target.value;
-                  const movie = MOVIES.find(m => m.id === +val);
+                  const movie = dbMovies.find(m => m.id === +val);
                   if (movie) {
                     setForm(prev => ({ 
                       ...prev, 
@@ -242,7 +245,7 @@ function ArticleModal({ mode, article, tab, onClose, onSave }) {
                   }
                 }}>
                   <option value="">-- Không liên kết --</option>
-                  {MOVIES.map(m => (
+                  {dbMovies.map(m => (
                     <option key={m.id} value={m.id}>{m.title}</option>
                   ))}
                 </select>
@@ -407,6 +410,7 @@ function ArticleRow({ article, onEdit, onDelete, onTogglePublish }) {
 export default function AdminNews() {
   const [activeTab, setActiveTab] = useState('review');
   const [articles, setArticles]   = useState([]);
+  const [dbMovies, setDbMovies]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -418,22 +422,38 @@ export default function AdminNews() {
   const fetchNews = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await newsService.getAll({ page: 0, size: 200, sort: 'id,desc' });
-      const content = data?.content ?? data ?? [];
+      const resData = await newsService.getAll({ page: 0, size: 200, sort: 'id,desc' });
+      
+      let rawContent = [];
+      if (resData) {
+        if (Array.isArray(resData)) rawContent = resData;
+        else if (resData.content && Array.isArray(resData.content)) rawContent = resData.content;
+        else if (resData.data) {
+          if (Array.isArray(resData.data)) rawContent = resData.data;
+          else if (resData.data.content && Array.isArray(resData.data.content)) rawContent = resData.data.content;
+        }
+      }
+
       // Map sang format dùng trong Admin (thêm field published)
-      setArticles(Array.isArray(content) ? content.map(n => ({
+      setArticles(rawContent.map(n => ({
         ...n,
         published: !n.isDeleted,
         // map fields cho ArticleRow
         coverImage: n.imageUrl || '',
-        excerpt:    n.content?.replace(/<[^>]*>/g, '').slice(0, 120) || '',
+        excerpt:    (n.content || '')
+                      .replace(/&lt;span.*?&gt;\[.*?\]&lt;\/span&gt;/gi, '')
+                      .replace(/<span.*?>\[.*?\]<\/span>/gi, '')
+                      .replace(/<[^>]*>/g, '')
+                      .replace(/&lt;[^&]*&gt;/gi, '')
+                      .replace(/^\[(Tin tức|Review phim|Dự báo phim|Khuyến mãi)\]\s*/i, '')
+                      .slice(0, 120),
         author:     'Admin',
         authorAvatar: 'AD',
         publishedAt: n.createDate,
         category:   detectCategory(n),
         tags: [],
         rating: null,
-      })) : []);
+      })));
     } catch {
       addNotification({ title: 'Lỗi', message: 'Không thể tải danh sách tin tức.', type: 'error', isAdmin: true });
     } finally {
@@ -441,14 +461,23 @@ export default function AdminNews() {
     }
   }, []);
 
-  useEffect(() => { fetchNews(); }, [fetchNews]);
+  const fetchMovies = useCallback(async () => {
+    try {
+      const data = await movieService.getAll();
+      setDbMovies(data || []);
+    } catch {
+      console.error("Lỗi lấy danh sách phim cho tin tức");
+    }
+  }, []);
+
+  useEffect(() => { fetchNews(); fetchMovies(); }, [fetchNews, fetchMovies]);
 
   // Heuristic category detect (đồng bộ với News.jsx)
   function detectCategory(news) {
     const text = ((news.title || '') + ' ' + (news.content || '')).toLowerCase();
-    if (text.includes('khuyến mãi') || text.includes('giảm giá') || text.includes('ưu đãi') || text.includes('voucher')) return 'Khuyến mãi';
-    if (text.includes('review') || text.includes('đánh giá')) return 'Review phim';
-    if (text.includes('dự báo') || text.includes('ra mắt') || text.includes('sắp chiếu')) return 'Dự báo phim';
+    if (text.includes('[khuyến mãi]') || text.includes('khuyến mãi') || text.includes('giảm giá') || text.includes('ưu đãi') || text.includes('voucher')) return 'Khuyến mãi';
+    if (text.includes('[review phim]') || text.includes('review') || text.includes('đánh giá')) return 'Review phim';
+    if (text.includes('[dự báo phim]') || text.includes('dự báo') || text.includes('ra mắt') || text.includes('sắp chiếu')) return 'Dự báo phim';
     return 'Tin tức';
   }
 
@@ -490,15 +519,38 @@ export default function AdminNews() {
   // Actions — kết nối API
   const handleSave = async (data) => {
     try {
-      const payload = { title: data.title, content: data.excerpt || data.content || '', imageUrl: data.coverImage || '' };
+      // Gắn thẻ category ẩn để backend lưu và frontend detect lại chính xác
+      const contentStr = data.excerpt || data.content || '';
+      const hiddenCategory = `<span style="display:none">[${data.category}]</span>`;
+      const finalContent = contentStr.includes(`[${data.category}]`) ? contentStr : hiddenCategory + contentStr;
+
+      const payload = { title: data.title, content: finalContent, imageUrl: data.coverImage || '' };
+      
       if (data.id && articles.find(a => a.id === data.id)) {
         // Update
         await newsService.update(data.id, payload);
-        setArticles(prev => prev.map(a => a.id === data.id ? { ...a, ...data, published: a.published } : a));
+        setArticles(prev => prev.map(a => a.id === data.id ? { ...a, ...data, excerpt: data.excerpt, category: data.category, published: a.published } : a));
       } else {
         // Create
-        await newsService.create(payload);
-        await fetchNews(); // Reload để lấy ID từ backend
+        const res = await newsService.create(payload);
+        const createdNews = res?.data || res;
+        
+        // Thêm trực tiếp vào UI state để hiện ngay lập tức
+        setArticles(prev => [{
+           id: createdNews?.id || Date.now(),
+           title: data.title,
+           coverImage: data.coverImage || '',
+           excerpt: data.excerpt,
+           author: data.author || 'Admin',
+           authorAvatar: data.authorAvatar || 'AD',
+           publishedAt: new Date().toISOString(),
+           category: data.category,
+           published: true,
+           tags: data.tags || [],
+           rating: data.rating || null,
+           expectedRating: data.expectedRating || null,
+           discountPercent: data.discountPercent || null
+        }, ...prev]);
       }
       addNotification({ title: 'Bài viết đã lưu', message: `"${data.title}" đã được lưu thành công.`, type: 'success', isAdmin: true });
     } catch {
@@ -543,14 +595,14 @@ export default function AdminNews() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-cinema-surface rounded-xl p-1 border border-cinema-border">
+      <div className="flex gap-1 bg-cinema-surface rounded-xl p-1 border border-cinema-border overflow-x-auto">
         {TABS.map(tab => (
           <button key={tab.key} onClick={() => { setActiveTab(tab.key); setSearch(''); setSuggestions([]); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+            className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
               activeTab === tab.key ? 'bg-cinema-card border border-cinema-border text-white shadow' : 'text-cinema-muted hover:text-white'
             }`}>
             <span>{tab.icon}</span>
-            <span className="hidden sm:inline">{tab.label}</span>
+            <span>{tab.label}</span>
             <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? 'bg-primary text-cinema-black' : 'bg-cinema-border text-cinema-muted'}`}>
               {articles.filter(a => a.category === tab.category).length}
             </span>
@@ -641,6 +693,7 @@ export default function AdminNews() {
             tab={activeTab}
             onClose={() => setModal(null)}
             onSave={handleSave}
+            dbMovies={dbMovies}
           />
         )}
       </AnimatePresence>

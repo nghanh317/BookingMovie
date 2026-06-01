@@ -108,7 +108,7 @@ export default function Checkout() {
   const { movieId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { movie, showtime, cinema, seats, totalPrice, snacks = [] } = location.state || {};
+  const { movie, showtime, cinema, seats, totalPrice, snacks = [], selectedVoucher } = location.state || {};
 
   const { user } = useAuthStore();
 
@@ -127,8 +127,24 @@ export default function Checkout() {
   const [timeLeft, setTimeLeft] = useState(0);
 
   const snackTotal = (snacks || []).reduce((sum, s) => sum + (s.subtotal || 0), 0);
-  const serviceFee = Math.round(((totalPrice || 0) + snackTotal) * 0.05);
-  const grandTotal = (totalPrice || 0) + snackTotal + serviceFee;
+  const subTotalAmount = (totalPrice || 0) + snackTotal;
+  
+  let discountAmount = 0;
+  if (selectedVoucher) {
+    if (subTotalAmount >= (selectedVoucher.minOrderAmount || 0)) {
+      if (selectedVoucher.discountType === 'PERCENTAGE') {
+        discountAmount = subTotalAmount * (selectedVoucher.discountValue / 100);
+        if (selectedVoucher.maxDiscountAmount) {
+          discountAmount = Math.min(discountAmount, selectedVoucher.maxDiscountAmount);
+        }
+      } else {
+        discountAmount = selectedVoucher.discountValue;
+      }
+    }
+  }
+
+  const serviceFee = Math.round(subTotalAmount * 0.05);
+  const grandTotal = Math.max(0, subTotalAmount - discountAmount) + serviceFee;
 
   // 1. Countdown timer
   useEffect(() => {
@@ -236,7 +252,7 @@ export default function Checkout() {
         const ticketPayload = {
           accountsId: user?.id || user?.accountsId || 1,
           slotsId: showtime?.id || location.state?.showtimeId,
-          discountAmount: 0,
+          discountAmount: discountAmount,
           note: `Thanh toán vé ${movie.title} qua PayOS`,
           seats: seats.map(s => ({ seatId: s.id })),
           products: snacks.map(s => ({ productId: s.id, quantity: s.quantity }))
@@ -578,6 +594,12 @@ export default function Checkout() {
                       </div>
                     </div>
                   </>
+                )}
+                {discountAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-cinema-muted">Mã giảm giá ({selectedVoucher?.promotionName})</span>
+                    <span className="text-red-400 font-bold">-{discountAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
                 )}
                 <div className="flex justify-between">
                   <span className="text-cinema-muted">Phí dịch vụ (5%)</span>
