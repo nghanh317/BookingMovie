@@ -29,6 +29,14 @@ public class AccountDTO {
     
     private Date createDate;
     
+    private BigDecimal spent;
+    
+    private Long points;
+    
+    private Integer bookings;
+    
+    private String level;
+    
     private List<TicketDTO> tickets;
     
     @Data

@@ -48,6 +48,22 @@ public class MovieService implements IMovieService {
 				new TypeToken<List<MovieDTO>>() {
 				}.getType());
 
+		for (int i = 0; i < moviePage.getContent().size(); i++) {
+			Movies movie = moviePage.getContent().get(i);
+			MovieDTO dto = dtos.get(i);
+			double sum = 0;
+			int count = 0;
+			if (movie.getReviews() != null) {
+				for (var review : movie.getReviews()) {
+					if (review.getRating() != null && (review.getIsDeleted() == null || !review.getIsDeleted())) {
+						sum += review.getRating();
+						count++;
+					}
+				}
+			}
+			dto.setRating(count == 0 ? 0.0 : Math.round((sum / count) * 10.0) / 10.0);
+		}
+
 		Page<MovieDTO> dtoPage = new PageImpl<>(dtos, pageable, moviePage.getTotalElements());
 		return dtoPage;
 	}
@@ -55,7 +71,21 @@ public class MovieService implements IMovieService {
 	@Override
 	public MovieDTO getById(Integer id) {
 		Movies movie = movieRepository.findById(id).get();
-		return modelMapper.map(movie, MovieDTO.class);
+		MovieDTO dto = modelMapper.map(movie, MovieDTO.class);
+		
+		double sum = 0;
+		int count = 0;
+		if (movie.getReviews() != null) {
+			for (var review : movie.getReviews()) {
+				if (review.getRating() != null && (review.getIsDeleted() == null || !review.getIsDeleted())) {
+					sum += review.getRating();
+					count++;
+				}
+			}
+		}
+		dto.setRating(count == 0 ? 0.0 : Math.round((sum / count) * 10.0) / 10.0);
+		
+		return dto;
 	}
 
 	@Override

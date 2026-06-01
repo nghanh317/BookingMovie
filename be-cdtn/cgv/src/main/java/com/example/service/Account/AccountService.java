@@ -55,6 +55,10 @@ public class AccountService implements IAccountService{
 				accountPage.getContent(), 
 				new TypeToken<List<AccountDTO>>() {}.getType());
 
+		for (int i = 0; i < accountPage.getContent().size(); i++) {
+			calculateAccountMetrics(accountPage.getContent().get(i), dtos.get(i));
+		}
+
 		Page<AccountDTO> dtoPage = new PageImpl<>(dtos, pageable, accountPage.getTotalElements());
 
 		return dtoPage;
@@ -63,7 +67,9 @@ public class AccountService implements IAccountService{
 	@Override
 	public AccountDTO getById (Integer id) {
 		Accounts account = accountRepository.findById(id).get();
-		return modelMapper.map(account, AccountDTO.class);
+		AccountDTO dto = modelMapper.map(account, AccountDTO.class);
+		calculateAccountMetrics(account, dto);
+		return dto;
 	}
 	
 	@Override
@@ -93,8 +99,35 @@ public class AccountService implements IAccountService{
 
 	@Override
 	public AccountDTO getAccountByUserName(String userName) {
-		Accounts nameAccount = accountRepository.findByUserName(userName);
-		return modelMapper.map(nameAccount, AccountDTO.class);
+		Accounts account = accountRepository.findByUserName(userName);
+		AccountDTO dto = modelMapper.map(account, AccountDTO.class);
+		calculateAccountMetrics(account, dto);
+		return dto;
+	}
+	
+	private void calculateAccountMetrics(Accounts account, AccountDTO dto) {
+		java.math.BigDecimal total = java.math.BigDecimal.ZERO;
+		int count = 0;
+		if (account.getTickets() != null) {
+			for (var ticket : account.getTickets()) {
+				if (ticket.getPaymentStatus() == com.example.entity.Tickets.PaymentStatus.PAID && (ticket.getIsDeleted() == null || !ticket.getIsDeleted())) {
+					count++;
+					if (ticket.getFinalAmount() != null) {
+						total = total.add(ticket.getFinalAmount());
+					}
+				}
+			}
+		}
+		dto.setSpent(total);
+		dto.setBookings(count);
+		long pts = total.divideToIntegralValue(new java.math.BigDecimal("10000")).longValue();
+		dto.setPoints(pts);
+		
+		String level = "Bronze";
+		if (pts >= 1000) level = "Diamond";
+		else if (pts >= 300) level = "Gold";
+		else if (pts >= 100) level = "Silver";
+		dto.setLevel(level);
 	}
 	
 

@@ -3,6 +3,7 @@ package com.example.entity;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
+import java.math.BigDecimal;
 
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -92,6 +93,7 @@ public class Accounts implements Serializable {
 			isDeleted = false;
 		}
 	}
+
 @Getter
 @NoArgsConstructor
 public enum Role {
