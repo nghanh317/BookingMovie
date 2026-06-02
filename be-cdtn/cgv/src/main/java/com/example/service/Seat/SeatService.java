@@ -163,8 +163,9 @@ public class SeatService implements ISeatService {
 		// 2. Lấy tất cả ghế của phòng
 		List<Seats> allSeats = seatRepository.findByRoomsId(roomId, Pageable.unpaged()).getContent();
 
-		// 3. Ghế đã đặt chính thức (status = CONFIRMED, is_deleted = false)
-		List<BookingSeats> bookedList = bookingSeatRepository.findConfirmedBySlotId(slotId);
+		// 3. Ghế đã đặt chính thức (status = CONFIRMED, is_deleted = false) hoặc đang chờ thanh toán (PENDING < 10 phút)
+		java.util.Date tenMinsAgo = new java.util.Date(System.currentTimeMillis() - (10 * 60 * 1000));
+		List<BookingSeats> bookedList = bookingSeatRepository.findUnavailableBySlotId(slotId, tenMinsAgo);
 		Set<Integer> bookedSeatIds = bookedList.stream()
 				.map(bs -> bs.getSeats().getId())
 				.collect(Collectors.toSet());
