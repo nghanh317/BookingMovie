@@ -190,7 +190,7 @@ export default function Profile() {
           email: data.email || '',
           phone: data.phone || '',
           joinDate: parsedJoinDate,
-          points: 0, // điểm tích lũy — tính từ tickets nếu cần
+          points: data.points || 0, // Dùng điểm tính toán sẵn từ backend
           totalBookings: 0,
           totalSpent: 0,
         };

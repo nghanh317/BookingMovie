@@ -24,7 +24,10 @@ import com.example.repository.AccountRepository;
 import com.example.specification.AccountSpecification;
 
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
+@Transactional
 public class AccountService implements IAccountService{
 	
 	@Autowired
