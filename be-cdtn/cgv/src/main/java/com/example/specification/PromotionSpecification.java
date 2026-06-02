@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 public class PromotionSpecification {
 @SuppressWarnings({"removal", "deprecation"})
 public static Specification<Promotions> buildWhere(PromotionFilterForm filterform){
-	Specification<Promotions> where = Specification.where(null);
+	Specification<Promotions> where = Specification.where(new CustomSpecification("isDeleted", false));
 	
 	if (filterform == null)
 		return where;
@@ -25,7 +25,7 @@ public static Specification<Promotions> buildWhere(PromotionFilterForm filterfor
 		String search = filterform.getSearch().trim();
 		
 	CustomSpecification promotionSpe = new CustomSpecification("promotionName", search);
-	where = Specification.where(promotionSpe);
+	where = where.and(promotionSpe);
 	}
 	if (filterform.getStatus() != null) {
 		CustomSpecification statusSpe = new CustomSpecification ("status", filterform.getStatus());
@@ -56,6 +56,12 @@ public Predicate toPredicate(
 	}
 	if (field.equalsIgnoreCase("status")) {
 		return criteriaBuilder.equal(root.get("status"), value);
+	}
+	if (field.equalsIgnoreCase("isDeleted")) {
+		return criteriaBuilder.or(
+			criteriaBuilder.isNull(root.get("isDeleted")),
+			criteriaBuilder.equal(root.get("isDeleted"), value)
+		);
 	}
 	return null;
 }

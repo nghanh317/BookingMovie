@@ -33,16 +33,37 @@ function fmt(n) { return new Intl.NumberFormat('vi-VN').format(n ?? 0); }
 function fmtDate(d) {
   if (!d) return '—';
   const s = typeof d === 'string' ? d : new Date(d).toISOString();
+  // if already DD/MM/YYYY or DD-MM-YYYY
+  if (/^\d{2}[-/]\d{2}[-/]\d{4}/.test(s)) {
+    const [day, month, year] = s.slice(0, 10).split(/[-/]/);
+    return `${day}/${month}/${year}`;
+  }
   const [y, m, day] = s.slice(0, 10).split('-');
   return `${day}/${m}/${y}`;
 }
-// "2024-06-01" → "2024-06-01 00:00:00"
-function toBackendDate(iso) { return iso ? `${iso} 00:00:00` : null; }
+// "2024-06-01" → "01-06-2024 00:00:00" (BE expects dd-MM-yyyy HH:mm:ss)
+function toBackendDate(iso) { 
+  if (!iso) return null;
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  return `${d}-${m}-${y} 00:00:00`;
+}
 // Date/string → "YYYY-MM-DD"
 function toIso(d) {
   if (!d) return '';
-  const s = typeof d === 'string' ? d : new Date(d).toISOString();
-  return s.slice(0, 10);
+  if (typeof d === 'string') {
+    if (/^\d{2}-\d{2}-\d{4}/.test(d)) {
+      const [day, month, year] = d.split(' ')[0].split('-');
+      return `${year}-${month}-${day}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}/.test(d)) {
+      return d.slice(0, 10);
+    }
+  }
+  try {
+    return new Date(d).toISOString().slice(0, 10);
+  } catch (e) {
+    return '';
+  }
 }
 
 // Normalize PromotionDTO → UI object
