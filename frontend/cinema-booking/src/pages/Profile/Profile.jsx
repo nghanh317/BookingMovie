@@ -828,9 +828,17 @@ export default function Profile() {
                     <p className="text-white font-bold text-xl">{userData.points.toLocaleString('vi-VN')} <span className="text-primary text-sm font-normal">điểm</span></p>
                   </div>
                 </div>
-                {redeemableOffers.length > 0 ? (
+                {redeemableOffers.filter(offer => {
+                  const limit = offer.original?.usagePerUser || 1; // Mặc định 1 nếu không set
+                  const count = ownedVouchers.filter(v => v.code === offer.code).length;
+                  return count < limit;
+                }).length > 0 ? (
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {redeemableOffers.map(v => (
+                    {redeemableOffers.filter(offer => {
+                      const limit = offer.original?.usagePerUser || 1;
+                      const count = ownedVouchers.filter(v => v.code === offer.code).length;
+                      return count < limit;
+                    }).map(v => (
                       <div key={v.id} className={`rounded-xl border p-5 ${v.color} flex flex-col`}>
                         <div className="mb-2">
                           <span className="font-heading font-bold text-white text-base block">{v.title}</span>
