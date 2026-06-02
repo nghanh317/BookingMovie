@@ -21,19 +21,20 @@ import com.example.repository.BookingSeatRepository;
 import com.example.specification.BookingSeatSpecification;
 
 @Service
-public class BookingSeatService implements IBookingSeatService{
-	
+public class BookingSeatService implements IBookingSeatService {
+
 	@Autowired
 	private BookingSeatRepository bookingSeatRepository;
-	
+
 	@Autowired
 	private ModelMapper modelMapper;
 
 	@Override
-	public Page<BookingSeatDTO> getAllBookingSeat(Pageable pageable , BookingSeatFilterForm form) {
+	public Page<BookingSeatDTO> getAllBookingSeat(Pageable pageable, BookingSeatFilterForm form) {
 		Specification<BookingSeats> where = BookingSeatSpecification.buildWhere(form);
 		Page<BookingSeats> bookingSeatPage = bookingSeatRepository.findAll(where, pageable);
-		List<BookingSeatDTO> dto = modelMapper.map(bookingSeatPage.getContent(),new TypeToken <List<BookingSeatDTO>>() {}.getType());
+		List<BookingSeatDTO> dto = modelMapper.map(bookingSeatPage.getContent(), new TypeToken<List<BookingSeatDTO>>() {
+		}.getType());
 		Page<BookingSeatDTO> dtoPage = new PageImpl<>(dto, pageable, bookingSeatPage.getTotalElements());
 		return dtoPage;
 	}
@@ -42,27 +43,28 @@ public class BookingSeatService implements IBookingSeatService{
 	public BookingSeatDTO getById(Integer id) {
 		BookingSeats booking = bookingSeatRepository.findById(id).get();
 		return modelMapper.map(booking, BookingSeatDTO.class);
-}
+	}
+
 	@Override
-	public void create (CreatBookingSeatForm form) {
+	public void create(CreatBookingSeatForm form) {
 		BookingSeats bookingSeats = new BookingSeats(form.getSeatPrice());
-		
+
 		Tickets ticket = new Tickets();
 		ticket.setId(form.getTicketsId());
 		bookingSeats.setTickets(ticket);
-		
+
 		Seats seat = new Seats();
 		seat.setId(form.getSeatsId());
 		bookingSeats.setSeats(seat);
-		
+
 		bookingSeatRepository.save(bookingSeats);
 	}
-	
+
 	@Override
 	public List<Integer> getBookedSeatsBySlot(Integer slotId) {
 		List<BookingSeats> booked = bookingSeatRepository.findByTickets_Slots_IdAndIsDeleted(slotId, false);
 		return booked.stream()
-			.map(bs -> bs.getSeats().getId())
-			.collect(java.util.stream.Collectors.toList());
+				.map(bs -> bs.getSeats().getId())
+				.collect(java.util.stream.Collectors.toList());
 	}
 }

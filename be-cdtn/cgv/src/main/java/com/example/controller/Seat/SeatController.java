@@ -17,14 +17,16 @@ import com.example.dto.SeatDTO;
 import com.example.form.Seat.CreateSeatForm;
 import com.example.form.Seat.UpdateSeatForm;
 import com.example.service.Seat.ISeatService;
+import java.util.List;
+import java.util.Map;
 
 @RequestMapping("api/v1/seats")
 @RestController
 public class SeatController {
-	
+
 	@Autowired
 	private ISeatService seatService;
-	
+
 	@GetMapping
 	public Page<SeatDTO> getAllSeat(Pageable pageable, @RequestParam(required = false) Integer roomId) {
 		return seatService.getAllSeat(pageable, roomId);
@@ -39,7 +41,7 @@ public class SeatController {
 	public void create(@RequestBody CreateSeatForm form) {
 		seatService.create(form);
 	}
-	
+
 	@PutMapping("/{id}")
 	public void updateSeat(@PathVariable Integer id, @RequestBody UpdateSeatForm form) {
 		seatService.updateSeat(id, form);
@@ -48,5 +50,10 @@ public class SeatController {
 	@DeleteMapping("/{id}")
 	public void deleteSeat(@PathVariable Integer id) {
 		seatService.deleteSeat(id);
+	}
+
+	@GetMapping("/slot-status/{slotId}")
+	public List<Map<String, Object>> getSlotSeatStatus(@PathVariable Integer slotId, @RequestParam(required = false) Integer accountId) {
+		return seatService.getSlotSeatStatus(slotId, accountId);
 	}
 }

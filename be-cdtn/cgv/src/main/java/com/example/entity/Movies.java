@@ -115,8 +115,8 @@ public class Movies implements Serializable{
 	@ManyToMany
 	@JoinTable(
 			name = "MovieCinemas",
-			joinColumns = {@JoinColumn(name = "movie_id")},
-			inverseJoinColumns = {@JoinColumn (name = "cinema_id")}
+			joinColumns = {@JoinColumn(name = "movie_id", columnDefinition = "int unsigned")},
+			inverseJoinColumns = {@JoinColumn (name = "cinema_id", columnDefinition = "int unsigned")}
 			)
 	private List<Cinemas> cinemas;
 	

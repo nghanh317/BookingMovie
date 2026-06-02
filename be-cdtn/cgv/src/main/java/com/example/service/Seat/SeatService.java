@@ -1,6 +1,12 @@
 package com.example.service.Seat;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
@@ -12,14 +18,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.dto.SeatDTO;
+import com.example.entity.BookingSeats;
 import com.example.entity.Rooms;
+import com.example.entity.SeatLocks;
 import com.example.entity.SeatTypes;
 import com.example.entity.Seats;
 import com.example.entity.Seats.Status;
+import com.example.entity.Slots;
 import com.example.form.Seat.CreateSeatForm;
 import com.example.form.Seat.UpdateSeatForm;
+import com.example.repository.BookingSeatRepository;
 import com.example.repository.RoomRepository;
+import com.example.repository.SeatLockRepository;
 import com.example.repository.SeatRepository;
+import com.example.repository.SlotRepository;
 
 @Service
 public class SeatService implements ISeatService {
@@ -33,6 +45,15 @@ public class SeatService implements ISeatService {
 	@Autowired
 	private ModelMapper modelMapper;
 
+	@Autowired
+	private BookingSeatRepository bookingSeatRepository;
+
+	@Autowired
+	private SeatLockRepository seatLockRepository;
+
+	@Autowired
+	private SlotRepository slotRepository;
+
 	@Override
 	public Page<SeatDTO> getAllSeat(Pageable pageable, Integer roomId) {
 		Page<Seats> seatPage;
@@ -43,9 +64,8 @@ public class SeatService implements ISeatService {
 		}
 
 		List<SeatDTO> dto = modelMapper.map(
-			seatPage.getContent(),
-			new TypeToken<List<SeatDTO>>() {}.getType()
-		);
+				seatPage.getContent(),
+				new TypeToken<List<SeatDTO>>() {}.getType());
 		Page<SeatDTO> dtoPage = new PageImpl<>(dto, pageable, seatPage.getTotalElements());
 		return dtoPage;
 	}
@@ -53,7 +73,7 @@ public class SeatService implements ISeatService {
 	@Override
 	public SeatDTO getById(Integer id) {
 		Seats seat = seatRepository.findById(id)
-			.orElseThrow(() -> new RuntimeException("Seat not found with id: " + id));
+				.orElseThrow(() -> new RuntimeException("Seat not found with id: " + id));
 		return modelMapper.map(seat, SeatDTO.class);
 	}
 
@@ -78,7 +98,7 @@ public class SeatService implements ISeatService {
 	@Transactional
 	public void updateSeat(Integer id, UpdateSeatForm form) {
 		Seats seat = seatRepository.findById(id)
-			.orElseThrow(() -> new RuntimeException("Seat not found with id: " + id));
+				.orElseThrow(() -> new RuntimeException("Seat not found with id: " + id));
 
 		Integer oldRoomId = seat.getRooms().getId();
 		Status oldStatus = seat.getStatus();
@@ -90,7 +110,6 @@ public class SeatService implements ISeatService {
 			seat.setSeatNumber(form.getSeatNumber());
 		}
 		if (form.getStatus() != null) {
-			// ✅ CHUYỂN ĐỔI STRING → ENUM
 			seat.setStatus(Seats.Status.valueOf(form.getStatus().toUpperCase()));
 		}
 
@@ -111,9 +130,7 @@ public class SeatService implements ISeatService {
 		if (form.getRoomsId() != null && !form.getRoomsId().equals(oldRoomId)) {
 			updateRoomTotalSeats(oldRoomId);
 			updateRoomTotalSeats(form.getRoomsId());
-		}
-		// ✅ SO SÁNH ĐÚNG: CHUYỂN STRING → ENUM RỒI MỚI SO SÁNH
-		else if (form.getStatus() != null && !Seats.Status.valueOf(form.getStatus().toUpperCase()).equals(oldStatus)) {
+		} else if (form.getStatus() != null && !Seats.Status.valueOf(form.getStatus().toUpperCase()).equals(oldStatus)) {
 			updateRoomTotalSeats(seat.getRooms().getId());
 		}
 	}
@@ -122,20 +139,82 @@ public class SeatService implements ISeatService {
 	@Transactional
 	public void deleteSeat(Integer id) {
 		Seats seat = seatRepository.findById(id)
-			.orElseThrow(() -> new RuntimeException("Seat not found with id: " + id));
+				.orElseThrow(() -> new RuntimeException("Seat not found with id: " + id));
 
 		Integer roomId = seat.getRooms().getId();
 		seatRepository.delete(seat);
 		updateRoomTotalSeats(roomId);
 	}
 
+	/**
+	 * Trả về trạng thái từng ghế cho một suất chiếu (slotId).
+	 * BE check cả BookingSeats (đã mua CONFIRMED) + SeatLocks (đang giữ tạm).
+	 *
+	 * status: "booked" | "locked" | "available"
+	 * lockedByMe: true nếu ghế đang do currentAccountId giữ
+	 */
+	@Override
+	public List<Map<String, Object>> getSlotSeatStatus(Integer slotId, Integer currentAccountId) {
+		// 1. Lấy roomId từ slot
+		Slots slot = slotRepository.findById(slotId)
+				.orElseThrow(() -> new RuntimeException("Slot not found: " + slotId));
+		Integer roomId = slot.getRooms().getId();
+
+		// 2. Lấy tất cả ghế của phòng
+		List<Seats> allSeats = seatRepository.findByRoomsId(roomId, Pageable.unpaged()).getContent();
+
+		// 3. Ghế đã đặt chính thức (status = CONFIRMED, is_deleted = false)
+		List<BookingSeats> bookedList = bookingSeatRepository.findConfirmedBySlotId(slotId);
+		Set<Integer> bookedSeatIds = bookedList.stream()
+				.map(bs -> bs.getSeats().getId())
+				.collect(Collectors.toSet());
+
+		// 4. Ghế đang bị lock tạm thời (is_active=true, expires_at > NOW)
+		LocalDateTime now = LocalDateTime.now();
+		List<SeatLocks> activeLocks = seatLockRepository.findActiveBySlotId(slotId, now);
+		Map<Integer, SeatLocks> lockMap = activeLocks.stream()
+				.collect(Collectors.toMap(
+						sl -> sl.getSeat().getId(),
+						sl -> sl,
+						(a, b) -> a // giữ cái đầu nếu trùng
+				));
+
+		// 5. Build kết quả
+		List<Map<String, Object>> result = new ArrayList<>();
+		for (Seats seat : allSeats) {
+			Map<String, Object> item = new HashMap<>();
+			item.put("seatId", seat.getId());
+			item.put("seatRow", seat.getSeatRow());
+			item.put("seatNumber", seat.getSeatNumber());
+			item.put("seatTypeName",
+					seat.getSeatTypes() != null ? seat.getSeatTypes().getTypeName() : "STANDARD");
+
+			if (bookedSeatIds.contains(seat.getId())) {
+				item.put("status", "booked");
+				item.put("lockedByMe", false);
+			} else if (lockMap.containsKey(seat.getId())) {
+				SeatLocks lock = lockMap.get(seat.getId());
+				item.put("status", "locked");
+				item.put("expiresAt", lock.getExpiresAt().toString());
+				boolean isMine = currentAccountId != null
+						&& currentAccountId.equals(lock.getAccount().getId());
+				item.put("lockedByMe", isMine);
+			} else {
+				item.put("status", "available");
+				item.put("lockedByMe", false);
+			}
+
+			result.add(item);
+		}
+		return result;
+	}
+
 	private void updateRoomTotalSeats(Integer roomId) {
-		// ✅ DÙNG ENUM, KHÔNG PHẢI STRING
 		Long totalSeats = seatRepository.countByRoomsIdAndStatus(roomId, Seats.Status.ACTIVE);
 
 		Rooms room = roomRepository.findById(roomId)
-			.orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
+				.orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
 		room.setTotalSeats(totalSeats.intValue());
 		roomRepository.save(room);
 	}
-}
+}

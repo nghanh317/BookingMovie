@@ -40,11 +40,11 @@ public class MovieReviews implements Serializable{
 private Integer id;
 
 @ManyToOne
-@JoinColumn (name = "account_id")
+@JoinColumn (name = "account_id", columnDefinition = "int unsigned")
 private Accounts account;
 
 @ManyToOne
-@JoinColumn ( name = "movie_id")
+@JoinColumn ( name = "movie_id", columnDefinition = "int unsigned")
 private Movies movie;
 
 @Min((long) 1.0)

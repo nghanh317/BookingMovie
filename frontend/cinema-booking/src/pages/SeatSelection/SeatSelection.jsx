@@ -4,13 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useAuthStore from '../../store/authStore';
 import seatService from '../../services/seatService';
 import seatLockService from '../../services/seatLockService';
-import bookingService from '../../services/bookingService';
 
 // ─── Seat type meta ───────────────────────────────────────────────────
 const SEAT_TYPE_META = {
-  VIP:      { icon: '👑', label: 'VIP',      color: 'text-yellow-400', btnBase: 'bg-yellow-900/20 border-yellow-600/40 hover:bg-yellow-700/30 hover:border-yellow-400' },
-  COUPLE:   { icon: '💑', label: 'Ghế đôi', color: 'text-pink-400',   btnBase: 'bg-pink-900/20 border-pink-600/40 hover:bg-pink-700/30 hover:border-pink-400' },
-  STANDARD: { icon: '💺', label: 'Thường',   color: 'text-white',      btnBase: 'bg-cinema-surface/80 border-cinema-border hover:bg-primary/10 hover:border-primary/60' },
+  VIP: { icon: '👑', label: 'VIP', color: 'text-yellow-400', btnBase: 'bg-yellow-900/20 border-yellow-600/40 hover:bg-yellow-700/30 hover:border-yellow-400' },
+  COUPLE: { icon: '💑', label: 'Ghế đôi', color: 'text-pink-400', btnBase: 'bg-pink-900/20 border-pink-600/40 hover:bg-pink-700/30 hover:border-pink-400' },
+  STANDARD: { icon: '💺', label: 'Thường', color: 'text-white', btnBase: 'bg-cinema-surface/80 border-cinema-border hover:bg-primary/10 hover:border-primary/60' },
 };
 
 function getSeatMeta(seatTypeName) {
@@ -27,13 +26,11 @@ function StepIndicator({ current }) {
     <div className="flex items-center justify-center gap-0 mb-8 flex-wrap gap-y-2">
       {steps.map((step, i) => (
         <div key={step} className="flex items-center">
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-            i + 1 === current ? 'bg-primary text-cinema-black' :
-            i + 1 < current ? 'text-primary' : 'text-cinema-muted'
-          }`}>
-            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${
-              i + 1 <= current ? 'bg-primary border-primary text-cinema-black' : 'border-cinema-border'
-            }`}>{i + 1 < current ? '✓' : i + 1}</span>
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${i + 1 === current ? 'bg-primary text-cinema-black' :
+              i + 1 < current ? 'text-primary' : 'text-cinema-muted'
+            }`}>
+            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${i + 1 <= current ? 'bg-primary border-primary text-cinema-black' : 'border-cinema-border'
+              }`}>{i + 1 < current ? '✓' : i + 1}</span>
             {step}
           </div>
           {i < steps.length - 1 && <div className={`w-6 h-0.5 ${i + 1 < current ? 'bg-primary' : 'bg-cinema-border'}`} />}
@@ -43,122 +40,57 @@ function StepIndicator({ current }) {
   );
 }
 
-// ─── Countdown Timer ─────────────────────────────────────────────────
-// Nhận ISO string `expiresAt` hoặc `durationMs` (ms)
-function CountdownTimer({ expiresAt, durationMs, onExpired }) {
-  const calcMs = () => {
-    if (expiresAt) return Math.max(0, new Date(expiresAt) - Date.now());
-    return Math.max(0, durationMs || 0);
-  };
-
-  const [ms, setMs] = useState(() => calcMs());
-
-  useEffect(() => {
-    const initial = calcMs();
-    setMs(initial);
-    if (initial <= 0) { onExpired?.(); return; }
-    const iv = setInterval(() => {
-      setMs(prev => {
-        const next = prev - 1000;
-        if (next <= 0) { clearInterval(iv); onExpired?.(); return 0; }
-        return next;
-      });
-    }, 1000);
-    return () => clearInterval(iv);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expiresAt, durationMs]);
-
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  const isUrgent = ms < 60000;
-
-  return (
-    <div className={`rounded-xl border p-3 text-center transition-colors ${isUrgent ? 'bg-red-500/10 border-red-500/30' : 'bg-primary/10 border-primary/30'}`}>
-      <p className="text-xs text-cinema-muted mb-1">⏱ Ghế được giữ trong</p>
-      <p className={`font-heading font-bold text-2xl tabular-nums ${isUrgent ? 'text-red-400' : 'text-primary'}`}>
-        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-      </p>
-      <p className="text-xs text-cinema-muted mt-1">
-        {isUrgent ? '⚠️ Sắp hết thời gian!' : 'Nhấn Tiếp tục để hoàn tất'}
-      </p>
-    </div>
-  );
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────
 export default function SeatSelection() {
   const { movieId } = useParams();
-  const location    = useLocation();
-  const navigate    = useNavigate();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { movie, showtime, cinema, slotId } = location.state || {};
-  const { user }    = useAuthStore();
+  const { user } = useAuthStore();
 
   // ── State ──
-  const [seats, setSeats]               = useState([]);
-  const [bookedIds, setBookedIds]       = useState(new Set());
+  const [seats, setSeats] = useState([]);
   const [loadingSeats, setLoadingSeats] = useState(false);
-  const [selected, setSelected]         = useState(new Set());
-  const [lockedByOthers, setLockedByOthers] = useState({});
-  const [lockLoading, setLockLoading]   = useState(false);
-  const [error, setError]               = useState('');
+  const [selected, setSelected] = useState(new Set()); // IDs of seats user wants to pick
+  const [lockLoading, setLockLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const pollRef    = useRef(null);
+  const pollRef = useRef(null);
   const showtimeId = slotId || showtime?.id;
-  const roomId     = showtime?.roomId;
-  const accountId  = user?.id || user?.userId;
+  const accountId = user?.id || user?.userId;
 
-  // ── Fetch ghế của phòng chiếu và ghế đã đặt ──
-  useEffect(() => {
-    if (!roomId) return;
-    setLoadingSeats(true);
-    
-    Promise.all([
-      seatService.getAll({ roomId, size: 500 }),
-      showtimeId ? bookingService.getBookedSeatsBySlot(showtimeId).catch(() => []) : Promise.resolve([])
-    ])
-      .then(([seatData, bookedData]) => {
-        const list = Array.isArray(seatData) ? seatData : (seatData?.content || seatData?.data || []);
-        list.sort((a, b) => {
-          const r = (a.seatRow || '').localeCompare(b.seatRow || '');
-          return r !== 0 ? r : (a.seatNumber || 0) - (b.seatNumber || 0);
-        });
-        setSeats(list);
-        setBookedIds(new Set(Array.isArray(bookedData) ? bookedData : []));
-      })
-      .catch(err => console.error('[SeatSelection] fetch seats:', err))
-      .finally(() => setLoadingSeats(false));
-  }, [roomId, showtimeId]);
-
-  // ── Poll ghế đang bị khoá bởi người khác từ API ──
-  const pollLockedSeats = useCallback(async () => {
+  // ── Fetch trạng thái toàn bộ ghế từ 1 API ──
+  const fetchSeatStatus = useCallback(async (isInitial = false) => {
     if (!showtimeId) return;
+    if (isInitial) setLoadingSeats(true);
+    
     try {
-      const locks = await seatLockService.getLockedSeats(showtimeId);
-      const byOthers = {};
-      locks.forEach(lock => {
-        // Chỉ mark là "by others" nếu không phải của mình
-        if (String(lock.accountId) !== String(accountId)) {
-          byOthers[lock.seatId] = lock.expiresAt;
-        }
+      const data = await seatService.getSlotStatus(showtimeId, accountId || '');
+      // Sắp xếp ghế
+      data.sort((a, b) => {
+        const r = (a.seatRow || '').localeCompare(b.seatRow || '');
+        return r !== 0 ? r : (a.seatNumber || 0) - (b.seatNumber || 0);
       });
-      setLockedByOthers(byOthers);
-    } catch {
-      // Silent fail — không block UI
+      setSeats(data);
+    } catch (err) {
+      console.error('[SeatSelection] fetch seat status error:', err);
+    } finally {
+      if (isInitial) setLoadingSeats(false);
     }
   }, [showtimeId, accountId]);
 
   useEffect(() => {
-    pollLockedSeats();
-    pollRef.current = setInterval(pollLockedSeats, 5000); // Poll 5s/lần
+    fetchSeatStatus(true);
+    pollRef.current = setInterval(() => fetchSeatStatus(false), 5000);
     return () => clearInterval(pollRef.current);
-  }, [pollLockedSeats]);
+  }, [fetchSeatStatus]);
 
   // ── Khi trang đóng / rời đi: giải phóng lock ──
   useEffect(() => {
     if (!accountId || !showtimeId) return;
     const release = () => {
       // Gửi beacon khi trang đóng (best-effort)
-      seatLockService.releaseSeats(accountId, showtimeId).catch(() => {});
+      seatLockService.releaseSeats(accountId, showtimeId).catch(() => { });
     };
     window.addEventListener('beforeunload', release);
     return () => {
@@ -188,28 +120,48 @@ export default function SeatSelection() {
   const rows = Object.keys(seatsByRow).sort();
 
   const pricePerSeat = showtime?.price || 0;
-  const selectedSeatObjects = seats.filter(s => selected.has(s.id));
+  
+  // Những ghế đang nằm trong Set selected hoặc đã bị account này lock trên db
+  const selectedSeatObjects = seats.filter(s => selected.has(s.seatId) || s.lockedByMe);
+  
   const totalPrice = selectedSeatObjects.reduce((sum, seat) => {
     const meta = getSeatMeta(seat.seatTypeName);
-    if (meta === SEAT_TYPE_META.VIP)    return sum + pricePerSeat * 1.3;
+    if (meta === SEAT_TYPE_META.VIP) return sum + pricePerSeat * 1.3;
     if (meta === SEAT_TYPE_META.COUPLE) return sum + pricePerSeat * 1.8;
     return sum + pricePerSeat;
   }, 0);
 
   // ── Toggle ghế ──
   const toggleSeat = (seatId) => {
-    if (bookedIds.has(seatId)) return;
-    if (lockedByOthers[seatId]) {
-      const seat = seats.find(s => s.id === seatId);
-      const label = seat ? `${seat.seatRow}${seat.seatNumber}` : seatId;
+    const seat = seats.find(s => s.seatId === seatId);
+    if (!seat) return;
+    
+    // Nếu ghế đã book chính thức
+    if (seat.status === 'booked') return;
+    
+    // Nếu ghế đang bị lock bởi người khác
+    if (seat.status === 'locked' && !seat.lockedByMe) {
+      const label = `${seat.seatRow}${seat.seatNumber}`;
       setError(`Ghế ${label} đang được người khác giữ. Vui lòng chọn ghế khác.`);
       setTimeout(() => setError(''), 3000);
       return;
     }
+    
+    // Nếu ghế do chính mình lock trên server, nhưng mình muốn bỏ tick
+    // Chỗ này hơi tricky, cứ allow bỏ chọn local, lúc bấm Tiếp tục server sẽ đè lên
+    
     setSelected(prev => {
       const next = new Set(prev);
-      if (next.has(seatId)) next.delete(seatId);
-      else next.add(seatId);
+      if (next.has(seatId) || seat.lockedByMe) {
+        next.delete(seatId);
+        // Nếu nó đang lockedByMe trên server, việc delete này chỉ tác dụng local (sẽ bị reset sau 5s nếu server vẫn trả về lockedByMe).
+        // Tốt nhất nếu nó đã lock, user nhấn vào sẽ nhả ghế khỏi DB luôn
+        if (seat.lockedByMe) {
+          seatLockService.releaseSeats(accountId, showtimeId).catch(()=>{});
+        }
+      } else {
+        next.add(seatId);
+      }
       return next;
     });
     setError('');
@@ -217,23 +169,22 @@ export default function SeatSelection() {
 
   // ── "Tiếp tục" — Khoá ghế vào DB (best-effort), luôn navigate sang Snacks ──
   const handleProceed = async () => {
-    if (selected.size === 0) return;
+    const idsToLock = selectedSeatObjects.map(s => s.seatId);
+    if (idsToLock.length === 0) return;
 
     setLockLoading(true);
     setError('');
 
-    let lockExpiresAt = null; // Từ server (nếu thành công)
+    let lockExpiresAt = null;
 
-    // Thử lock ghế trong DB — nếu lỗi vẫn cho đi tiếp (local timer trên trang Snacks sẽ xử lý)
     if (accountId && showtimeId) {
       try {
-        const result = await seatLockService.lockSeats(accountId, showtimeId, [...selected]);
+        const result = await seatLockService.lockSeats(accountId, showtimeId, idsToLock);
         if (result?.success) {
-          lockExpiresAt = result.expiresAt; // Dùng thời gian từ server (chính xác hơn)
+          lockExpiresAt = result.expiresAt;
         }
       } catch {
-        // Silent — backend chưa sẵn sàng hoặc ghế đã bị người khác lock
-        // Trang Snacks sẽ tự tạo local timer 10 phút
+        // Silent
       }
     }
 
@@ -243,7 +194,7 @@ export default function SeatSelection() {
       state: {
         movie, showtime, cinema,
         seats: selectedSeatObjects.map(s => ({
-          id: s.id,
+          id: s.seatId,
           label: `${s.seatRow}${s.seatNumber}`,
           seatRow: s.seatRow,
           seatNumber: s.seatNumber,
@@ -252,22 +203,13 @@ export default function SeatSelection() {
         totalPrice,
         showtimeId,
         slotId,
-        lockExpiresAt, // null nếu server chưa sẵn sàng → Snacks tự tạo timer local
+        lockExpiresAt,
       }
     });
   };
 
-  // ── Xử lý khi lock hết hạn ──
-  const handleHoldExpired = async () => {
-    setHoldExpired(true);
-    setSelected(new Set());
-    setMyExpiresAt(null);
-    setLocalExpiresAt(null);
-    if (accountId && showtimeId) {
-      await seatLockService.releaseSeats(accountId, showtimeId).catch(() => {});
-    }
-    pollLockedSeats();
-  };
+  // Dùng để filter những ghế bị khoá bởi người khác cho UI "Ghế đang được giữ"
+  const lockedByOthersList = seats.filter(s => s.status === 'locked' && !s.lockedByMe);
 
   return (
     <div className="min-h-screen py-8">
@@ -327,12 +269,13 @@ export default function SeatSelection() {
                     <span className="text-cinema-muted text-xs w-5 text-right font-mono flex-shrink-0">{row}</span>
                     <div className="flex gap-1 flex-wrap">
                       {seatsByRow[row].map(seat => {
-                        const seatId        = seat.id;
-                        const meta          = getSeatMeta(seat.seatTypeName);
-                        const isBooked      = bookedIds.has(seatId);
-                        const isSelected    = selected.has(seatId);
-                        const isLockedOther = !!lockedByOthers[seatId];
-                        const label         = `${seat.seatRow}${seat.seatNumber}`;
+                        const seatId = seat.seatId;
+                        const meta = getSeatMeta(seat.seatTypeName);
+                        
+                        const isBooked = seat.status === 'booked';
+                        const isLockedOther = seat.status === 'locked' && !seat.lockedByMe;
+                        const isSelected = selected.has(seatId) || seat.lockedByMe;
+                        const label = `${seat.seatRow}${seat.seatNumber}`;
 
                         let icon, btnClass;
                         if (isBooked) {
@@ -352,8 +295,8 @@ export default function SeatSelection() {
                         const tooltip = isBooked
                           ? `${label} - Đã đặt`
                           : isLockedOther
-                          ? `${label} - Đang được giữ`
-                          : `${label} - ${seat.seatTypeName || 'Thường'} - ${pricePerSeat > 0 ? pricePerSeat.toLocaleString('vi-VN') + 'đ' : ''}`;
+                            ? `${label} - Đang được giữ`
+                            : `${label} - ${seat.seatTypeName || 'Thường'} - ${pricePerSeat > 0 ? pricePerSeat.toLocaleString('vi-VN') + 'đ' : ''}`;
 
                         return (
                           <motion.button
@@ -386,7 +329,7 @@ export default function SeatSelection() {
                   { icon: '💑', label: 'Ghế đôi' },
                   { icon: '✅', label: 'Đang chọn' },
                   { icon: '🔒', label: 'Đang được giữ' },
-                  { icon: '✕',  label: 'Đã đặt' },
+                  { icon: '✕', label: 'Đã đặt' },
                 ].map(item => (
                   <div key={item.label} className="flex items-center gap-2">
                     <span className="text-base w-6 text-center">{item.icon}</span>
@@ -405,15 +348,13 @@ export default function SeatSelection() {
             {/* Selected summary */}
             <div className="card p-4">
               <h3 className="font-heading font-bold text-white text-sm mb-3">Ghế đã chọn</h3>
-              {selected.size > 0 ? (
+              {selectedSeatObjects.length > 0 ? (
                 <>
-
-
                   <div className="flex flex-wrap gap-1 mb-3">
                     {selectedSeatObjects
                       .sort((a, b) => `${a.seatRow}${a.seatNumber}`.localeCompare(`${b.seatRow}${b.seatNumber}`))
                       .map(seat => (
-                        <span key={seat.id} className="badge bg-primary text-cinema-black font-bold text-xs">
+                        <span key={seat.seatId} className="badge bg-primary text-cinema-black font-bold text-xs">
                           {seat.seatRow}{seat.seatNumber}
                         </span>
                       ))}
@@ -421,7 +362,7 @@ export default function SeatSelection() {
                   <div className="border-t border-cinema-border pt-3 mb-4 space-y-1">
                     <div className="flex justify-between text-sm">
                       <span className="text-cinema-muted">Số ghế:</span>
-                      <span className="text-white font-bold">{selected.size}</span>
+                      <span className="text-white font-bold">{selectedSeatObjects.length}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-cinema-muted">Tổng tiền:</span>
@@ -449,18 +390,15 @@ export default function SeatSelection() {
             </div>
 
             {/* Ghế bị lock bởi người khác */}
-            {Object.keys(lockedByOthers).length > 0 && (
+            {lockedByOthersList.length > 0 && (
               <div className="card p-3 mt-3">
                 <p className="text-xs text-orange-400 font-medium mb-1.5">🔒 Ghế đang được giữ</p>
                 <div className="flex flex-wrap gap-1">
-                  {Object.keys(lockedByOthers).sort().map(sid => {
-                    const seat = seats.find(s => s.id === Number(sid));
-                    return (
-                      <span key={sid} className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 border border-orange-500/30 text-orange-400">
-                        {seat ? `${seat.seatRow}${seat.seatNumber}` : sid}
-                      </span>
-                    );
-                  })}
+                  {lockedByOthersList.map(seat => (
+                    <span key={seat.seatId} className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 border border-orange-500/30 text-orange-400">
+                      {seat.seatRow}{seat.seatNumber}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}

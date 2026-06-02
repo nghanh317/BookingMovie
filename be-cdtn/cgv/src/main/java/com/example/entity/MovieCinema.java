@@ -49,11 +49,11 @@ public class MovieCinema implements Serializable{
 	public static class MovieCinemaPk implements Serializable{
 		private static final long serialVersionUID = 1L;
 		
-		@Column(name = "movie_id")
+		@Column(name = "movie_id", columnDefinition = "int unsigned")
 		@NonNull
 		private Integer movieId;
 		
-		@Column (name = "cinema_id")
+		@Column (name = "cinema_id", columnDefinition = "int unsigned")
 		@NonNull
 		private Integer cinemaId;
 		

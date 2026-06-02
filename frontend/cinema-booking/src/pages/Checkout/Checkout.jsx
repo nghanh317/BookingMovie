@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PAYMENT_METHODS } from '../../constants/mockData';
 import useAuthStore from '../../store/authStore';
 import { sendBookingConfirmEmail } from '../../services/emailService';
 import ticketService from '../../services/ticketService';
@@ -431,10 +430,9 @@ export default function Checkout() {
             {/* Payment Method */}
             <div className="card p-6">
               <h2 className="font-heading font-bold text-white text-lg mb-4">Phương Thức Thanh Toán</h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 {[
-                  { id: 'payos', label: 'Quét mã VietQR (PayOS)', desc: 'Tạo mã QR chuyển khoản nhanh' },
-                  ...PAYMENT_METHODS
+                  { id: 'payos', label: 'Quét mã VietQR (PayOS)', desc: 'Tạo mã QR chuyển khoản nhanh' }
                 ].map(method => {
                   const isSelected = paymentMethod === method.id;
                   const logos = {
@@ -446,64 +444,7 @@ export default function Checkout() {
                         <rect x="18" y="16" width="8" height="8" fill="white" />
                         <text x="44" y="25" fill="white" fontSize="13" fontWeight="bold" fontFamily="Arial, sans-serif">VietQR PayOS</text>
                       </svg>
-                    ),
-                    momo: (
-                      <svg viewBox="0 0 120 40" className="h-8 w-auto" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="120" height="40" rx="8" fill="#AE2070"/>
-                        <circle cx="20" cy="20" r="12" fill="white" opacity="0.15"/>
-                        <circle cx="20" cy="20" r="7" fill="white" opacity="0.9"/>
-                        <text x="38" y="26" fill="white" fontSize="16" fontWeight="bold" fontFamily="Arial, sans-serif">MoMo</text>
-                      </svg>
-                    ),
-                    vnpay: (
-                      <svg viewBox="0 0 140 40" className="h-8 w-auto" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="140" height="40" rx="8" fill="#0A2E6E"/>
-                        {/* VN text red */}
-                        <text x="8" y="17" fill="#E31837" fontSize="14" fontWeight="900" fontFamily="Arial, sans-serif">VN</text>
-                        <text x="8" y="33" fill="#FFFFFF" fontSize="14" fontWeight="900" fontFamily="Arial, sans-serif">PAY</text>
-                        {/* divider */}
-                        <rect x="44" y="7" width="1.5" height="26" fill="#E31837" opacity="0.5"/>
-                        {/* QR icon */}
-                        <rect x="52" y="10" width="8" height="8" rx="1" fill="none" stroke="white" strokeWidth="1.2"/>
-                        <rect x="54" y="12" width="4" height="4" rx="0.5" fill="white"/>
-                        <rect x="52" y="22" width="8" height="8" rx="1" fill="none" stroke="white" strokeWidth="1.2"/>
-                        <rect x="54" y="24" width="4" height="4" rx="0.5" fill="white"/>
-                        <rect x="63" y="10" width="8" height="8" rx="1" fill="none" stroke="white" strokeWidth="1.2"/>
-                        <rect x="65" y="12" width="4" height="4" rx="0.5" fill="white"/>
-                        <rect x="63" y="22" width="3" height="3" fill="white"/>
-                        <rect x="68" y="22" width="3" height="3" fill="white"/>
-                        <rect x="63" y="27" width="3" height="3" fill="white"/>
-                        <text x="78" y="27" fill="#E8C84A" fontSize="10" fontWeight="bold" fontFamily="Arial, sans-serif">QR Code</text>
-                      </svg>
-                    ),
-                    vnpay2: (
-                      <svg viewBox="0 0 140 40" className="h-8 w-auto" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="140" height="40" rx="8" fill="#005BAA"/>
-                        {/* VN text */}
-                        <text x="8" y="17" fill="#FFD700" fontSize="14" fontWeight="900" fontFamily="Arial, sans-serif">VN</text>
-                        <text x="8" y="33" fill="#FFFFFF" fontSize="14" fontWeight="900" fontFamily="Arial, sans-serif">PAY</text>
-                        {/* divider */}
-                        <rect x="44" y="7" width="1.5" height="26" fill="white" opacity="0.3"/>
-                        {/* Bank card icon */}
-                        <rect x="52" y="12" width="26" height="17" rx="3" fill="none" stroke="white" strokeWidth="1.2"/>
-                        <rect x="52" y="16" width="26" height="4" fill="white" opacity="0.3"/>
-                        <rect x="55" y="22" width="8" height="2" rx="1" fill="white" opacity="0.7"/>
-                        <rect x="65" y="22" width="5" height="2" rx="1" fill="white" opacity="0.5"/>
-                        {/* ATM text */}
-                        <text x="84" y="23" fill="white" fontSize="11" fontWeight="bold" fontFamily="Arial, sans-serif">ATM</text>
-                        <text x="82" y="33" fill="#A8D4FF" fontSize="8" fontFamily="Arial, sans-serif">Ngân hàng</text>
-                      </svg>
-                    ),
-                    card: (
-                      <svg viewBox="0 0 120 40" className="h-8 w-auto" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="120" height="40" rx="8" fill="#1A1F36"/>
-                        {/* Mastercard logo */}
-                        <circle cx="22" cy="20" r="11" fill="#EB001B"/>
-                        <circle cx="36" cy="20" r="11" fill="#F79E1B" opacity="0.9"/>
-                        <path d="M29 11.2a11 11 0 010 17.6A11 11 0 0129 11.2z" fill="#FF5F00"/>
-                        <text x="52" y="26" fill="white" fontSize="12" fontWeight="bold" fontFamily="Arial, sans-serif">Credit</text>
-                      </svg>
-                    ),
+                    )
                   };
                   return (
                     <button

@@ -14,6 +14,14 @@ const payosService = {
     return res.data;
   },
 
+  /**
+   * Sync payment status from PayOS
+   * @param { number } ticketId
+   */
+  syncPayment: async (ticketId) => {
+    const res = await api.post(`/v1/payos/sync/${ticketId}`);
+    return res.data;
+  }
 };
 
 export default payosService;

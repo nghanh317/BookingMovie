@@ -8,13 +8,13 @@ import com.example.form.BookingSeat.BookingSeatFilterForm;
 import com.example.form.BookingSeat.CreatBookingSeatForm;
 
 public interface IBookingSeatService {
-	
-	Page<BookingSeatDTO> getAllBookingSeat (Pageable pageable, BookingSeatFilterForm form);
-	
-	BookingSeatDTO getById (Integer id);
-	
+
+	Page<BookingSeatDTO> getAllBookingSeat(Pageable pageable, BookingSeatFilterForm form);
+
+	BookingSeatDTO getById(Integer id);
+
 	void create(CreatBookingSeatForm form);
-	
+
 	java.util.List<Integer> getBookedSeatsBySlot(Integer slotId);
 
 }

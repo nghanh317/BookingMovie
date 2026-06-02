@@ -16,22 +16,24 @@ import com.example.form.BookingSeat.CreatBookingSeatForm;
 import com.example.service.BookingSeat.IBookingSeatService;
 
 @RestController
-@RequestMapping ("api/v1/bookingSeats")
+@RequestMapping("api/v1/bookingSeats")
 public class BookingSeatController {
-	
+
 	@Autowired
 	private IBookingSeatService service;
-	
+
 	@GetMapping
-	public Page<BookingSeatDTO> getAllBookingSeat ( Pageable pageable, BookingSeatFilterForm form){
+	public Page<BookingSeatDTO> getAllBookingSeat(Pageable pageable, BookingSeatFilterForm form) {
 		return service.getAllBookingSeat(pageable, form);
 	}
-	@GetMapping ("/{id}")
-	public BookingSeatDTO getById (@PathVariable Integer id) {
+
+	@GetMapping("/{id}")
+	public BookingSeatDTO getById(@PathVariable Integer id) {
 		return service.getById(id);
 	}
+
 	@PostMapping
-	public void create (@RequestBody CreatBookingSeatForm form) {
+	public void create(@RequestBody CreatBookingSeatForm form) {
 		service.create(form);
 	}
 

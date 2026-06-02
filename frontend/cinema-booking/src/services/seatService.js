@@ -49,6 +49,17 @@ const seatService = {
   remove: async (id) => {
     await api.delete(`/v1/seats/${id}`);
   },
+
+  /**
+   * Lấy trạng thái tất cả ghế của một suất chiếu (Single Source of Truth)
+   * GET /api/v1/seats/slot-status/{slotId}?accountId={id}
+   */
+  getSlotStatus: async (slotId, accountId = '') => {
+    const res = await api.get(`/v1/seats/slot-status/${slotId}`, {
+      params: { accountId }
+    });
+    return res.data;
+  },
 };
 
 export default seatService;

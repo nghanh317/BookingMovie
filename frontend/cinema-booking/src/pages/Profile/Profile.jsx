@@ -147,11 +147,22 @@ export default function Profile() {
     if (!userId) { setProfileLoading(false); return; }
     accountService.getById(userId)
       .then(data => {
+        let parsedJoinDate = '';
+        if (data.createDate) {
+          if (typeof data.createDate === 'string' && data.createDate.includes('-') && data.createDate.split('-')[0].length === 2) {
+            const [datePart, timePart] = data.createDate.split(' ');
+            const [dd, mm, yyyy] = datePart.split('-');
+            parsedJoinDate = `${yyyy}-${mm}-${dd}T${timePart || '00:00:00'}`;
+          } else {
+            parsedJoinDate = data.createDate;
+          }
+        }
+
         const info = {
           name: data.fullName || data.userName || 'Người dùng',
           email: data.email || '',
           phone: data.phone || '',
-          joinDate: data.createDate ? new Date(data.createDate).toISOString().split('T')[0] : '',
+          joinDate: parsedJoinDate,
           points: 0, // điểm tích lũy — tính từ tickets nếu cần
           totalBookings: 0,
           totalSpent: 0,
@@ -381,7 +392,9 @@ export default function Profile() {
               </div>
               <div>
                 <p className="text-primary font-heading font-bold text-xl">
-                  {new Date(userData.joinDate).toLocaleDateString('vi-VN', { year: 'numeric', month: 'short' })}
+                  {userData.joinDate && !isNaN(new Date(userData.joinDate).getTime())
+                    ? new Date(userData.joinDate).toLocaleDateString('vi-VN', { year: 'numeric', month: 'short' })
+                    : '--'}
                 </p>
                 <p className="text-cinema-muted text-xs">Ngày tham gia</p>
               </div>
