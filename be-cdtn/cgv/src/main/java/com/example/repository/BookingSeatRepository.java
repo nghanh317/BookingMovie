@@ -19,13 +19,14 @@ public interface BookingSeatRepository
 	List<BookingSeats> findByTickets_Slots_IdAndIsDeleted(Integer slotId, Boolean isDeleted);
 
 	/**
-	 * Lấy danh sách BookingSeats đã được xác nhận (status = 'confirmed') cho một slot.
+	 * Lấy danh sách BookingSeats đã bị chiếm (CONFIRMED hoặc PENDING còn hạn 10 phút).
 	 * Dùng JPQL tường minh để tránh lỗi với custom AttributeConverter.
 	 */
 	@Query("SELECT bs FROM BookingSeats bs " +
 	       "WHERE bs.tickets.slots.id = :slotId " +
 	       "AND bs.isDeleted = false " +
-	       "AND bs.tickets.status = com.example.entity.Tickets.Status.CONFIRMED")
-	List<BookingSeats> findConfirmedBySlotId(@Param("slotId") Integer slotId);
+	       "AND (bs.tickets.status = com.example.entity.Tickets.Status.CONFIRMED " +
+	       "OR (bs.tickets.status = com.example.entity.Tickets.Status.PENDING AND bs.tickets.ticketsDate > :tenMinsAgo))")
+	List<BookingSeats> findUnavailableBySlotId(@Param("slotId") Integer slotId, @Param("tenMinsAgo") java.util.Date tenMinsAgo);
 }
 

@@ -126,6 +126,12 @@ private Date updateDate;
 @Column (name = "is_deleted")
 private Boolean isDeleted;
 
+@Column(name = "required_rank", length = 50)
+private String requiredRank;
+
+@Column(name = "required_points")
+private Integer requiredPoints;
+
 @OneToMany ( mappedBy = "promotion")
 private List<PromotionUsage> promotionUsages;
 
@@ -145,6 +151,12 @@ public void prePersist() {
 	}
 	if (usageCount == null) {
 		usageCount = 0;
+	}
+	if (requiredRank == null) {
+		requiredRank = "all";
+	}
+	if (requiredPoints == null) {
+		requiredPoints = 0;
 	}
 }
 

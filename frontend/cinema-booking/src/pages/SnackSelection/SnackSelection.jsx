@@ -3,6 +3,7 @@ import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import productService from '../../services/productService';
 import promotionService from '../../services/promotionService';
+import useAuthStore from '../../store/authStore';
 
 const HOLD_MINUTES = 10; // Thời gian giữ ghế (phút)
 
@@ -71,6 +72,8 @@ export default function SnackSelection() {
     movie, showtime, cinema, seats, totalPrice,
     showtimeId, slotId, lockExpiresAt,
   } = location.state || {};
+  
+  const { user } = useAuthStore();
 
   // ── Khởi tạo thời gian hết hạn ──
   // Nếu backend đã trả lockExpiresAt (ISO string) thì dùng luôn,
@@ -113,8 +116,40 @@ export default function SnackSelection() {
         else if (Array.isArray(resPromotions?.data)) promoItems = resPromotions.data;
         else if (Array.isArray(resPromotions)) promoItems = resPromotions;
 
-        const validVouchers = promoItems.filter(v => v.status === 'ACTIVE');
-        setVouchers(validVouchers);
+        // Vouchers thông thường (không yêu cầu điểm)
+        const generalVouchers = promoItems.filter(v => v.status === 'ACTIVE' && (!v.requiredPoints || v.requiredPoints <= 0));
+        
+        // Vouchers người dùng đã đổi từ điểm
+        let userOwned = [];
+        try {
+          const saved = localStorage.getItem(`ownedVouchers_${user?.id || user?.userId}`);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            userOwned = parsed.map(item => item.original).filter(Boolean);
+          }
+        } catch (e) {}
+
+        const allAvailable = [...generalVouchers, ...userOwned];
+        
+        // Lọc bỏ các voucher đã hết hạn
+        const now = new Date();
+        const validVouchersOnly = allAvailable.filter(v => {
+          if (!v.endDate) return true;
+          let end = null;
+          if (typeof v.endDate === 'string' && v.endDate.includes('-') && v.endDate.split('-')[0].length === 2) {
+             const [datePart, timePart] = v.endDate.split(' ');
+             const [dd, mm, yyyy] = datePart.split('-');
+             end = new Date(`${yyyy}-${mm}-${dd}T${timePart || '23:59:59'}`);
+          } else {
+             end = new Date(v.endDate);
+          }
+          return end > now;
+        });
+
+        // Xóa trùng lặp theo ID
+        const uniqueVouchers = Array.from(new Map(validVouchersOnly.map(v => [v.id, v])).values());
+        
+        setVouchers(uniqueVouchers);
 
       } catch (err) {
         console.error('[SnackSelection] fetch data error:', err.message);

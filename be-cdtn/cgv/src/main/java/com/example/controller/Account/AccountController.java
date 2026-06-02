@@ -54,5 +54,12 @@ public class AccountController {
 		service.deleteAccount(id);
 	}
 	
+	@PostMapping("/{id}/redeem-points")
+	public void redeemPoints(@PathVariable(name = "id") Integer id, @RequestBody java.util.Map<String, Integer> request) {
+		Integer points = request.get("points");
+		if (points != null && points > 0) {
+			service.redeemPoints(id, points);
+		}
+	}
 	
 }

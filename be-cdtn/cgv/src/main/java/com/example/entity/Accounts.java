@@ -72,6 +72,9 @@ public class Accounts implements Serializable {
 	@Column (name = "is_deleted")
 	private Boolean isDeleted;
 	
+	@Column (name = "history_points")
+	private Integer historyPoints;
+	
 	@OneToMany (mappedBy = "accounts")
 	private List<Tickets> tickets;
 	
@@ -91,6 +94,9 @@ public class Accounts implements Serializable {
 		}
 		if (isDeleted == null) {
 			isDeleted = false;
+		}
+		if (historyPoints == null) {
+			historyPoints = 0;
 		}
 	}
 

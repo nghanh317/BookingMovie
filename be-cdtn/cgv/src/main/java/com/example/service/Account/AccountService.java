@@ -105,6 +105,13 @@ public class AccountService implements IAccountService{
 		return dto;
 	}
 	
+	@Override
+	public void redeemPoints(Integer id, Integer points) {
+		Accounts account = accountRepository.findById(id).get();
+		account.setHistoryPoints(account.getHistoryPoints() + points);
+		accountRepository.save(account);
+	}
+	
 	private void calculateAccountMetrics(Accounts account, AccountDTO dto) {
 		java.math.BigDecimal total = java.math.BigDecimal.ZERO;
 		int count = 0;
@@ -120,13 +127,16 @@ public class AccountService implements IAccountService{
 		}
 		dto.setSpent(total);
 		dto.setBookings(count);
-		long pts = total.divideToIntegralValue(new java.math.BigDecimal("10000")).longValue();
-		dto.setPoints(pts);
+		long totalEarned = total.divideToIntegralValue(new java.math.BigDecimal("10000")).longValue();
+		long history = account.getHistoryPoints() != null ? account.getHistoryPoints() : 0;
+		long currentPoints = totalEarned - history;
+		if (currentPoints < 0) currentPoints = 0;
+		dto.setPoints(currentPoints);
 		
 		String level = "Bronze";
-		if (pts >= 1000) level = "Diamond";
-		else if (pts >= 300) level = "Gold";
-		else if (pts >= 100) level = "Silver";
+		if (totalEarned >= 1000) level = "Diamond";
+		else if (totalEarned >= 300) level = "Gold";
+		else if (totalEarned >= 100) level = "Silver";
 		dto.setLevel(level);
 	}
 	

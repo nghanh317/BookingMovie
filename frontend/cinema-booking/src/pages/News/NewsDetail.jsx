@@ -5,9 +5,26 @@ import newsService from '../../services/newsService';
 import { detectCategory, categoryColor } from './News';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
+function parseDateStr(str) {
+  if (!str) return null;
+  // If backend returns dd-MM-yyyy HH:mm:ss
+  if (/^\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}$/.test(str)) {
+    const [dPart, tPart] = str.split(' ');
+    const [d, m, y] = dPart.split('-');
+    return new Date(`${y}-${m}-${d}T${tPart}`);
+  }
+  return new Date(str);
+}
+
 function fmtDateLong(dateStr) {
   if (!dateStr) return '';
-  return new Date(dateStr).toLocaleDateString('vi-VN', { day: '2-digit', month: 'long', year: 'numeric' });
+  const date = parseDateStr(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  
+  const time = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const day = date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  
+  return `${time} | ${day}`;
 }
 
 function estimateReadTime(content) {

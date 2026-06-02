@@ -10,6 +10,7 @@ import movieService from '../../services/movieService';
 import MovieCard from '../../components/movie/MovieCard';
 import { RANKS, POINT_EARN_EXAMPLES, getRankByPoints, getRankProgress } from '../../constants/rankingConfig';
 import api from '../../services/api';
+import promotionService from '../../services/promotionService';
 
 
 
@@ -133,13 +134,39 @@ export default function Profile() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [bookingsLoading, setBookingsLoading] = useState(true);
 
-  const [ownedVouchers, setOwnedVouchers] = useState([]);
-
-  const redeemableOffers = [
-    { id: 'r1', code: 'POINT50K', title: 'Voucher 50.000đ', points: 500, desc: 'Giảm trực tiếp 50k vào tổng hóa đơn', color: 'border-orange-500/40 bg-orange-500/5' },
-    { id: 'r2', code: 'FREE2D', title: 'Vé xem phim 2D', points: 1000, desc: 'Đổi 1 vé xem phim 2D miễn phí', color: 'border-blue-500/40 bg-blue-500/5' },
-    { id: 'r3', code: 'VIPCOMBO', title: 'Combo Bắp Nước VIP', points: 800, desc: '2 nước lớn + 1 bắp phô mai lớn', color: 'border-primary/40 bg-primary/5' },
-  ];
+  const [ownedVouchers, setOwnedVouchers] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`ownedVouchers_${user?.id || user?.userId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const now = new Date();
+        // Lọc bỏ những voucher đã hết hạn
+        const valid = parsed.filter(v => {
+          if (!v.original || !v.original.endDate) return true;
+          const ed = v.original.endDate;
+          let end = null;
+          if (typeof ed === 'string' && ed.includes('-') && ed.split('-')[0].length === 2) {
+             const [datePart, timePart] = ed.split(' ');
+             const [dd, mm, yyyy] = datePart.split('-');
+             end = new Date(`${yyyy}-${mm}-${dd}T${timePart || '23:59:59'}`);
+          } else {
+             end = new Date(ed);
+          }
+          return end > now;
+        });
+        
+        // Nếu số lượng thay đổi thì cập nhật lại localStorage
+        if (valid.length !== parsed.length) {
+          localStorage.setItem(`ownedVouchers_${user?.id || user?.userId}`, JSON.stringify(valid));
+        }
+        return valid;
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+  const [redeemableOffers, setRedeemableOffers] = useState([]);
 
   // Fetch user info
   useEffect(() => {
@@ -197,17 +224,41 @@ export default function Profile() {
           : Array.isArray(res?.data?.content) ? res.data.content
           : Array.isArray(res?.data) ? res.data
           : Array.isArray(res) ? res : [];
+          
+        // Lọc bỏ vé "pending" (chờ thanh toán) nếu đã quá 10 phút kể từ lúc tạo (ticketsDate)
+        const now = new Date();
+        const validList = list.filter(t => {
+          if (t.paymentStatus !== 'PAID' && t.status !== 'CONFIRMED') {
+            let tDate = null;
+            if (t.ticketsDate) {
+              if (typeof t.ticketsDate === 'string' && t.ticketsDate.includes('-') && t.ticketsDate.split('-')[0].length === 2) {
+                const [datePart, timePart] = t.ticketsDate.split(' ');
+                const [dd, mm, yyyy] = datePart.split('-');
+                tDate = new Date(`${yyyy}-${mm}-${dd}T${timePart || '00:00:00'}`);
+              } else {
+                tDate = new Date(t.ticketsDate);
+              }
+            }
+            if (tDate) {
+              const diffMinutes = (now - tDate) / 1000 / 60;
+              if (diffMinutes > 10) return false; // xoá / ẩn đi
+            }
+          }
+          return true;
+        });
+
         // Normalize ticket → BookingCard format
-        const normalized = list.map(t => {
+        const normalized = validList.map(t => {
           const now = new Date();
           let ticketDate = null;
-          if (t.ticketsDate) {
-            if (typeof t.ticketsDate === 'string' && t.ticketsDate.includes('-') && t.ticketsDate.split('-')[0].length === 2) {
-              const [datePart, timePart] = t.ticketsDate.split(' ');
+          const displayDateStr = t.slotsShowTime || t.ticketsDate;
+          if (displayDateStr) {
+            if (typeof displayDateStr === 'string' && displayDateStr.includes('-') && displayDateStr.split('-')[0].length === 2) {
+              const [datePart, timePart] = displayDateStr.split(' ');
               const [dd, mm, yyyy] = datePart.split('-');
               ticketDate = new Date(`${yyyy}-${mm}-${dd}T${timePart || '00:00:00'}`);
             } else {
-              ticketDate = new Date(t.ticketsDate);
+              ticketDate = new Date(displayDateStr);
             }
           }
           const isUpcoming = ticketDate && ticketDate > now;
@@ -232,7 +283,7 @@ export default function Profile() {
         // Cập nhật stats
         const paid = normalized.filter(t => t.rawPaymentStatus === 'PAID');
         const totalSpent = paid.reduce((sum, t) => sum + t.total, 0);
-        setUserData(prev => prev ? { ...prev, totalBookings: paid.length, totalSpent, points: Math.floor(totalSpent / 10000) } : prev);
+        setUserData(prev => prev ? { ...prev, totalBookings: paid.length, totalSpent } : prev);
       })
       .catch(err => console.error('[Profile] fetch tickets error:', err.message))
       .finally(() => setBookingsLoading(false));
@@ -241,6 +292,42 @@ export default function Profile() {
   // Fetch all movies (for favorites tab)
   useEffect(() => {
     movieService.getAll().then(data => setAllMovies(Array.isArray(data) ? data : [])).catch(() => {});
+  }, []);
+
+  // Fetch redeemable offers (admin created vouchers with requiredPoints > 0)
+  useEffect(() => {
+    promotionService.getAll({ size: 100 })
+      .then(res => {
+        const raw = Array.isArray(res) ? res : (res?.content || res?.data || []);
+        const activeAndRedeemable = raw.filter(p => {
+          if (p.isDeleted || p.deleted || p.status === 'INACTIVE') return false;
+          if (!p.requiredPoints || p.requiredPoints <= 0) return false;
+          
+          if (p.endDate) {
+            let parsedExp = null;
+            if (typeof p.endDate === 'string' && p.endDate.includes('-') && p.endDate.split('-')[0].length === 2) {
+              const [datePart, timePart] = p.endDate.split(' ');
+              const [dd, mm, yyyy] = datePart.split('-');
+              parsedExp = new Date(`${yyyy}-${mm}-${dd}T${timePart || '23:59:59'}`);
+            } else {
+              parsedExp = new Date(p.endDate);
+            }
+            if (!isNaN(parsedExp.getTime()) && parsedExp < new Date()) return false;
+          }
+          return true;
+        });
+        
+        setRedeemableOffers(activeAndRedeemable.map(p => ({
+          id: p.id,
+          code: p.promotionCode,
+          title: p.promotionName || p.promotionCode,
+          desc: p.description,
+          points: p.requiredPoints,
+          color: 'border-primary/40 bg-primary/5',
+          original: p
+        })));
+      })
+      .catch(err => console.error('[Profile] fetch redeemable vouchers error:', err.message));
   }, []);
 
   // Review Modal state
@@ -331,17 +418,34 @@ export default function Profile() {
     }
   };
 
-  const handleRedeem = (offer) => {
+  const handleRedeem = async (offer) => {
     if (userData.points < offer.points) {
       addNotification({ type: 'error', title: 'Không đủ điểm', message: `Bạn cần thêm ${offer.points - userData.points} điểm để đổi ${offer.title}.` });
       return;
     }
-    setUserData({ ...userData, points: userData.points - offer.points });
-    setOwnedVouchers([
-      { id: Date.now().toString(), code: offer.code, desc: offer.desc, exp: '30 ngày kể từ ngày đổi', color: offer.color },
-      ...ownedVouchers
-    ]);
-    addNotification({ type: 'success', title: 'Đổi ưu đãi thành công', message: `Bạn đã đổi thành công ${offer.title} với ${offer.points} điểm.` });
+    
+    const userId = user?.id || user?.userId;
+    if (!userId) {
+      addNotification({ type: 'error', title: 'Lỗi', message: 'Vui lòng đăng nhập để đổi điểm.' });
+      return;
+    }
+    
+    try {
+      // Gọi API trừ điểm (cộng vào history_points)
+      await api.post(`/v1/accounts/${userId}/redeem-points`, { points: offer.points });
+      
+      setUserData({ ...userData, points: userData.points - offer.points });
+      const newOwned = [
+        { id: Date.now().toString(), code: offer.code, desc: offer.desc, exp: '30 ngày kể từ ngày đổi', color: offer.color, original: offer.original },
+        ...ownedVouchers
+      ];
+      setOwnedVouchers(newOwned);
+      localStorage.setItem(`ownedVouchers_${userId}`, JSON.stringify(newOwned));
+      
+      addNotification({ type: 'success', title: 'Đổi ưu đãi thành công', message: `Bạn đã đổi thành công ${offer.title} với ${offer.points} điểm.` });
+    } catch (err) {
+      addNotification({ type: 'error', title: 'Lỗi', message: 'Có lỗi xảy ra khi đổi điểm. Vui lòng thử lại sau.' });
+    }
   };
 
   // Loading skeleton khi chưa có userData
@@ -724,26 +828,30 @@ export default function Profile() {
                     <p className="text-white font-bold text-xl">{userData.points.toLocaleString('vi-VN')} <span className="text-primary text-sm font-normal">điểm</span></p>
                   </div>
                 </div>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {redeemableOffers.map(v => (
-                    <div key={v.id} className={`rounded-xl border p-5 ${v.color} flex flex-col`}>
-                      <div className="mb-2">
-                        <span className="font-heading font-bold text-white text-base block">{v.title}</span>
-                        <p className="text-cinema-muted text-sm mt-1">{v.desc}</p>
+                {redeemableOffers.length > 0 ? (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {redeemableOffers.map(v => (
+                      <div key={v.id} className={`rounded-xl border p-5 ${v.color} flex flex-col`}>
+                        <div className="mb-2">
+                          <span className="font-heading font-bold text-white text-base block">{v.title}</span>
+                          <p className="text-cinema-muted text-sm mt-1">{v.desc}</p>
+                        </div>
+                        <div className="mt-auto pt-4 flex items-center justify-between border-t border-cinema-border/50">
+                          <span className="font-bold text-primary">{v.points} điểm</span>
+                          <button
+                            onClick={() => handleRedeem(v)}
+                            disabled={userData.points < v.points}
+                            className="btn-primary text-xs px-4 py-1.5 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                          >
+                            {userData.points >= v.points ? 'Đổi ngay' : 'Chưa đủ điểm'}
+                          </button>
+                        </div>
                       </div>
-                      <div className="mt-auto pt-4 flex items-center justify-between border-t border-cinema-border/50">
-                        <span className="font-bold text-primary">{v.points} điểm</span>
-                        <button
-                          onClick={() => handleRedeem(v)}
-                          disabled={userData.points < v.points}
-                          className="btn-primary text-xs px-4 py-1.5 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
-                        >
-                          {userData.points >= v.points ? 'Đổi ngay' : 'Chưa đủ điểm'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-cinema-muted text-center py-8">Hiện tại chưa có ưu đãi đổi điểm nào.</p>
+                )}
               </div>
 
               {/* ── Ưu đãi đang có ── */}

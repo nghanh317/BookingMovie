@@ -58,6 +58,9 @@ public class TicketDTO {
 
 	private String note;
 	
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private Date slotsShowTime;
+	
 	private List<TicketsDetailDTO> ticketsDetails;
 	
 	

@@ -195,6 +195,17 @@ public class TicketService implements ITicketService{
 			.findByTickets_Slots_IdAndIsDeleted(form.getSlotsId(), false);
 		
 		List<Integer> bookedSeatIds = existingBookings.stream()
+			.filter(bs -> {
+				Tickets t = bs.getTickets();
+				if (t.getStatus() == null || t.getStatus() == Tickets.Status.CONFIRMED) {
+					return true;
+				}
+				if (t.getStatus() == Tickets.Status.PENDING) {
+					long tenMinsAgo = System.currentTimeMillis() - (10 * 60 * 1000);
+					return t.getTicketsDate() != null && t.getTicketsDate().getTime() > tenMinsAgo;
+				}
+				return false;
+			})
 			.map(bs -> bs.getSeats().getId())
 			.collect(Collectors.toList());
 

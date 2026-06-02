@@ -44,6 +44,8 @@ public class PromotionService implements IPromotionService{
 	@Override
 	public void createPromotion(CreatePromotion form) {
 		Promotions createPromotion = new Promotions(form.getPromotionCode(), form.getPromotionName(), form.getDescription(), form.getDiscountType(), form.getDiscountValue(), form.getMaxDiscountAmount(), form.getMinOrderAmount(), form.getUsageLimit(), form.getUsageCount(), form.getUsagePerUser(), form.getStartDate(), form.getEndDate(), form.getApplicableDay(), form.getApplicableMovie(), form.getApplicableCinema(), form.getStatus(), form.getImageUrl());
+		createPromotion.setRequiredRank(form.getRequiredRank());
+		createPromotion.setRequiredPoints(form.getRequiredPoints());
 		promotionRepository.save(createPromotion);
 		
 	}
@@ -68,6 +70,8 @@ public class PromotionService implements IPromotionService{
 		updatePromotion.setApplicableCinema(form.getApplicableCinema());
 		updatePromotion.setStatus(form.getStatus());
 		updatePromotion.setImageUrl(form.getImageUrl());
+		updatePromotion.setRequiredRank(form.getRequiredRank());
+		updatePromotion.setRequiredPoints(form.getRequiredPoints());
 		
 		promotionRepository.save(updatePromotion);
 	}

@@ -41,6 +41,10 @@ public class CreatePromotion {
 	
 	private String applicableCinema;
 	
+	private String requiredRank;
+	
+	private Integer requiredPoints;
+	
 	private Status status;
 	
 	private String imageUrl;

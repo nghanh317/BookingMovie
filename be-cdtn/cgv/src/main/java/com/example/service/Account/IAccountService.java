@@ -22,5 +22,7 @@ public interface IAccountService extends UserDetailsService {
 	
 	void deleteAccount (Integer id);
 	
+	void redeemPoints(Integer id, Integer points);
+	
 	
 }

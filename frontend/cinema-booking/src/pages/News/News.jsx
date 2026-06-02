@@ -6,7 +6,17 @@ import newsService from '../../services/newsService';
 // ─── Helpers ────────────────────────────────────────────────────────
 function fmtDate(dateStr) {
   if (!dateStr) return '';
-  return new Date(dateStr).toLocaleDateString('vi-VN');
+  let date = new Date(dateStr);
+  if (/^\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}$/.test(dateStr)) {
+    const [dPart, tPart] = dateStr.split(' ');
+    const [d, m, y] = dPart.split('-');
+    date = new Date(`${y}-${m}-${d}T${tPart}`);
+  }
+  if (isNaN(date.getTime())) return dateStr;
+  
+  const time = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  const day = date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `${time} | ${day}`;
 }
 
 function estimateReadTime(content) {

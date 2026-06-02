@@ -87,6 +87,8 @@ function normalize(p) {
     applicableDay: p.applicableDay || '',
     applicableMovie: p.applicableMovie || '',
     applicableCinema: p.applicableCinema || '',
+    requiredRank: p.requiredRank || 'all',
+    requiredPoints: Number(p.requiredPoints) || 0,
   };
 }
 
@@ -108,6 +110,8 @@ function toPayload(form) {
     applicableDay: form.applicableDay || '',
     applicableMovie: form.applicableMovie || '',
     applicableCinema: form.applicableCinema || '',
+    requiredRank: form.requiredRank || 'all',
+    requiredPoints: Number(form.requiredPoints) || 0,
     status: form.active ? 'ACTIVE' : 'INACTIVE',
     imageUrl: form.imageUrl || '',
   };
@@ -118,6 +122,7 @@ const EMPTY_FORM = {
   minOrder: '', desc: '', startDate: new Date().toISOString().split('T')[0],
   expiry: '', stock: '', usesPerUser: 1, active: true,
   imageUrl: '', applicableDay: '', applicableMovie: '', applicableCinema: '',
+  requiredRank: 'all', requiredPoints: 0,
 };
 
 // ── Add / Edit Modal ─────────────────────────────────────────
@@ -230,9 +235,28 @@ function VoucherModal({ initial, onClose, onSave, saving }) {
             </div>
           </div>
 
-          <Field label="Số lần dùng / user" fieldKey="usesPerUser" type="number" {...sharedFieldProps} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">Hạng thành viên yêu cầu</label>
+              <select className="input-field cursor-pointer"
+                value={form.requiredRank}
+                onChange={e => f('requiredRank', e.target.value)}>
+                <option value="all">Tất cả (không giới hạn)</option>
+                <option value="bronze">Bronze (Đồng)</option>
+                <option value="silver">Silver (Bạc)</option>
+                <option value="gold">Gold (Vàng)</option>
+                <option value="diamond">Diamond (Kim Cương)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block">Điểm yêu cầu (0 = Miễn phí)</label>
+              <input type="number" min="0" className="input-field w-full"
+                value={form.requiredPoints} onChange={e => f('requiredPoints', e.target.value)} />
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
+            <Field label="Số lần dùng / user" fieldKey="usesPerUser" type="number" {...sharedFieldProps} />
             <div>
               <label className="text-cinema-muted text-xs mb-1 block">Ngày bắt đầu</label>
               <DatePickerInput value={form.startDate} onChange={iso => f('startDate', iso)} className="input-field" />
@@ -447,7 +471,7 @@ export default function AdminVouchers() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-cinema-border bg-cinema-dark">
-                {['Mã / Tên', 'Loại & Giá trị', 'Tối đa', 'Đơn tối thiểu', 'Số lượng', 'Lần/user', 'Ngày BĐ – KT', 'Trạng thái', 'Thao tác'].map(h => (
+                {['Mã / Tên', 'Loại & Giá trị', 'Điểm đổi', 'Số lượng', 'Lần/user', 'Ngày BĐ – KT', 'Trạng thái', 'Thao tác'].map(h => (
                   <th key={h} className="text-left px-3 py-3 text-cinema-muted text-xs font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -475,11 +499,8 @@ export default function AdminVouchers() {
                       </span>
                       <p className="text-cinema-muted text-[10px]">{v.type === 'percent' ? 'Phần trăm' : 'Cố định'}</p>
                     </td>
-                    <td className="px-3 py-3 text-cinema-muted text-sm">
-                      {v.maxDiscount > 0 ? `${fmt(v.maxDiscount)}đ` : '—'}
-                    </td>
-                    <td className="px-3 py-3 text-cinema-muted text-sm">
-                      {v.minOrder > 0 ? `${fmt(v.minOrder)}đ` : '—'}
+                    <td className="px-3 py-3 text-sm">
+                      <span className="font-bold text-yellow-400">{v.requiredPoints > 0 ? v.requiredPoints : 'Miễn phí'}</span>
                     </td>
                     <td className="px-3 py-3 text-sm">
                       <span className="text-white font-semibold">{v.stock}</span>
