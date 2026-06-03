@@ -23,6 +23,8 @@ import com.example.repository.RoomRepository;
 import com.example.repository.SlotRepository;
 import com.example.service.SettingSystem.PricingService;
 import com.example.specification.SlotSpecification;
+import com.example.config.exception.SlotOverlapException;
+import java.text.SimpleDateFormat;
 
 @Service
 public class SlotService implements ISlotService {
@@ -100,6 +102,20 @@ public class SlotService implements ISlotService {
 	@Override
 	@Transactional
 	public void createSlot(CreateSlotForm form) {
+		List<Slots> overlapping = slotRepository.findOverlappingSlots(form.getRoomId(), form.getShowTime(), form.getEndTime());
+		if (!overlapping.isEmpty()) {
+			Slots overlap = overlapping.get(0);
+			SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
+			String startTime = sdf.format(overlap.getShowTime());
+			String endTime = sdf.format(overlap.getEndTime());
+			String roomName = overlap.getRooms() != null ? overlap.getRooms().getRoomName() : "không xác định";
+			String movieName = overlap.getMovies() != null ? overlap.getMovies().getTitle() : "không xác định";
+			
+			String detailMsg = String.format("Phòng chiếu %s đã có suất chiếu phim '%s' từ %s đến %s. Vui lòng chọn khung giờ khác.", 
+					roomName, movieName, startTime, endTime);
+			throw new SlotOverlapException("Trùng lịch chiếu!", detailMsg);
+		}
+
 		BigDecimal autoPrice = pricingService.calculatePrice(form.getShowTime());
 
 		Rooms room = roomRepository.findById(form.getRoomId())
@@ -121,6 +137,20 @@ public class SlotService implements ISlotService {
 	@Override
 	@Transactional
 	public void updateSlot(Integer id, UpdateSlotForm form) {
+		List<Slots> overlapping = slotRepository.findOverlappingSlots(form.getRoomId(), form.getShowTime(), form.getEndTime());
+		Slots overlap = overlapping.stream().filter(s -> !s.getId().equals(id)).findFirst().orElse(null);
+		if (overlap != null) {
+			SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
+			String startTime = sdf.format(overlap.getShowTime());
+			String endTime = sdf.format(overlap.getEndTime());
+			String roomName = overlap.getRooms() != null ? overlap.getRooms().getRoomName() : "không xác định";
+			String movieName = overlap.getMovies() != null ? overlap.getMovies().getTitle() : "không xác định";
+			
+			String detailMsg = String.format("Phòng chiếu %s đã có suất chiếu phim '%s' từ %s đến %s. Vui lòng chọn khung giờ khác.", 
+					roomName, movieName, startTime, endTime);
+			throw new SlotOverlapException("Trùng lịch chiếu!", detailMsg);
+		}
+
 		Slots updateSlot = slotRepository.findById(id)
 			.orElseThrow(() -> new RuntimeException("Slot not found"));
 		

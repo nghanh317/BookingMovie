@@ -44,6 +44,17 @@ public class ExceptionConfiguration extends ResponseEntityExceptionHandler {
 		return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
 	}
 
+	// Slot overlap exception
+	@ExceptionHandler({ SlotOverlapException.class })
+	public ResponseEntity<Object> handleSlotOverlap(SlotOverlapException exception) {
+		Map<String, Object> response = new HashMap<>();
+		response.put("success", false);
+		response.put("code", 4001);
+		response.put("message", exception.getMessage());
+		response.put("detailMessage", exception.getDetailMessage());
+		return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+	}
+
 	// Business logic exception (e.g. user chưa mua vé)
 	@ExceptionHandler({ IllegalStateException.class })
 	public ResponseEntity<Object> handleIllegalState(IllegalStateException exception) {

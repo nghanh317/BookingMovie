@@ -110,8 +110,13 @@ export default function AdminShowtimes() {
       await fetchSlots();
       closeForm();
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Không thể lưu suất chiếu';
-      addNotification({ title: 'Lỗi', message: msg, type: 'error', isAdmin: true });
+      const data = err.response?.data;
+      if (data && data.code === 4001) {
+        addNotification({ title: data.message || 'Lỗi trùng lịch', message: data.detailMessage, type: 'error', isAdmin: true });
+      } else {
+        const msg = data?.detailMessage || data?.message || err.message || 'Không thể lưu suất chiếu';
+        addNotification({ title: 'Lỗi', message: msg, type: 'error', isAdmin: true });
+      }
     } finally {
       setSaving(false);
     }
