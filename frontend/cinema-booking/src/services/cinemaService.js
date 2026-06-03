@@ -19,6 +19,7 @@ const normalize = (cinema) => ({
   email: cinema.email || '',
   screens: parseInt(cinema.screens || cinema.numberOfScreens) || 0,
   rating: parseFloat(cinema.rating) || 0,
+  rooms: cinema.rooms || [],
 });
 
 const cinemaService = {

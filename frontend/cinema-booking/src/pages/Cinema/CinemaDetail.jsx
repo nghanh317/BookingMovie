@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CINEMAS, MOVIES, SHOWTIMES, CINEMA_DETAILS } from '../../constants/mockData';
+import { CINEMA_DETAILS } from '../../constants/mockData';
 import cinemaService from '../../services/cinemaService';
+import movieService from '../../services/movieService';
+import slotService from '../../services/slotService';
 import useAuthStore from '../../store/authStore';
 
 const TYPE_COLORS = {
@@ -211,6 +213,8 @@ export default function CinemaDetail() {
   const cinemaId = Number(id);
 
   const [cinema, setCinema] = useState(null);
+  const [allMovies, setAllMovies] = useState([]);
+  const [allShowtimes, setAllShowtimes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(getNextDays(1)[0].value);
 
@@ -219,8 +223,21 @@ export default function CinemaDetail() {
 
   useEffect(() => {
     setLoading(true);
-    cinemaService.getById(cinemaId).then((data) => {
-      setCinema(data);
+    Promise.all([
+      cinemaService.getById(cinemaId),
+      movieService.getAll({ size: 100 }),
+      slotService.getAll({ size: 1000 })
+    ]).then(([cinemaData, movieRes, slotRes]) => {
+      setCinema(cinemaData);
+      
+      const mList = Array.isArray(movieRes) ? movieRes : (movieRes?.content || movieRes?.data || []);
+      setAllMovies(mList);
+
+      const sList = Array.isArray(slotRes) ? slotRes : (slotRes?.content || slotRes?.data || []);
+      setAllShowtimes(sList);
+    }).catch(err => {
+      console.error(err);
+    }).finally(() => {
       setLoading(false);
     });
   }, [cinemaId]);
@@ -250,10 +267,26 @@ export default function CinemaDetail() {
 
   const heroImage = details.image || cinema.image;
 
-  // Lịch chiếu theo ngày + cinemaId
-  const showtimesOfDay = SHOWTIMES.filter(
-    (s) => s.cinemaId === cinemaId && s.date === selectedDate
-  );
+  const parseShowTime = (stStr) => {
+    if (!stStr) return '';
+    const isIsoFormat = /^\d{4}-\d{2}-\d{2}/.test(stStr);
+    const isVnFormat = /^\d{2}-\d{2}-\d{4}/.test(stStr);
+    if (isIsoFormat) return stStr.substring(0, 10);
+    if (isVnFormat) return stStr.substring(6,10) + '-' + stStr.substring(3,5) + '-' + stStr.substring(0,2);
+    return stStr.substring(0, 10);
+  }
+
+  const getTimeOnly = (stStr) => {
+    if (!stStr) return '';
+    return stStr.substring(11, 16);
+  }
+
+  // Lịch chiếu theo ngày + rạp
+  const showtimesOfDay = allShowtimes.filter((s) => {
+    if (s.cinemaName !== cinema?.name) return false;
+    const stDate = parseShowTime(s.showTime);
+    return stDate === selectedDate;
+  });
 
   // Group theo movieId
   const groupedByMovie = showtimesOfDay.reduce((acc, s) => {
@@ -263,8 +296,8 @@ export default function CinemaDetail() {
   }, {});
 
   const moviesShowing = Object.entries(groupedByMovie).map(([movieId, showtimes]) => ({
-    movie: MOVIES.find((m) => m.id === Number(movieId)),
-    showtimes,
+    movie: allMovies.find((m) => m.id === Number(movieId)),
+    showtimes: showtimes.sort((a,b) => getTimeOnly(a.showTime).localeCompare(getTimeOnly(b.showTime))),
   })).filter((item) => item.movie);
 
   return (
@@ -401,10 +434,10 @@ export default function CinemaDetail() {
                               className="group flex flex-col items-center px-3 py-2 rounded-xl border border-cinema-border bg-cinema-surface hover:border-primary hover:bg-primary/10 transition-all duration-200 min-w-[70px]"
                             >
                               <span className="text-white font-bold text-sm group-hover:text-primary transition-colors">
-                                {s.time}
+                                {getTimeOnly(s.showTime)}
                               </span>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-md border mt-1 ${TYPE_COLORS[s.type] || TYPE_COLORS['2D']}`}>
-                                {s.type}
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-md border mt-1 ${TYPE_COLORS['2D']}`}>
+                                {s.roomName}
                               </span>
                               <span className="text-cinema-muted text-[10px] mt-1">
                                 {s.availableSeats} ghế
@@ -486,7 +519,7 @@ export default function CinemaDetail() {
                   </svg>
                   <div>
                     <p className="text-cinema-muted text-xs mb-0.5">Số phòng chiếu</p>
-                    <p className="text-white">{cinema.screens} phòng</p>
+                    <p className="text-white">{(cinema.rooms || []).length || cinema.screens || 0} phòng</p>
                   </div>
                 </div>
 

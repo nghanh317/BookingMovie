@@ -42,7 +42,7 @@ function CinemaCard({ cinema, index, allMovies, allShowtimes }) {
       {/* Cinema Header */}
       <div className="relative h-44 overflow-hidden">
         <img
-          src={cinema.image}
+          src={cinema.image || `https://placehold.co/800x300/1A1A24/A0A0B4?text=${encodeURIComponent(cinema.name)}`}
           alt={cinema.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           onError={e => { e.target.src = `https://placehold.co/800x300/1A1A24/A0A0B4?text=${encodeURIComponent(cinema.name)}`; }}

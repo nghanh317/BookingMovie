@@ -22,7 +22,7 @@ public class CinemaSpecification {
 
 @SuppressWarnings({"deprecation","removal"})
 public static Specification<Cinemas> buildWhere (CinemaFilterForm filterform){
-	Specification<Cinemas> where = Specification.where(null);
+	Specification<Cinemas> where = Specification.where(new CustomSpecification("isDeleted", false));
 	if (filterform == null)
 		return where;
     if (filterform.getProvinceId() != null) {
@@ -51,12 +51,8 @@ public static Specification<Cinemas> buildWhere (CinemaFilterForm filterform){
 	if (!StringUtils.isEmpty(filterform.getSearch())) {
 		String search = filterform.getSearch().trim();
 		CustomSpecification cinemaNameSpecification = new CustomSpecification ("cinemaName", search);
-		where = Specification.where(cinemaNameSpecification);
-	}
-	if (!StringUtils.isEmpty(filterform.getSearch())) {
-		String search = filterform.getSearch().trim();
 		CustomSpecification provinceNameSpecification = new CustomSpecification ("provinceName", search);
-		where = Specification.where(provinceNameSpecification);
+		where = where.and(Specification.where(cinemaNameSpecification).or(provinceNameSpecification));
 	}
 	
 	if (filterform.getStatus() != null) {
@@ -125,6 +121,9 @@ static class CustomSpecification implements Specification<Cinemas>{
 		}
 		if (field.equalsIgnoreCase("status")) {
 			return criteriaBuilder.equal(root.get("status"), value);
+		}
+		if (field.equalsIgnoreCase("isDeleted")) {
+			return criteriaBuilder.equal(root.get("isDeleted"), value);
 		}
 		return null;
 	}

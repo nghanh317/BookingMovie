@@ -37,7 +37,7 @@ function CinemaDropdownItem({ cinema, onClick }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium group-hover:text-white truncate">{cinema.name}</p>
-        <p className="text-xs text-cinema-muted truncate">{cinema.city} · {cinema.screens} phòng</p>
+        <p className="text-xs text-cinema-muted truncate">{cinema.city} · {(cinema.rooms || []).length || cinema.screens || 0} phòng</p>
       </div>
       {cinema.rating > 0 && (
         <div className="flex items-center gap-1 flex-shrink-0">
