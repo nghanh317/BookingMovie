@@ -290,6 +290,9 @@ export default function Profile() {
             rawPaymentStatus: t.paymentStatus,
           };
         });
+        
+        normalized.sort((a, b) => b.ticketId - a.ticketId);
+        
         setBookings(normalized);
         // Cập nhật stats
         const paid = normalized.filter(t => t.rawPaymentStatus === 'PAID');
