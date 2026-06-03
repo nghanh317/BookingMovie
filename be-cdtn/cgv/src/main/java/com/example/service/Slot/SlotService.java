@@ -52,8 +52,12 @@ public class SlotService implements ISlotService {
 				if (slot.getRooms() != null) {
 					dto.setRoomId(slot.getRooms().getId());
 					dto.setRoomName(slot.getRooms().getRoomName());
-					dto.setCinemaName(slot.getRooms().getCinemas().getCinemaName());
-					dto.setProvinceName(slot.getRooms().getCinemas().getProvinces().getProvinceName());
+					if (slot.getRooms().getCinemas() != null) {
+						dto.setCinemaName(slot.getRooms().getCinemas().getCinemaName());
+						if (slot.getRooms().getCinemas().getProvinces() != null) {
+							dto.setProvinceName(slot.getRooms().getCinemas().getProvinces().getProvinceName());
+						}
+					}
 				}
 				dto.setShowTime(slot.getShowTime());
 				dto.setEndTime(slot.getEndTime());
@@ -78,8 +82,12 @@ public class SlotService implements ISlotService {
 		if (slot.getRooms() != null) {
 			dto.setRoomId(slot.getRooms().getId());
 			dto.setRoomName(slot.getRooms().getRoomName());
-			dto.setCinemaName(slot.getRooms().getCinemas().getCinemaName());
-			dto.setProvinceName(slot.getRooms().getCinemas().getProvinces().getProvinceName());
+			if (slot.getRooms().getCinemas() != null) {
+				dto.setCinemaName(slot.getRooms().getCinemas().getCinemaName());
+				if (slot.getRooms().getCinemas().getProvinces() != null) {
+					dto.setProvinceName(slot.getRooms().getCinemas().getProvinces().getProvinceName());
+				}
+			}
 		}
 		dto.setShowTime(slot.getShowTime());
 		dto.setEndTime(slot.getEndTime());
@@ -122,8 +130,8 @@ public class SlotService implements ISlotService {
 		movie.setId(form.getMovieId());
 		updateSlot.setMovies(movie);
 		
-		Rooms room = new Rooms();
-		room.setId(form.getRoomId());
+		Rooms room = roomRepository.findById(form.getRoomId())
+			.orElseThrow(() -> new RuntimeException("Room not found with id: " + form.getRoomId()));
 		updateSlot.setRooms(room);
 		updateSlot.setShowTime(form.getShowTime());
 		updateSlot.setEndTime(form.getEndTime());
