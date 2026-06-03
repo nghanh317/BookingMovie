@@ -17,11 +17,8 @@ const RECENT_BOOKINGS = [
 ];
 
 const safeParseDate = (dateStr) => {
-  if (!dateStr) return new Date();
+  if (!dateStr) return new Date(0);
   if (typeof dateStr === 'number' || dateStr instanceof Date) return new Date(dateStr);
-  
-  const defaultParsed = new Date(dateStr);
-  if (!isNaN(defaultParsed.getTime())) return defaultParsed;
 
   try {
     const [d, t] = String(dateStr).split(' ');
@@ -35,8 +32,11 @@ const safeParseDate = (dateStr) => {
       }
     }
   } catch (e) {}
+
+  const defaultParsed = new Date(dateStr);
+  if (!isNaN(defaultParsed.getTime())) return defaultParsed;
   
-  return new Date(); // fallback safe
+  return new Date(0); // fallback safe
 };
 
 const formatTimeAgo = (dateStr) => {
@@ -438,7 +438,7 @@ export default function AdminDashboard() {
       <div className="bg-cinema-surface rounded-xl border border-cinema-border">
         <div className="flex items-center justify-between p-5 border-b border-cinema-border">
           <h3 className="font-heading font-bold text-white">Đặt vé gần đây</h3>
-          <Link to="/admin/users" className="text-primary text-sm hover:text-primary/80 transition-colors">Xem tất cả →</Link>
+          <Link to="/admin/tickets" className="text-primary text-sm hover:text-primary/80 transition-colors">Xem tất cả →</Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">

@@ -32,7 +32,7 @@ function Avatar({ name, size = 'lg' }) {
   );
 }
 
-function BookingCard({ booking, onRate, allMovies }) {
+function BookingCard({ booking, onRate, onViewDetail, allMovies }) {
   const status = STATUS_CONFIG[booking.status] || { label: booking.status, color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
   
   // Find matching movie by checking if booking note includes movie title
@@ -90,16 +90,16 @@ function BookingCard({ booking, onRate, allMovies }) {
         </p>
         <div className="flex flex-col gap-1 mt-2">
           <span className="text-cinema-muted text-[10px] font-mono">#{booking.id}</span>
-          {booking.status === 'completed' && (
-            <div className="flex flex-col gap-1 items-end">
-              <button className="text-primary hover:text-primary/80 text-xs transition-colors">
-                Xem lại
-              </button>
+          <div className="flex flex-col gap-1 items-end mt-1">
+            <button onClick={() => onViewDetail && onViewDetail(booking)} className="text-primary hover:text-primary/80 text-xs transition-colors font-semibold">
+              Chi tiết
+            </button>
+            {booking.status === 'completed' && (
               <button onClick={() => onRate && onRate(booking)} className="text-accent hover:text-accent/80 text-xs transition-colors mt-1 font-semibold">
                 Đánh giá
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </motion.div>
@@ -346,6 +346,7 @@ export default function Profile() {
 
   // Review Modal state
   const [reviewModal, setReviewModal] = useState({ open: false, booking: null });
+  const [ticketDetailModal, setTicketDetailModal] = useState({ open: false, booking: null });
   const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' });
   const [reviewSuccess, setReviewSuccess] = useState(false);
   const [showPointsTable, setShowPointsTable] = useState(false);
@@ -652,7 +653,7 @@ export default function Profile() {
                     <span className="text-cinema-muted ml-3 text-sm">Đang tải vé...</span>
                   </div>
                 ) : filteredBookings.length > 0 ? (
-                  filteredBookings.map(b => <BookingCard key={b.id} booking={b} onRate={handleOpenReview} allMovies={allMovies} />)
+                  filteredBookings.map(b => <BookingCard key={b.id} booking={b} onViewDetail={(b) => setTicketDetailModal({ open: true, booking: b })} onRate={handleOpenReview} allMovies={allMovies} />)
                 ) : (
                   <div className="text-center py-16">
                     <div className="text-5xl mb-3">🎟️</div>
@@ -1091,6 +1092,79 @@ export default function Profile() {
                   </button>
                 </form>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Ticket Detail Modal */}
+      <AnimatePresence>
+        {ticketDetailModal.open && ticketDetailModal.booking && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cinema-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-cinema-card border border-cinema-border p-6 rounded-2xl w-full max-w-md relative overflow-hidden"
+            >
+              <button
+                onClick={() => setTicketDetailModal({ open: false, booking: null })}
+                className="absolute top-4 right-4 text-cinema-muted hover:text-white transition-colors z-10"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <h3 className="font-heading font-bold text-xl text-white mb-6 border-b border-cinema-border/50 pb-3">
+                Chi Tiết Vé
+              </h3>
+
+              <div className="space-y-4">
+                <div className="flex justify-between items-start">
+                  <span className="text-cinema-muted text-sm">Mã vé:</span>
+                  <span className="font-mono text-white text-sm font-semibold">{ticketDetailModal.booking.id}</span>
+                </div>
+                <div className="flex justify-between items-start">
+                  <span className="text-cinema-muted text-sm">Tên phim:</span>
+                  <span className="text-white text-sm font-semibold text-right flex-1 ml-4">{ticketDetailModal.booking.movie}</span>
+                </div>
+                <div className="flex justify-between items-start">
+                  <span className="text-cinema-muted text-sm">Rạp chiếu:</span>
+                  <span className="text-white text-sm font-semibold text-right flex-1 ml-4">{ticketDetailModal.booking.cinema}</span>
+                </div>
+                <div className="flex justify-between items-start">
+                  <span className="text-cinema-muted text-sm">Phòng chiếu:</span>
+                  <span className="text-white text-sm font-semibold text-right">{ticketDetailModal.booking.room}</span>
+                </div>
+                <div className="flex justify-between items-start">
+                  <span className="text-cinema-muted text-sm">Suất chiếu:</span>
+                  <span className="text-white text-sm font-semibold text-right text-primary">{ticketDetailModal.booking.date} lúc {ticketDetailModal.booking.time}</span>
+                </div>
+                <div className="flex justify-between items-start">
+                  <span className="text-cinema-muted text-sm">Ghế:</span>
+                  <span className="text-white text-sm font-semibold text-right text-accent">{ticketDetailModal.booking.seats.join(', ')}</span>
+                </div>
+
+                {ticketDetailModal.booking.products && ticketDetailModal.booking.products.length > 0 && (
+                  <div className="pt-2 border-t border-cinema-border/30 mt-2">
+                    <span className="text-cinema-muted text-sm block mb-2">Sản phẩm đi kèm:</span>
+                    <ul className="text-sm space-y-1.5">
+                      {ticketDetailModal.booking.products.map((p, idx) => (
+                        <li key={idx} className="flex justify-between text-white/90">
+                          <span>{p.quantity}x {p.productsName}</span>
+                          <span className="text-cinema-muted font-mono">{p.totalPrice.toLocaleString('vi-VN')}đ</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-cinema-border/50 flex justify-between items-center">
+                <span className="text-cinema-muted font-medium text-sm">Tổng tiền</span>
+                <span className="text-primary font-heading font-bold text-xl">{ticketDetailModal.booking.total.toLocaleString('vi-VN')}đ</span>
+              </div>
             </motion.div>
           </div>
         )}
