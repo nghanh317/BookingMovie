@@ -504,12 +504,7 @@ export default function Profile() {
               </div>
             </div>
           </div>
-
-          <Link to="/" className="btn-outline text-sm px-4 py-2 self-start">
-            ← Trang chủ
-          </Link>
         </motion.div>
-
         {/* Tabs */}
         <div className="flex gap-1 bg-cinema-surface rounded-xl p-1 border border-cinema-border mb-6">
           {TABS.map(tab => (

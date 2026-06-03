@@ -4,6 +4,7 @@ import { MOVIES, VOUCHERS } from '../../constants/mockData';
 import useNotificationStore from '../../store/notificationStore';
 import newsService from '../../services/newsService';
 import movieService from '../../services/movieService';
+import promotionService from '../../services/promotionService';
 
 // ── Tabs giống phía user ─────────────────────────────────────
 const TABS = [
@@ -36,7 +37,7 @@ function fmtDate(dateStr) {
 }
 
 // ── Modal tạo/sửa bài viết ───────────────────────────────────
-function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [] }) {
+function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [], dbPromotions = [] }) {
   const tabMeta   = TABS.find(t => t.key === tab);
   const isPromo   = tab === 'promo';
   const isPreview = tab === 'preview';
@@ -326,22 +327,26 @@ function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [] }) {
               <div>
                 <label className="text-cinema-muted text-xs mb-1 block cursor-pointer">Chọn Voucher áp dụng</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
-                  {VOUCHERS.map(v => {
-                    const ids = Array.isArray(form.voucherIds) ? form.voucherIds : form.voucherIds.split(',').map(s => s.trim()).filter(Boolean);
-                    const checked = ids.includes(v.id);
+                  {dbPromotions.map(v => {
+                    const ids = Array.isArray(form.voucherIds) 
+                      ? form.voucherIds 
+                      : (typeof form.voucherIds === 'string' ? form.voucherIds.split(',').map(s => s.trim()).filter(Boolean) : []);
+                    const checked = ids.includes(String(v.id)) || ids.includes(Number(v.id));
                     return (
                       <label key={v.id} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition-colors ${
                         checked ? 'bg-primary/15 border border-primary/30 text-primary' : 'bg-cinema-card border border-cinema-border text-cinema-muted hover:border-primary/30'
                       }`}>
                         <input type="checkbox" className="accent-yellow-400" checked={checked}
                           onChange={() => {
-                            const cur = Array.isArray(form.voucherIds) ? form.voucherIds : form.voucherIds.split(',').map(s => s.trim()).filter(Boolean);
-                            const next = checked ? cur.filter(x => x !== v.id) : [...cur, v.id];
+                            const cur = Array.isArray(form.voucherIds) 
+                              ? form.voucherIds.map(String) 
+                              : (typeof form.voucherIds === 'string' ? form.voucherIds.split(',').map(s => s.trim()).filter(Boolean) : []);
+                            const next = checked ? cur.filter(x => x !== String(v.id)) : [...cur, String(v.id)];
                             f('voucherIds', next);
                           }} />
                         <div>
-                          <p className="font-bold">{v.code}</p>
-                          <p className="text-[10px] truncate max-w-[120px]">{v.desc}</p>
+                          <p className="font-bold">{v.promotionCode}</p>
+                          <p className="text-[10px] truncate max-w-[120px]" title={v.description}>{v.description}</p>
                         </div>
                       </label>
                     );
@@ -421,6 +426,7 @@ export default function AdminNews() {
   const [activeTab, setActiveTab] = useState('review');
   const [articles, setArticles]   = useState([]);
   const [dbMovies, setDbMovies]   = useState([]);
+  const [dbPromotions, setDbPromotions] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -480,7 +486,25 @@ export default function AdminNews() {
     }
   }, []);
 
-  useEffect(() => { fetchNews(); fetchMovies(); }, [fetchNews, fetchMovies]);
+  const fetchPromotions = useCallback(async () => {
+    try {
+      const data = await promotionService.getAll({ size: 200, sort: 'id,desc' });
+      let rawContent = [];
+      if (data) {
+        if (Array.isArray(data)) rawContent = data;
+        else if (data.content && Array.isArray(data.content)) rawContent = data.content;
+        else if (data.data) {
+          if (Array.isArray(data.data)) rawContent = data.data;
+          else if (data.data.content && Array.isArray(data.data.content)) rawContent = data.data.content;
+        }
+      }
+      setDbPromotions(rawContent);
+    } catch {
+      console.error("Lỗi lấy danh sách promotion cho tin tức");
+    }
+  }, []);
+
+  useEffect(() => { fetchNews(); fetchMovies(); fetchPromotions(); }, [fetchNews, fetchMovies, fetchPromotions]);
 
   // Heuristic category detect (đồng bộ với News.jsx)
   function detectCategory(news) {
@@ -704,6 +728,7 @@ export default function AdminNews() {
             onClose={() => setModal(null)}
             onSave={handleSave}
             dbMovies={dbMovies}
+            dbPromotions={dbPromotions}
           />
         )}
       </AnimatePresence>

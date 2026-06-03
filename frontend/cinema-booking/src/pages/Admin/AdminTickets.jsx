@@ -265,12 +265,7 @@ export default function AdminTickets() {
   // Filters
   const [search, setSearch]             = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-
-  // Modals
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [deleteTicket, setDeleteTicket]     = useState(null);
+  // Modals logic removed
 
   // Debounce search
   const debounceRef = useRef(null);
@@ -293,8 +288,6 @@ export default function AdminTickets() {
         size: PAGE_SIZE,
         sort: 'id,desc',
       };
-      if (paymentFilter) params.paymentStatus = paymentFilter;
-      if (statusFilter)  params.status = statusFilter;
       // accountId search by keyword — backend supports accountId filter; for name search we pass keyword if backend supports
       const data = await ticketService.getAll(params);
       const content = data?.content ?? data?.data ?? data ?? [];
@@ -307,24 +300,9 @@ export default function AdminTickets() {
     } finally {
       setLoading(false);
     }
-  }, [page, paymentFilter, statusFilter]);
+  }, [page]);
 
   useEffect(() => { fetchTickets(); }, [fetchTickets]);
-
-  // Reset page when filters change
-  useEffect(() => { setPage(0); }, [paymentFilter, statusFilter]);
-
-  // Handle update from modal
-  const handleSaved = (updated) => {
-    setTickets(prev => prev.map(t => t.id === updated.id ? updated : t));
-    setSelectedTicket(null);
-  };
-
-  const handleDeleted = (id) => {
-    setTickets(prev => prev.filter(t => t.id !== id));
-    setDeleteTicket(null);
-    setTotalElements(prev => prev - 1);
-  };
 
   // Client-side search filter on loaded tickets (for name search)
   const displayedTickets = debouncedSearch
@@ -390,32 +368,9 @@ export default function AdminTickets() {
           className="input-field w-64"
         />
 
-        {/* Payment filter */}
-        <select
-          value={paymentFilter}
-          onChange={e => { setPaymentFilter(e.target.value); setPage(0); }}
-          className="input-field"
-        >
-          <option value="">💳 Thanh toán: Tất cả</option>
-          <option value="PAID">Đã thanh toán</option>
-          <option value="UNPAID">Chưa thanh toán</option>
-        </select>
-
-        {/* Status filter */}
-        <select
-          value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value); setPage(0); }}
-          className="input-field"
-        >
-          <option value="">📋 Trạng thái: Tất cả</option>
-          <option value="PENDING">Chờ xác nhận</option>
-          <option value="CONFIRMED">Đã xác nhận</option>
-          <option value="CANCELLED">Đã hủy</option>
-        </select>
-
-        {(paymentFilter || statusFilter || search) && (
+        {search && (
           <button
-            onClick={() => { setSearch(''); setDebouncedSearch(''); setPaymentFilter(''); setStatusFilter(''); setPage(0); }}
+            onClick={() => { setSearch(''); setDebouncedSearch(''); setPage(0); }}
             className="text-xs text-cinema-muted hover:text-red-400 transition-colors"
           >
             ✕ Xóa bộ lọc
@@ -437,7 +392,7 @@ export default function AdminTickets() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-cinema-dark border-b border-cinema-border">
-                {['ID', 'Mã vé', 'Khách hàng', 'Ngày đặt', 'Thành tiền', 'Thanh toán', 'Trạng thái', 'Thao tác'].map(h => (
+                {['ID', 'Mã vé', 'Khách hàng', 'Ngày đặt', 'Thành tiền'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-cinema-muted text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                     {h}
                   </th>
@@ -449,7 +404,7 @@ export default function AdminTickets() {
                 [...Array(8)].map((_, i) => <SkeletonRow key={i} />)
               ) : displayedTickets.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-16 text-cinema-muted">
+                  <td colSpan={5} className="text-center py-16 text-cinema-muted">
                     <div className="text-4xl mb-2">🎟️</div>
                     <p>Không tìm thấy vé nào</p>
                   </td>
@@ -477,30 +432,6 @@ export default function AdminTickets() {
                     </td>
                     <td className="px-4 py-3 text-white font-semibold whitespace-nowrap">
                       {fmtMoney(ticket.finalAmount)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge config={PAYMENT_STATUS_CONFIG} value={ticket.paymentStatus} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge config={STATUS_CONFIG} value={ticket.status} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setSelectedTicket(ticket)}
-                          className="p-1.5 rounded-lg hover:bg-primary/10 text-cinema-muted hover:text-primary transition-colors"
-                          title="Xem / Chỉnh sửa"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={() => setDeleteTicket(ticket)}
-                          className="p-1.5 rounded-lg hover:bg-red-500/10 text-cinema-muted hover:text-red-400 transition-colors"
-                          title="Xóa vé"
-                        >
-                          🗑️
-                        </button>
-                      </div>
                     </td>
                   </motion.tr>
                 ))
@@ -557,23 +488,7 @@ export default function AdminTickets() {
         )}
       </div>
 
-      {/* Modals */}
-      <AnimatePresence>
-        {selectedTicket && (
-          <TicketDetailModal
-            ticket={selectedTicket}
-            onClose={() => setSelectedTicket(null)}
-            onSave={handleSaved}
-          />
-        )}
-        {deleteTicket && (
-          <DeleteModal
-            ticket={deleteTicket}
-            onClose={() => setDeleteTicket(null)}
-            onDeleted={handleDeleted}
-          />
-        )}
-      </AnimatePresence>
+
     </div>
   );
 }

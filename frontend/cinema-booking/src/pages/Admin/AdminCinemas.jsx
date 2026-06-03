@@ -205,21 +205,6 @@ export default function AdminCinemas() {
 
   const isAuthenticated = accessToken && accessToken.startsWith('eyJ');
 
-  useEffect(() => {
-    Promise.all([
-      cinemaService.getAll(),
-      provinceService.getAll()
-    ]).then(([cinemasData, provincesData]) => {
-      setCinemas(Array.isArray(cinemasData) ? cinemasData : []);
-      const provs = Array.isArray(provincesData) ? provincesData : (provincesData?.content || provincesData?.data || []);
-      setProvinces(provs);
-    }).catch(err => {
-      console.error(err);
-      setCinemas([]);
-      setProvinces([]);
-    }).finally(() => setLoading(false));
-  }, []);
-
   // Fetch rooms của một rạp theo cinemaId
   const fetchRoomsForCinema = useCallback(async (cinemaId) => {
     setRoomsLoading(prev => ({ ...prev, [cinemaId]: true }));
@@ -234,7 +219,29 @@ export default function AdminCinemas() {
       setRoomsLoading(prev => ({ ...prev, [cinemaId]: false }));
     }
   }, []);
-  
+
+  useEffect(() => {
+    Promise.all([
+      cinemaService.getAll(),
+      provinceService.getAll()
+    ]).then(([cinemasData, provincesData]) => {
+      const cList = Array.isArray(cinemasData) ? cinemasData : [];
+      setCinemas(cList);
+      const provs = Array.isArray(provincesData) ? provincesData : (provincesData?.content || provincesData?.data || []);
+      setProvinces(provs);
+      
+      // Auto fetch rooms for all cinemas to display accurate count immediately
+      cList.forEach(c => {
+        if (c && c.id) {
+          fetchRoomsForCinema(c.id);
+        }
+      });
+    }).catch(err => {
+      console.error(err);
+      setCinemas([]);
+      setProvinces([]);
+    }).finally(() => setLoading(false));
+  }, [fetchRoomsForCinema]);
   const [search, setSearch] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('all');
 
@@ -494,7 +501,7 @@ export default function AdminCinemas() {
                   </button>
                 </div>
                 <div className="flex items-center gap-2 text-cinema-muted ml-2 border-l border-cinema-border pl-4">
-                  <span className="text-sm">{(roomsByCinema[cinema.id] || []).length} phòng chiếu</span>
+                  <span className="text-sm">{roomsByCinema[cinema.id] ? roomsByCinema[cinema.id].length : (cinema.rooms || []).length} phòng chiếu</span>
                   <svg className={`w-5 h-5 transition-transform ${expandedCinemaId === cinema.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
