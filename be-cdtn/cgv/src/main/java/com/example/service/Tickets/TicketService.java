@@ -83,6 +83,7 @@ public class TicketService implements ITicketService{
 			dto.setMovieName(ticket.getSlots().getMovies().getTitle());
 			dto.setPosterUrl(ticket.getSlots().getMovies().getPosterUrl());
 			dto.setMovieId(ticket.getSlots().getMovies().getId());
+			dto.setSlotsShowTime(ticket.getSlots().getShowTime());
 		}
 		dto.setTicketsCode(ticket.getTicketsCode());
 		dto.setQrCodeUrl(ticket.getQrCodeUrl());

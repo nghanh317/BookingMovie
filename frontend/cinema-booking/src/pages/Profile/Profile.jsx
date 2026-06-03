@@ -263,6 +263,17 @@ export default function Profile() {
           }
           const isUpcoming = ticketDate && ticketDate > now;
           const seatLabels = (t.seats || []).map(s => `${s.seatsRow || ''}${s.seatsNumber || ''}`).filter(Boolean);
+          
+          let parsedStatus = 'pending';
+          if (t.paymentStatus === 'PAID') {
+            parsedStatus = isUpcoming ? 'upcoming' : 'completed';
+          } else if (t.paymentStatus === 'CANCELLED') {
+            parsedStatus = 'cancelled';
+          }
+
+          const localDateStr = ticketDate ? `${ticketDate.getFullYear()}-${String(ticketDate.getMonth() + 1).padStart(2, '0')}-${String(ticketDate.getDate()).padStart(2, '0')}` : '';
+          const localTimeStr = ticketDate ? `${String(ticketDate.getHours()).padStart(2, '0')}:${String(ticketDate.getMinutes()).padStart(2, '0')}` : '';
+
           return {
             id: t.ticketsCode || `#${t.id}`,
             ticketId: t.id,
@@ -270,12 +281,12 @@ export default function Profile() {
             movie: t.movieName || t.note || 'Vé xem phim',
             poster: t.posterUrl || null,
             cinema: '',
-            date: ticketDate ? ticketDate.toISOString().split('T')[0] : '',
-            time: ticketDate ? ticketDate.toTimeString().slice(0, 5) : '',
+            date: localDateStr,
+            time: localTimeStr,
             type: '',
             seats: seatLabels,
             total: parseFloat(t.finalAmount || t.totalAmount || 0),
-            status: t.paymentStatus === 'PAID' ? (isUpcoming ? 'upcoming' : 'completed') : 'pending',
+            status: parsedStatus,
             rawPaymentStatus: t.paymentStatus,
           };
         });
