@@ -21,12 +21,29 @@ const DEFAULT_SEAT_PRICES = { standard: 75000, vip: 110000, couple: 200000 };
 
 /** Chuyển SlotDTO -> object chuẩn cho UI */
 function normalizeSlot(s) {
-  const showTimeStr = s.showTime
-    ? (typeof s.showTime === 'string' ? s.showTime : new Date(s.showTime).toISOString())
-    : '2024-01-01T00:00:00';
-  const dateObj = new Date(showTimeStr);
-  const date = dateObj.toISOString().split('T')[0];
-  const time = dateObj.toTimeString().substring(0, 5);
+  let date = '';
+  let time = '';
+  if (s.showTime) {
+    if (typeof s.showTime === 'string') {
+      const parts = s.showTime.split(' ');
+      if (parts.length === 2) {
+        date = parts[0];
+        time = parts[1].substring(0, 5);
+      } else {
+        const d = new Date(s.showTime);
+        if (!isNaN(d)) {
+          date = d.toISOString().split('T')[0];
+          time = d.toTimeString().substring(0, 5);
+        }
+      }
+    } else {
+      const d = new Date(s.showTime);
+      if (!isNaN(d)) {
+        date = d.toISOString().split('T')[0];
+        time = d.toTimeString().substring(0, 5);
+      }
+    }
+  }
   return {
     id: s.id,
     movieId: s.movieId,

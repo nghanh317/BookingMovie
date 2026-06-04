@@ -17,7 +17,6 @@ const useAuthStore = create(
     (set, get) => ({
       user: null,           // { id, userName, email, phone, fullName, role }
       accessToken: null,    // JWT 15 phút
-      refreshToken: null,   // JWT 7 ngày
       isLoggedIn: false,
 
       /**
@@ -27,13 +26,12 @@ const useAuthStore = create(
         try {
           const data = await authService.login(userName, passwordHash);
 
-          // data = { id, userName, email, phone, fullName, role, accessToken, refreshToken }
-          const { accessToken, refreshToken, ...userInfo } = data;
+          // data = { id, userName, email, phone, fullName, role, accessToken }
+          const { accessToken, ...userInfo } = data;
 
           set({
             user: userInfo,
             accessToken,
-            refreshToken,
             isLoggedIn: true,
           });
 
@@ -55,8 +53,23 @@ const useAuthStore = create(
         set({ accessToken: newAccessToken });
       },
 
-      /** Đăng xuất */
-      logout: () => set({ user: null, accessToken: null, refreshToken: null, isLoggedIn: false }),
+      /** Đăng xuất an toàn */
+      logout: async () => {
+        try {
+          // Gọi API để Backend xóa Cookie
+          await authService.logout(); 
+        } catch (error) {
+          console.warn("Lỗi khi gọi API logout, vẫn tiếp tục dọn dẹp máy khách:", error);
+        } finally {
+          // Xóa sạch RAM và đẩy về trang login
+          set({ user: null, accessToken: null, isLoggedIn: false });
+          localStorage.removeItem('cinema-auth'); 
+          
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
+        }
+      },
 
       /** Kiểm tra user có phải admin */
       isAdmin: () => {
@@ -88,7 +101,6 @@ const useAuthStore = create(
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         isLoggedIn: state.isLoggedIn,
       }),
     }

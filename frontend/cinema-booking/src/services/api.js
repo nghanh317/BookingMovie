@@ -19,14 +19,13 @@ const isRealJWT = (token) => typeof token === 'string' && token.startsWith('eyJ'
 const getTokens = () => {
   try {
     const raw = localStorage.getItem('cinema-auth');
-    if (!raw) return { accessToken: null, refreshToken: null };
+    if (!raw) return { accessToken: null };
     const parsed = JSON.parse(raw);
     return {
       accessToken: parsed?.state?.accessToken || null,
-      refreshToken: parsed?.state?.refreshToken || null,
     };
   } catch {
-    return { accessToken: null, refreshToken: null };
+    return { accessToken: null };
   }
 };
 
@@ -90,13 +89,9 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const { refreshToken } = getTokens();
-
-    // Không có refresh token → logout ngay
-    if (!refreshToken || !isRealJWT(refreshToken)) {
-      forceLogout();
-      return Promise.reject(error);
-    }
+    // Nếu backend trả 401 thì sẽ không kiểm tra refreshToken từ localStorage nữa
+    // vì refreshToken đang nằm an toàn ở HttpOnly cookie.
+    // Nếu gọi refresh bị lỗi, thì refreshToken trong cookie cũng đã hết hạn hoặc không hợp lệ.
 
     // Đang refresh → đưa request vào hàng đợi
     if (isRefreshing) {
@@ -113,7 +108,7 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const { accessToken: newAccessToken } = await authService.refresh(refreshToken);
+      const { accessToken: newAccessToken } = await authService.refresh();
 
       // Lưu token mới
       saveNewAccessToken(newAccessToken);

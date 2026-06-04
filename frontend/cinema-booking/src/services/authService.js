@@ -14,6 +14,7 @@ const authAxios = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true, // Quan trọng: cho phép gửi và nhận HttpOnly Cookie
 });
 
 const authService = {
@@ -28,11 +29,11 @@ const authService = {
 
   /**
    * Làm mới access token — POST /api/v1/auth/refresh
-   * @param {string} refreshToken
+   * Backend sẽ tự đọc refreshToken từ HttpOnly Cookie
    * @returns {{ accessToken: string }}
    */
-  refresh: async (refreshToken) => {
-    const res = await authAxios.post('/v1/auth/refresh', { refreshToken });
+  refresh: async () => {
+    const res = await authAxios.post('/v1/auth/refresh');
     return res.data; // { accessToken }
   },
 
@@ -41,6 +42,14 @@ const authService = {
    */
   register: async (payload) => {
     const res = await authAxios.post('/v1/auth/register', payload);
+    return res.data;
+  },
+  /**
+   * Đăng xuất — POST /api/v1/auth/logout
+   * Gọi lên server để server trả về lệnh xóa HttpOnly Cookie
+   */
+  logout: async () => {
+    const res = await authAxios.post('/v1/auth/logout');
     return res.data;
   },
 };
