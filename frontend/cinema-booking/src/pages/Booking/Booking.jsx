@@ -58,16 +58,16 @@ function StepIndicator({ current }) {
 
 // Chuyển showTime string/Date -> { date: 'YYYY-MM-DD', time: 'HH:mm' }
 function parseShowTime(showTime) {
-  if (!showTime) return { date: '', time: '' };
+  if (!showTime) return { date: '', time: '', rawDate: null };
   // Hỗ trợ format "yyyy-MM-dd HH:mm:ss" hoặc ISO hoặc timestamp
   const str = typeof showTime === 'string'
     ? showTime.replace(' ', 'T')
     : new Date(showTime).toISOString();
   const d = new Date(str);
-  if (isNaN(d.getTime())) return { date: '', time: '' };
+  if (isNaN(d.getTime())) return { date: '', time: '', rawDate: null };
   const date = d.toISOString().split('T')[0];
   const time = d.toTimeString().substring(0, 5);
-  return { date, time };
+  return { date, time, rawDate: d };
 }
 
 export default function Booking() {
@@ -100,19 +100,23 @@ export default function Booking() {
       .finally(() => setLoading(false));
   }, [movieId]);
 
-  // Normalize slots -> thêm date/time/hall/type
-  const normalizedSlots = useMemo(() => slots.map(s => {
-    const { date, time } = parseShowTime(s.showTime);
-    return {
-      ...s,
-      date,
-      time,
-      hall: s.roomName || '',
-      type: '2D',
-      availableSeats: s.emptySeats || 0,
-      price: Number(s.price) || 0,
-    };
-  }), [slots]);
+  // Normalize slots -> thêm date/time/hall/type và lọc các suất chiếu đã qua
+  const normalizedSlots = useMemo(() => {
+    const now = new Date();
+    return slots.map(s => {
+      const { date, time, rawDate } = parseShowTime(s.showTime);
+      return {
+        ...s,
+        date,
+        time,
+        rawDate,
+        hall: s.roomName || '',
+        type: '2D',
+        availableSeats: s.emptySeats || 0,
+        price: Number(s.price) || 0,
+      };
+    }).filter(s => s.rawDate && s.rawDate > now);
+  }, [slots]);
 
   // Province names từ API provinceService + slots
   const allProvinces = useMemo(() => {
