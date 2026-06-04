@@ -153,6 +153,9 @@ export default function Checkout() {
         setTimeLeft(prev => prev - 1);
       }, 1000);
     } else if (timeLeft <= 0 && payosData) {
+      if (payosData?.ticketId) {
+        ticketService.update(payosData.ticketId, { status: 'CANCELLED', paymentStatus: 'UNPAID' }).catch(err => console.error(err));
+      }
       setPayosData(null);
       alert('Đã hết thời gian thanh toán (10 phút). Giao dịch đã bị huỷ!');
       navigate('/');
@@ -369,7 +372,17 @@ export default function Checkout() {
           </div>
           
           <button 
-            onClick={() => { setPayosData(null); navigate('/'); }}
+            onClick={async () => {
+              if (payosData?.ticketId) {
+                try {
+                  await ticketService.update(payosData.ticketId, { status: 'CANCELLED', paymentStatus: 'UNPAID' });
+                } catch (err) {
+                  console.error('Lỗi khi hủy vé:', err);
+                }
+              }
+              setPayosData(null); 
+              navigate('/'); 
+            }}
             className="text-cinema-muted hover:text-red-400 transition-colors underline text-sm"
           >
             Hủy thanh toán và quay về

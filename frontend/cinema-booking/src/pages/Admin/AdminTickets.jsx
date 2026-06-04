@@ -106,6 +106,8 @@ function TicketDetailModal({ ticket, onClose, onSave }) {
             {[
               { label: 'Khách hàng', value: ticket.accountsFullName || '—' },
               { label: 'Ngày đặt', value: fmtDate(ticket.ticketsDate) },
+              { label: 'Rạp chiếu', value: ticket.cinemaName || '—' },
+              { label: 'Phòng chiếu', value: ticket.roomName || '—' },
               { label: 'Tổng tiền', value: fmtMoney(ticket.totalAmount) },
               { label: 'Giảm giá', value: fmtMoney(ticket.discountAmount) },
               { label: 'Thành tiền', value: fmtMoney(ticket.finalAmount) },

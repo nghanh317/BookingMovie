@@ -79,11 +79,19 @@ public class TicketService implements ITicketService{
 		dto.setAccountsId(ticket.getAccounts().getId());
 		dto.setAccountsFullName(ticket.getAccounts().getFullName());
 		dto.setSlotsId(ticket.getSlots().getId());
-		if (ticket.getSlots() != null && ticket.getSlots().getMovies() != null) {
-			dto.setMovieName(ticket.getSlots().getMovies().getTitle());
-			dto.setPosterUrl(ticket.getSlots().getMovies().getPosterUrl());
-			dto.setMovieId(ticket.getSlots().getMovies().getId());
+		if (ticket.getSlots() != null) {
 			dto.setSlotsShowTime(ticket.getSlots().getShowTime());
+			if (ticket.getSlots().getMovies() != null) {
+				dto.setMovieName(ticket.getSlots().getMovies().getTitle());
+				dto.setPosterUrl(ticket.getSlots().getMovies().getPosterUrl());
+				dto.setMovieId(ticket.getSlots().getMovies().getId());
+			}
+			if (ticket.getSlots().getRooms() != null) {
+				dto.setRoomName(ticket.getSlots().getRooms().getRoomName());
+				if (ticket.getSlots().getRooms().getCinemas() != null) {
+					dto.setCinemaName(ticket.getSlots().getRooms().getCinemas().getCinemaName());
+				}
+			}
 		}
 		dto.setTicketsCode(ticket.getTicketsCode());
 		dto.setQrCodeUrl(ticket.getQrCodeUrl());
@@ -368,9 +376,19 @@ public class TicketService implements ITicketService{
 	@Transactional
 	public void updateTicket(Integer id, UpdateTicketForm form) {
 		Tickets updateTicket = ticketRepository.findById(id).get();
+		Tickets.Status oldStatus = updateTicket.getStatus();
+		Tickets.Status newStatus = form.getStatus();
+		
 		updateTicket.setPaymentStatus(form.getPaymentStatus());
-		updateTicket.setStatus(form.getStatus());
+		updateTicket.setStatus(newStatus);
 		ticketRepository.save(updateTicket);
+		
+		if (newStatus == Tickets.Status.CANCELLED && oldStatus != Tickets.Status.CANCELLED) {
+			Slots slot = updateTicket.getSlots();
+			int seatsCount = bookingSeatRepository.findByTickets_IdAndIsDeleted(id, false).size();
+			slot.setEmptySeats(slot.getEmptySeats() + seatsCount);
+			slotRepository.save(slot);
+		}
 	}
 
 	@Override

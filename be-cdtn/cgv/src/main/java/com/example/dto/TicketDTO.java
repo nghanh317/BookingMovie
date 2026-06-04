@@ -55,6 +55,12 @@ public class TicketDTO {
 	
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	private Integer movieId;
+	
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private String cinemaName;
+	
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	private String roomName;
 
 	private String note;
 	

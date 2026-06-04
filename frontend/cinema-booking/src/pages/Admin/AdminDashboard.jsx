@@ -143,8 +143,9 @@ export default function AdminDashboard() {
         ]);
         const tickets = Array.isArray(res) ? res : res?.content || res?.data || [];
         
-        // Xử lý danh sách Đặt vé gần đây
-        const sortedBookings = [...tickets].sort((a, b) => {
+        // Xử lý danh sách Đặt vé gần đây (chỉ vé đã thanh toán/xác nhận)
+        const successfulTickets = tickets.filter(t => t.paymentStatus === 'PAID' || t.status === 'CONFIRMED');
+        const sortedBookings = [...successfulTickets].sort((a, b) => {
           const dateA = safeParseDate(a.ticketsDate || a.createDate || 0);
           const dateB = safeParseDate(b.ticketsDate || b.createDate || 0);
           return dateB - dateA; // Mới nhất lên đầu
