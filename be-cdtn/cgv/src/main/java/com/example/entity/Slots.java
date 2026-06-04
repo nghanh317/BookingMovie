@@ -52,6 +52,12 @@ public class Slots implements Serializable{
 	@NonNull
 	private BigDecimal price;
 	
+	@Column (name = "vip_price", precision = 10, scale = 2)
+	private BigDecimal vipPrice;
+	
+	@Column (name = "couple_price", precision = 10, scale = 2)
+	private BigDecimal couplePrice;
+	
 	@Column (name ="empty_seats", nullable = false)
 	@NonNull
 	private Integer emptySeats;

@@ -100,11 +100,21 @@ export default function AdminShowtimes() {
       const endTimeDate = new Date(new Date(`${form.date}T${form.time}:00`).getTime() + durationMs);
       const endTime = `${endTimeDate.toISOString().split('T')[0]} ${endTimeDate.toTimeString().substring(0, 5)}:00`;
 
+      const payload = {
+        movieId: +form.movieId,
+        roomId: +form.roomId,
+        showTime,
+        endTime,
+        price: form.seatPrices?.standard,
+        vipPrice: form.seatPrices?.vip,
+        couplePrice: form.seatPrices?.couple
+      };
+
       if (editingId) {
-        await slotService.update(editingId, { movieId: +form.movieId, roomId: +form.roomId, showTime, endTime });
+        await slotService.update(editingId, payload);
         addNotification({ title: 'Thành công', message: `Đã cập nhật suất chiếu`, type: 'success', isAdmin: true });
       } else {
-        await slotService.create({ movieId: +form.movieId, roomId: +form.roomId, showTime, endTime });
+        await slotService.create(payload);
         addNotification({ title: 'Thành công', message: `Đã tạo suất chiếu lúc ${form.time}`, type: 'success', isAdmin: true });
       }
       await fetchSlots();
@@ -133,7 +143,11 @@ export default function AdminShowtimes() {
       roomId: st.roomId || '',
       date: st.date,
       time: st.time,
-      seatPrices: { ...DEFAULT_SEAT_PRICES },
+      seatPrices: {
+        standard: st.price || 0,
+        vip: st.vipPrice || 0,
+        couple: st.couplePrice || 0
+      },
     });
     setEditingId(st.id);
     setShowForm(true);

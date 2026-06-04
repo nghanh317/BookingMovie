@@ -126,8 +126,8 @@ export default function SeatSelection() {
   
   const totalPrice = selectedSeatObjects.reduce((sum, seat) => {
     const meta = getSeatMeta(seat.seatTypeName);
-    if (meta === SEAT_TYPE_META.VIP) return sum + pricePerSeat * 1.3;
-    if (meta === SEAT_TYPE_META.COUPLE) return sum + pricePerSeat * 1.8;
+    if (meta === SEAT_TYPE_META.VIP) return sum + (showtime?.vipPrice || pricePerSeat * 1.3);
+    if (meta === SEAT_TYPE_META.COUPLE) return sum + (showtime?.couplePrice || pricePerSeat * 1.8);
     return sum + pricePerSeat;
   }, 0);
 
@@ -292,11 +292,15 @@ export default function SeatSelection() {
                           btnClass = `${meta.btnBase} cursor-pointer hover:scale-110 transition-transform`;
                         }
 
+                        let seatPrice = pricePerSeat;
+                        if (meta === SEAT_TYPE_META.VIP) seatPrice = showtime?.vipPrice || pricePerSeat * 1.3;
+                        if (meta === SEAT_TYPE_META.COUPLE) seatPrice = showtime?.couplePrice || pricePerSeat * 1.8;
+
                         const tooltip = isBooked
                           ? `${label} - Đã đặt`
                           : isLockedOther
                             ? `${label} - Đang được giữ`
-                            : `${label} - ${seat.seatTypeName || 'Thường'} - ${pricePerSeat > 0 ? pricePerSeat.toLocaleString('vi-VN') + 'đ' : ''}`;
+                            : `${label} - ${seat.seatTypeName || 'Thường'} - ${seatPrice > 0 ? seatPrice.toLocaleString('vi-VN') + 'đ' : ''}`;
 
                         return (
                           <motion.button
@@ -338,9 +342,10 @@ export default function SeatSelection() {
                 ))}
               </div>
               {pricePerSeat > 0 && (
-                <div className="mt-3 pt-3 border-t border-cinema-border text-xs text-cinema-muted">
-                  <p>Giá vé cơ bản: <span className="text-primary font-bold">{pricePerSeat.toLocaleString('vi-VN')}đ</span></p>
-                  <p className="mt-0.5">VIP: x1.3 · Đôi: x1.8</p>
+                <div className="mt-3 pt-3 border-t border-cinema-border text-xs text-cinema-muted space-y-1">
+                  <div className="flex justify-between"><span>Thường:</span> <span className="text-primary font-bold">{pricePerSeat.toLocaleString('vi-VN')}đ</span></div>
+                  <div className="flex justify-between"><span>VIP:</span> <span className="text-primary font-bold">{(showtime?.vipPrice || pricePerSeat * 1.3).toLocaleString('vi-VN')}đ</span></div>
+                  <div className="flex justify-between"><span>Ghế đôi:</span> <span className="text-primary font-bold">{(showtime?.couplePrice || pricePerSeat * 1.8).toLocaleString('vi-VN')}đ</span></div>
                 </div>
               )}
             </div>

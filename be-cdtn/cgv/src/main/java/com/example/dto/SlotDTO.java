@@ -31,6 +31,10 @@ public class SlotDTO {
 	
 	private BigDecimal price;
 	
+	private BigDecimal vipPrice;
+	
+	private BigDecimal couplePrice;
+	
 	private Integer emptySeats;
 	
 	private Date createDate;

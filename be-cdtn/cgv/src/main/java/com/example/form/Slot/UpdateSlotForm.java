@@ -25,5 +25,9 @@ public class UpdateSlotForm {
     
     private BigDecimal price;
     
+    private BigDecimal vipPrice;
+    
+    private BigDecimal couplePrice;
+    
     private Integer emptySeats;
 }

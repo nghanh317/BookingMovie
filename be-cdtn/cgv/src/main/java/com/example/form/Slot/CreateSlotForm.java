@@ -31,4 +31,8 @@ public class CreateSlotForm {
         lenient = OptBoolean.FALSE
     )
     private Date endTime;
+    
+    private java.math.BigDecimal price;
+    private java.math.BigDecimal vipPrice;
+    private java.math.BigDecimal couplePrice;
 }

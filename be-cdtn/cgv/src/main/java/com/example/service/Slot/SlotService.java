@@ -64,6 +64,8 @@ public class SlotService implements ISlotService {
 				dto.setShowTime(slot.getShowTime());
 				dto.setEndTime(slot.getEndTime());
 				dto.setPrice(slot.getPrice());
+				dto.setVipPrice(slot.getVipPrice());
+				dto.setCouplePrice(slot.getCouplePrice());
 				dto.setEmptySeats(slot.getEmptySeats());
 				dto.setCreateDate(slot.getCreateDate());
 				return dto;
@@ -94,6 +96,8 @@ public class SlotService implements ISlotService {
 		dto.setShowTime(slot.getShowTime());
 		dto.setEndTime(slot.getEndTime());
 		dto.setPrice(slot.getPrice());
+		dto.setVipPrice(slot.getVipPrice());
+		dto.setCouplePrice(slot.getCouplePrice());
 		dto.setEmptySeats(slot.getEmptySeats());
 		dto.setCreateDate(slot.getCreateDate());
 		return dto;
@@ -117,13 +121,18 @@ public class SlotService implements ISlotService {
 		}
 
 		BigDecimal autoPrice = pricingService.calculatePrice(form.getShowTime());
+		BigDecimal standardPrice = form.getPrice() != null ? form.getPrice() : autoPrice;
+		BigDecimal vPrice = form.getVipPrice() != null ? form.getVipPrice() : autoPrice.multiply(new BigDecimal("1.3"));
+		BigDecimal cPrice = form.getCouplePrice() != null ? form.getCouplePrice() : autoPrice.multiply(new BigDecimal("1.8"));
 
 		Rooms room = roomRepository.findById(form.getRoomId())
 			.orElseThrow(() -> new RuntimeException("Room not found with id: " + form.getRoomId()));
 		
 		Integer totalSeats = room.getTotalSeats();
 		
-		Slots createSlot = new Slots(form.getShowTime(), form.getEndTime(), autoPrice, totalSeats);
+		Slots createSlot = new Slots(form.getShowTime(), form.getEndTime(), standardPrice, totalSeats);
+		createSlot.setVipPrice(vPrice);
+		createSlot.setCouplePrice(cPrice);
 		
 		Movies movie = new Movies();
 		movie.setId(form.getMovieId());
@@ -155,6 +164,9 @@ public class SlotService implements ISlotService {
 			.orElseThrow(() -> new RuntimeException("Slot not found"));
 		
 		BigDecimal autoPrice = pricingService.calculatePrice(form.getShowTime());
+		BigDecimal standardPrice = form.getPrice() != null ? form.getPrice() : autoPrice;
+		BigDecimal vPrice = form.getVipPrice() != null ? form.getVipPrice() : autoPrice.multiply(new BigDecimal("1.3"));
+		BigDecimal cPrice = form.getCouplePrice() != null ? form.getCouplePrice() : autoPrice.multiply(new BigDecimal("1.8"));
 		
 		Movies movie = new Movies();
 		movie.setId(form.getMovieId());
@@ -165,7 +177,9 @@ public class SlotService implements ISlotService {
 		updateSlot.setRooms(room);
 		updateSlot.setShowTime(form.getShowTime());
 		updateSlot.setEndTime(form.getEndTime());
-		updateSlot.setPrice(autoPrice);
+		updateSlot.setPrice(standardPrice);
+		updateSlot.setVipPrice(vPrice);
+		updateSlot.setCouplePrice(cPrice);
 
 		
 		slotRepository.save(updateSlot);
