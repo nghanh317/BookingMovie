@@ -37,4 +37,13 @@ public class PayOSController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    @org.springframework.web.bind.annotation.GetMapping("/{ticketId}")
+    public ResponseEntity<?> getPaymentLink(@org.springframework.web.bind.annotation.PathVariable Integer ticketId) {
+        try {
+            return ResponseEntity.ok(payOSService.getPaymentLink(ticketId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

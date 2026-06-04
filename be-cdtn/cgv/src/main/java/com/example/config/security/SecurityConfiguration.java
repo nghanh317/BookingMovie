@@ -112,6 +112,7 @@ public class SecurityConfiguration {
 						.requestMatchers(HttpMethod.DELETE, "/api/v1/news/**", "/api/v1/news").hasAuthority("ADMIN")
 						// PAYOS - tạo link cần login, webhook public (PayOS server gọi vào)
 						.requestMatchers(HttpMethod.POST, "/api/v1/payos/create-link").hasAnyAuthority("USER", "ADMIN")
+						.requestMatchers(HttpMethod.GET, "/api/v1/payos/**").hasAnyAuthority("USER", "ADMIN")
 						.requestMatchers("/api/v1/webhook/**").permitAll()
 						.requestMatchers("/error").permitAll()
 						.requestMatchers("/api/v1/**").hasAuthority("ADMIN")

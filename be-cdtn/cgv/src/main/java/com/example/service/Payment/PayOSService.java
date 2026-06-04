@@ -84,7 +84,10 @@ public class PayOSService {
             throw new RuntimeException("Vé này đã bị hủy, không thể thanh toán");
         }
 
-        long orderCode  = ticketId.longValue();
+        // Tạo orderCode unique bằng cách kết hợp ticketId và số ngẫu nhiên
+        // Đảm bảo mỗi lần bấm thanh toán lại sẽ tạo ra một QR code mới, tránh lỗi 400 "Đơn thanh toán đã tồn tại"
+        long uniqueSuffix = System.currentTimeMillis() % 100000L;
+        long orderCode  = ticketId.longValue() * 100000L + uniqueSuffix;
         long realAmount = ticket.getFinalAmount().longValue();
 
         // Test mode: gửi giá ảo lên PayOS, DB không thay đổi (vẫn giữ giá thật)
@@ -95,8 +98,8 @@ public class PayOSService {
         String cancelUrl   = frontendUrl + "/payment-result?ticketId=" + ticketId + "&status=cancel";
 
         if (testMode) {
-            System.out.printf("[PayOS TEST MODE] ticketId=%d | Giá thật: %,d đ | Gửi PayOS: %,d đ%n",
-                    ticketId, realAmount, amountToSend);
+            System.out.printf("[PayOS TEST MODE] ticketId=%d | orderCode=%d | Giá thật: %,d đ | Gửi PayOS: %,d đ%n",
+                    ticketId, orderCode, realAmount, amountToSend);
         }
 
         CreatePaymentLinkRequest request = CreatePaymentLinkRequest.builder()
@@ -109,6 +112,10 @@ public class PayOSService {
 
         CreatePaymentLinkResponse response = payOS.paymentRequests().create(request);
         return response;
+    }
+
+    public PaymentLink getPaymentLink(Integer ticketId) throws Exception {
+        return payOS.paymentRequests().get(ticketId.longValue());
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -125,7 +132,15 @@ public class PayOSService {
         // Bỏ qua webhook probe/test của PayOS
         if (orderCode == 123456789L) return;
 
-        Integer ticketId = (int) orderCode;
+        // Giải mã ticketId từ orderCode
+        // Hỗ trợ tương thích ngược cho các vé cũ có orderCode = ticketId
+        Integer ticketId;
+        if (orderCode < 100000L) {
+            ticketId = (int) orderCode;
+        } else {
+            ticketId = (int) (orderCode / 100000L);
+        }
+        
         Tickets ticket   = ticketRepository.findById(ticketId).orElse(null);
         if (ticket == null) return;
 

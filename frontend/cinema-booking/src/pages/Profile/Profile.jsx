@@ -11,6 +11,8 @@ import MovieCard from '../../components/movie/MovieCard';
 import { RANKS, POINT_EARN_EXAMPLES, getRankByPoints, getRankProgress } from '../../constants/rankingConfig';
 import api from '../../services/api';
 import promotionService from '../../services/promotionService';
+import payosService from '../../services/payosService';
+import { QRCodeCanvas } from 'qrcode.react';
 
 
 
@@ -32,7 +34,7 @@ function Avatar({ name, size = 'lg' }) {
   );
 }
 
-function BookingCard({ booking, onRate, onViewDetail, allMovies }) {
+function BookingCard({ booking, onRate, onViewDetail, onPay, allMovies }) {
   const status = STATUS_CONFIG[booking.status] || { label: booking.status, color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
   
   // Find matching movie by checking if booking note includes movie title
@@ -99,6 +101,11 @@ function BookingCard({ booking, onRate, onViewDetail, allMovies }) {
                 Đánh giá
               </button>
             )}
+            {booking.status === 'pending' && (
+              <button onClick={() => onPay && onPay(booking)} className="text-blue-400 hover:text-blue-300 text-xs transition-colors mt-1 font-semibold">
+                Thanh toán
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -133,6 +140,9 @@ export default function Profile() {
   const [allMovies, setAllMovies] = useState([]);
   const [profileLoading, setProfileLoading] = useState(true);
   const [bookingsLoading, setBookingsLoading] = useState(true);
+
+  const [payosData, setPayosData] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0);
 
   const [ownedVouchers, setOwnedVouchers] = useState(() => {
     try {
@@ -289,6 +299,7 @@ export default function Profile() {
             total: parseFloat(t.finalAmount || t.totalAmount || 0),
             status: parsedStatus,
             rawPaymentStatus: t.paymentStatus,
+            rawTicketDate: t.ticketsDate || t.createDate,
           };
         });
         
@@ -351,6 +362,80 @@ export default function Profile() {
   const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' });
   const [reviewSuccess, setReviewSuccess] = useState(false);
   const [showPointsTable, setShowPointsTable] = useState(false);
+
+  // Polling for payos payment
+  useEffect(() => {
+    let pollInterval;
+    if (payosData) {
+      pollInterval = setInterval(async () => {
+        try {
+          const ticket = await ticketService.getById(payosData.ticketId, { _t: Date.now() });
+          if (ticket && (ticket.paymentStatus === 'PAID' || ticket.status === 'CONFIRMED')) {
+            clearInterval(pollInterval);
+            setPayosData(null);
+            addNotification({ type: 'success', title: 'Thành công', message: 'Thanh toán vé thành công!' });
+            window.location.reload(); 
+          }
+        } catch (e) {}
+      }, 3000);
+    }
+    return () => clearInterval(pollInterval);
+  }, [payosData]);
+
+  // Countdown timer
+  useEffect(() => {
+    let timer;
+    if (payosData && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (timeLeft <= 0 && payosData) {
+      if (payosData?.ticketId) {
+        ticketService.update(payosData.ticketId, { status: 'CANCELLED', paymentStatus: 'UNPAID' }).catch(err => console.error(err));
+      }
+      setPayosData(null);
+      addNotification({ type: 'error', title: 'Hết hạn', message: 'Đã hết thời gian thanh toán (10 phút). Giao dịch bị huỷ!' });
+      window.location.reload();
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [payosData, timeLeft]);
+
+  const handlePay = async (booking) => {
+    try {
+      const ticketDateStr = booking.rawTicketDate;
+      let ticketDate = new Date();
+      if (ticketDateStr) {
+        if (typeof ticketDateStr === 'string' && ticketDateStr.includes('-') && ticketDateStr.split('-')[0].length === 2) {
+          const [datePart, timePart] = ticketDateStr.split(' ');
+          const [dd, mm, yyyy] = datePart.split('-');
+          ticketDate = new Date(`${yyyy}-${mm}-${dd}T${timePart || '00:00:00'}`);
+        } else {
+          ticketDate = new Date(ticketDateStr);
+        }
+      }
+      
+      const now = new Date();
+      const diffSecs = Math.floor((now - ticketDate) / 1000);
+      let remaining = 600 - diffSecs;
+      
+      if (remaining <= 0) {
+        addNotification({ type: 'error', title: 'Lỗi', message: 'Vé này đã hết hạn thanh toán.' });
+        return;
+      }
+      
+      const payosResponse = await payosService.createPaymentLink(booking.ticketId);
+      if (payosResponse && payosResponse.qrCode) {
+        setPayosData({ ...payosResponse, ticketId: booking.ticketId });
+        setTimeLeft(remaining);
+      } else {
+        addNotification({ type: 'error', title: 'Lỗi', message: 'Không thể tạo mã thanh toán từ PayOS.' });
+      }
+    } catch (e) {
+      addNotification({ type: 'error', title: 'Lỗi', message: 'Không thể tạo mã thanh toán. Có thể vé đã bị xử lý hoặc hệ thống quá tải.' });
+    }
+  };
 
   const filteredBookings = filterStatus === 'all'
     ? bookings.filter(b => b.status !== 'cancelled')
@@ -654,7 +739,7 @@ export default function Profile() {
                     <span className="text-cinema-muted ml-3 text-sm">Đang tải vé...</span>
                   </div>
                 ) : filteredBookings.length > 0 ? (
-                  filteredBookings.map(b => <BookingCard key={b.id} booking={b} onViewDetail={(b) => setTicketDetailModal({ open: true, booking: b })} onRate={handleOpenReview} allMovies={allMovies} />)
+                  filteredBookings.map(b => <BookingCard key={b.id} booking={b} onViewDetail={(b) => setTicketDetailModal({ open: true, booking: b })} onRate={handleOpenReview} onPay={handlePay} allMovies={allMovies} />)
                 ) : (
                   <div className="text-center py-16">
                     <div className="text-5xl mb-3">🎟️</div>
@@ -1166,6 +1251,87 @@ export default function Profile() {
                 <span className="text-cinema-muted font-medium text-sm">Tổng tiền</span>
                 <span className="text-primary font-heading font-bold text-xl">{ticketDetailModal.booking.total.toLocaleString('vi-VN')}đ</span>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* PayOS Modal */}
+      <AnimatePresence>
+        {payosData && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-cinema-black/80 backdrop-blur-sm z-0" onClick={() => setPayosData(null)}></div>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="card p-8 max-w-md w-full text-center relative z-10 border-primary/50 shadow-glow-gold"
+            >
+              <div className="flex justify-center mb-4">
+                 <svg viewBox="0 0 140 40" className="h-10 w-auto" xmlns="http://www.w3.org/2000/svg">
+                   <rect width="140" height="40" rx="8" fill="#0052FF"/>
+                   <rect x="10" y="8" width="24" height="24" rx="6" fill="white" />
+                   <rect x="15" y="13" width="14" height="14" rx="2" fill="#0052FF" />
+                   <rect x="18" y="16" width="8" height="8" fill="white" />
+                   <text x="44" y="25" fill="white" fontSize="13" fontWeight="bold" fontFamily="Arial, sans-serif">VietQR PayOS</text>
+                 </svg>
+              </div>
+              <h2 className="font-heading font-bold text-2xl text-white mb-2">Thanh Toán Trực Tuyến</h2>
+              <p className="text-cinema-muted text-sm mb-6">Mở ứng dụng ngân hàng và quét mã hoặc bấm nút thanh toán</p>
+              
+              {payosData.qrCode ? (
+                <div className="bg-white p-3 rounded-2xl inline-block mb-6 shadow-xl">
+                  <QRCodeCanvas value={payosData.qrCode} size={224} />
+                </div>
+              ) : (
+                <div className="mb-6">
+                  <a href={`https://pay.payos.vn/web/${payosData.id}`} target="_blank" rel="noopener noreferrer" className="btn-primary px-8 py-3 rounded-xl inline-block shadow-lg hover:scale-105 transition-transform font-bold">
+                    Mở trang thanh toán PayOS
+                  </a>
+                  <p className="text-xs text-cinema-muted mt-3">Sau khi thanh toán thành công, hệ thống sẽ tự động cập nhật.</p>
+                </div>
+              )}
+
+              <div className="bg-cinema-surface rounded-xl p-4 mb-6 text-left border border-cinema-border/50">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-cinema-muted">Số tiền:</span>
+                  <span className="text-primary font-bold text-xl">{payosData.amount.toLocaleString('vi-VN')} đ</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-cinema-muted">Nội dung:</span>
+                  <span className="text-white font-medium text-right max-w-[200px] break-words">{payosData.description}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center justify-center gap-2 mb-6">
+                <p className="text-cinema-muted text-sm">Thời gian còn lại:</p>
+                <div className={`text-4xl font-mono font-bold ${timeLeft <= 60 ? 'text-red-500 animate-pulse' : 'text-primary'}`}>
+                  {Math.floor(timeLeft / 60).toString().padStart(2, '0')}:{Math.floor(timeLeft % 60).toString().padStart(2, '0')}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-xs text-cinema-muted">
+                    Hệ thống đang chờ bạn thanh toán...
+                  </p>
+                </div>
+              </div>
+              
+              <button 
+                onClick={async () => {
+                  if (payosData?.ticketId) {
+                    try {
+                      await ticketService.update(payosData.ticketId, { status: 'CANCELLED', paymentStatus: 'UNPAID' });
+                    } catch (err) {
+                      console.error('Lỗi khi hủy vé:', err);
+                    }
+                  }
+                  setPayosData(null); 
+                  window.location.reload(); 
+                }}
+                className="text-cinema-muted hover:text-red-400 transition-colors underline text-sm"
+              >
+                Hủy thanh toán
+              </button>
             </motion.div>
           </div>
         )}

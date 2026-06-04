@@ -14,6 +14,11 @@ const payosService = {
     return res.data;
   },
 
+  getPaymentLink: async (ticketId) => {
+    const res = await api.get(`/v1/payos/${ticketId}`);
+    return res.data;
+  },
+
   /**
    * Sync payment status from PayOS
    * @param { number } ticketId
