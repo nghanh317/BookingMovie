@@ -35,10 +35,8 @@ function RankBadge({ rank }) {
   );
 }
 
-/** Rating progress bar */
-function RatingBar({ rating, maxRating = 10 }) {
-  const pct = (rating / maxRating) * 100;
-  const color = rating >= 8 ? 'bg-green-500' : rating >= 6.5 ? 'bg-primary' : 'bg-yellow-500';
+function RatingBar({ rating, maxRating = 5 }) {
+  const pct = Math.min((rating / maxRating) * 100, 100);
   return (
     <div className="flex items-center gap-2 flex-1">
       <div className="flex-1 h-1.5 bg-cinema-surface rounded-full overflow-hidden">
@@ -46,11 +44,11 @@ function RatingBar({ rating, maxRating = 10 }) {
           initial={{ width: 0 }}
           animate={{ width: `${pct}%` }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className={`h-full ${color} rounded-full`}
+          className="h-full bg-primary rounded-full"
         />
       </div>
-      <span className={`text-sm font-bold flex-shrink-0 ${rating >= 8 ? 'text-green-400' : rating >= 6.5 ? 'text-primary' : 'text-yellow-400'}`}>
-        {rating.toFixed(1)}
+      <span className="text-sm font-bold flex-shrink-0 text-primary">
+        {rating.toFixed(1)}/5
       </span>
     </div>
   );
