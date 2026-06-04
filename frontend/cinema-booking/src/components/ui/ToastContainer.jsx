@@ -5,12 +5,12 @@ export default function ToastContainer() {
   const { toasts, removeToast } = useNotificationStore();
 
   return (
-    <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
+    <div className="fixed top-20 left-6 z-[9999] flex flex-col gap-3 pointer-events-none">
       <AnimatePresence>
         {toasts.map((toast) => (
           <motion.div
             key={toast.id}
-            initial={{ opacity: 0, x: 50, scale: 0.9 }}
+            initial={{ opacity: 0, x: -50, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
             className="pointer-events-auto"

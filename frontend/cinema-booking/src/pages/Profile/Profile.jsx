@@ -461,8 +461,8 @@ export default function Profile() {
   };
 
   const filteredBookings = filterStatus === 'all'
-    ? bookings.filter(b => b.status !== 'cancelled')
-    : bookings.filter(b => b.status === filterStatus && b.status !== 'cancelled');
+    ? bookings
+    : bookings.filter(b => b.status === filterStatus);
 
   useEffect(() => {
     if (tabParam) setActiveTab(tabParam);
@@ -739,6 +739,7 @@ export default function Profile() {
                   { value: 'all', label: 'Tất cả' },
                   { value: 'upcoming', label: '🕐 Sắp tới' },
                   { value: 'completed', label: '✅ Đã xem' },
+                  { value: 'cancelled', label: '❌ Đã hủy' },
                 ].map(f => (
                   <button
                     key={f.value}
