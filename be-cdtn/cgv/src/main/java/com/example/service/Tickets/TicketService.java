@@ -28,6 +28,7 @@ import com.example.form.Tickets.UpdateTicketForm;
 import com.example.repository.BookingSeatRepository;
 import com.example.repository.ProductRepository;
 import com.example.repository.SeatRepository;
+import com.example.repository.SeatLockRepository;
 import com.example.repository.SlotRepository;
 import com.example.repository.TicketDetailRepository;
 import com.example.repository.TicketRepository;
@@ -44,6 +45,9 @@ public class TicketService implements ITicketService{
 	
 	@Autowired
 	private SeatRepository seatRepository;
+
+	@Autowired
+	private SeatLockRepository seatLockRepository;
 	
 	@Autowired
 	private TicketDetailRepository ticketDetailRepository;
@@ -385,9 +389,27 @@ public class TicketService implements ITicketService{
 		
 		if (newStatus == Tickets.Status.CANCELLED && oldStatus != Tickets.Status.CANCELLED) {
 			Slots slot = updateTicket.getSlots();
-			int seatsCount = bookingSeatRepository.findByTickets_IdAndIsDeleted(id, false).size();
-			slot.setEmptySeats(slot.getEmptySeats() + seatsCount);
-			slotRepository.save(slot);
+			if (slot != null) {
+				java.util.List<com.example.entity.BookingSeats> bookingSeats = 
+					bookingSeatRepository.findByTickets_IdAndIsDeleted(id, false);
+					
+				if (bookingSeats != null && !bookingSeats.isEmpty()) {
+					int count = bookingSeats.size();
+					for (com.example.entity.BookingSeats bs : bookingSeats) {
+						bs.setIsDeleted(true);
+						bookingSeatRepository.save(bs);
+					}
+					slot.setEmptySeats(slot.getEmptySeats() + count);
+					slotRepository.save(slot);
+					
+					// Giải phóng SeatLocks ngay lập tức để người khác có thể chọn ghế
+					if (updateTicket.getAccounts() != null) {
+						seatLockRepository.releaseByAccountIdAndSlotId(updateTicket.getAccounts().getId(), slot.getId());
+					}
+					
+					System.out.printf("[TicketService] Hủy vé %d, nhả %d ghế cho suất chiếu %d%n", id, count, slot.getId());
+				}
+			}
 		}
 	}
 

@@ -34,7 +34,7 @@ function Avatar({ name, size = 'lg' }) {
   );
 }
 
-function BookingCard({ booking, onRate, onViewDetail, onPay, allMovies }) {
+function BookingCard({ booking, onRate, onViewDetail, onPay, onCancel, allMovies }) {
   const status = STATUS_CONFIG[booking.status] || { label: booking.status, color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
   
   // Find matching movie by checking if booking note includes movie title
@@ -101,11 +101,21 @@ function BookingCard({ booking, onRate, onViewDetail, onPay, allMovies }) {
                 Đánh giá
               </button>
             )}
-            {booking.status === 'pending' && (
-              <button onClick={() => onPay && onPay(booking)} className="text-blue-400 hover:text-blue-300 text-xs transition-colors mt-1 font-semibold">
-                Thanh toán
-              </button>
-            )}
+            <div className="flex justify-end mt-1">
+              {booking.status === 'pending' && (
+                <div className="flex gap-4 mt-2">
+                  <button onClick={() => onPay && onPay(booking)} className="text-blue-400 hover:text-blue-300 text-xs transition-colors font-semibold">
+                    Thanh toán
+                  </button>
+                  <button 
+                    onClick={() => onCancel && onCancel(booking)} 
+                    className="text-red-400 hover:text-red-300 text-xs transition-colors font-semibold"
+                  >
+                    Hủy vé
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -275,10 +285,10 @@ export default function Profile() {
           const seatLabels = (t.seats || []).map(s => `${s.seatsRow || ''}${s.seatsNumber || ''}`).filter(Boolean);
           
           let parsedStatus = 'pending';
-          if (t.paymentStatus === 'PAID') {
-            parsedStatus = isUpcoming ? 'upcoming' : 'completed';
-          } else if (t.paymentStatus === 'CANCELLED') {
+          if (t.status === 'CANCELLED') {
             parsedStatus = 'cancelled';
+          } else if (t.paymentStatus === 'PAID') {
+            parsedStatus = isUpcoming ? 'upcoming' : 'completed';
           }
 
           const localDateStr = ticketDate ? `${ticketDate.getFullYear()}-${String(ticketDate.getMonth() + 1).padStart(2, '0')}-${String(ticketDate.getDate()).padStart(2, '0')}` : '';
@@ -434,6 +444,19 @@ export default function Profile() {
       }
     } catch (e) {
       addNotification({ type: 'error', title: 'Lỗi', message: 'Không thể tạo mã thanh toán. Có thể vé đã bị xử lý hoặc hệ thống quá tải.' });
+    }
+  };
+
+  const handleCancel = async (booking) => {
+    if (window.confirm('Bạn có chắc chắn muốn hủy vé này? Ghế của bạn sẽ không còn được giữ nữa.')) {
+      try {
+        await ticketService.update(booking.ticketId, { status: 'CANCELLED', paymentStatus: 'UNPAID' });
+        setBookings(prev => prev.map(b => b.ticketId === booking.ticketId ? { ...b, status: 'cancelled' } : b));
+        addNotification({ type: 'success', title: 'Thành công', message: 'Hủy vé thành công.' });
+      } catch (err) {
+        console.error('Lỗi khi hủy vé:', err);
+        addNotification({ type: 'error', title: 'Lỗi', message: 'Không thể hủy vé. Vui lòng thử lại.' });
+      }
     }
   };
 
@@ -739,7 +762,7 @@ export default function Profile() {
                     <span className="text-cinema-muted ml-3 text-sm">Đang tải vé...</span>
                   </div>
                 ) : filteredBookings.length > 0 ? (
-                  filteredBookings.map(b => <BookingCard key={b.id} booking={b} onViewDetail={(b) => setTicketDetailModal({ open: true, booking: b })} onRate={handleOpenReview} onPay={handlePay} allMovies={allMovies} />)
+                  filteredBookings.map(b => <BookingCard key={b.id} booking={b} onViewDetail={(b) => setTicketDetailModal({ open: true, booking: b })} onRate={handleOpenReview} onPay={handlePay} onCancel={handleCancel} allMovies={allMovies} />)
                 ) : (
                   <div className="text-center py-16">
                     <div className="text-5xl mb-3">🎟️</div>
@@ -1321,12 +1344,14 @@ export default function Profile() {
                   if (payosData?.ticketId) {
                     try {
                       await ticketService.update(payosData.ticketId, { status: 'CANCELLED', paymentStatus: 'UNPAID' });
+                      setBookings(prev => prev.map(b => b.ticketId === payosData.ticketId ? { ...b, status: 'cancelled' } : b));
+                      addNotification({ type: 'success', title: 'Thành công', message: 'Hủy vé thành công.' });
                     } catch (err) {
                       console.error('Lỗi khi hủy vé:', err);
+                      addNotification({ type: 'error', title: 'Lỗi', message: 'Không thể hủy vé.' });
                     }
                   }
                   setPayosData(null); 
-                  window.location.reload(); 
                 }}
                 className="text-cinema-muted hover:text-red-400 transition-colors underline text-sm"
               >
