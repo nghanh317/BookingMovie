@@ -15,4 +15,5 @@ public interface SlotRepository extends JpaRepository<Slots, Integer>,JpaSpecifi
 
 	@org.springframework.data.jpa.repository.Query("SELECT s FROM Slots s WHERE s.rooms.id = :roomId AND s.showTime < :newEnd AND s.endTime > :newStart AND (s.isDeleted IS NULL OR s.isDeleted = false)")
 	List<Slots> findOverlappingSlots(@org.springframework.data.repository.query.Param("roomId") Integer roomId, @org.springframework.data.repository.query.Param("newStart") java.util.Date newStart, @org.springframework.data.repository.query.Param("newEnd") java.util.Date newEnd);
+	List<Slots> findByRoomsId(Integer roomId);
 }

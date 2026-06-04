@@ -215,7 +215,20 @@ public class SeatService implements ISeatService {
 
 		Rooms room = roomRepository.findById(roomId)
 				.orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));
+				
+		int oldTotalSeats = room.getTotalSeats() != null ? room.getTotalSeats() : 0;
+		int diff = totalSeats.intValue() - oldTotalSeats;
+		
 		room.setTotalSeats(totalSeats.intValue());
 		roomRepository.save(room);
+		
+		if (diff != 0) {
+			List<Slots> slots = slotRepository.findByRoomsId(roomId);
+			for (Slots s : slots) {
+				int newEmpty = (s.getEmptySeats() != null ? s.getEmptySeats() : 0) + diff;
+				s.setEmptySeats(Math.max(0, newEmpty));
+				slotRepository.save(s);
+			}
+		}
 	}
 }
