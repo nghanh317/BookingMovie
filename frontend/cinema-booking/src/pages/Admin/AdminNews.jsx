@@ -21,13 +21,36 @@ const CATEGORY_COLOR = {
   'Tin tức':     'bg-blue-500/20 text-blue-400 border-blue-500/30',
 };
 
+function formatDateForInput(dateVal) {
+  if (!dateVal) return '';
+  if (typeof dateVal === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateVal)) return dateVal;
+    if (dateVal.includes('T')) return dateVal.split('T')[0];
+    const match = dateVal.match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+    if (match) {
+      const [_, d, m, y] = match;
+      return `${y}-${m}-${d}`;
+    }
+    const d = new Date(dateVal);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  } else if (Array.isArray(dateVal)) {
+    const y = dateVal[0];
+    const m = String(dateVal[1] || 1).padStart(2, '0');
+    const d = String(dateVal[2] || 1).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return '';
+}
+
 function fmtDate(dateStr) {
   if (!dateStr) return '';
   let date = new Date(dateStr);
-  if (/^\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}$/.test(dateStr)) {
+  if (typeof dateStr === 'string' && /^\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2}$/.test(dateStr)) {
     const [dPart, tPart] = dateStr.split(' ');
     const [d, m, y] = dPart.split('-');
     date = new Date(`${y}-${m}-${d}T${tPart}`);
+  } else if (Array.isArray(dateStr)) {
+    date = new Date(dateStr[0], (dateStr[1]||1)-1, dateStr[2]||1, dateStr[3]||0, dateStr[4]||0, dateStr[5]||0);
   }
   if (isNaN(date.getTime())) return dateStr;
   
@@ -50,7 +73,7 @@ function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [], dbPr
     bannerImage:      article?.bannerImage   || '',
     author:           article?.author        || 'Admin',
     authorAvatar:     article?.authorAvatar  || 'AD',
-    publishedAt:      article?.publishedAt   || today,
+    publishedAt:      formatDateForInput(article?.publishedAt) || today,
     readTime:         article?.readTime      || '5 phút đọc',
     genre:            article?.genre?.join(', ') || '',
     tags:             article?.tags?.join(', ')  || '',
@@ -67,7 +90,7 @@ function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [], dbPr
     ratingCine:       article?.sections?.ratingCine       || '',
     // ── Preview (Dự báo) fields ──
     previewContent:   article?.previewContent  || '',
-    releaseDate:      article?.releaseDate     || '',
+    releaseDate:      formatDateForInput(article?.releaseDate) || '',
     trailerUrl:       article?.trailerUrl      || '',
     expectedRating:   article?.expectedRating  || '',
     linkedMovieIds:   article?.linkedMovieIds?.join(', ') || (article?.linkedMovieId ? String(article.linkedMovieId) : ''),
@@ -75,8 +98,8 @@ function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [], dbPr
     voucherIds:       article?.voucherIds?.join(', ') || '',
     promotionContent: article?.promotionContent || '',
     discountPercent:  article?.discountPercent || '',
-    validFrom:        article?.validFrom || today,
-    validTo:          article?.validTo   || '',
+    validFrom:        formatDateForInput(article?.validFrom) || today,
+    validTo:          formatDateForInput(article?.validTo)   || '',
   });
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -130,22 +153,58 @@ function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [], dbPr
     onClose();
   };
 
-  const renderField = (label, fieldKey, type='text', required=false, placeholder='') => (
-    <div key={fieldKey}>
-      <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor={`field-${fieldKey}`}>
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
-      </label>
-      <input
-        id={`field-${fieldKey}`}
-        type={type}
-        className="input-field w-full"
-        placeholder={placeholder}
-        value={form[fieldKey] !== undefined ? form[fieldKey] : ''}
-        onChange={e => f(fieldKey, e.target.value)}
-        {...(type === 'number' ? { step: '0.1', min: '0', max: '10' } : {})}
-      />
-    </div>
-  );
+  const renderField = (label, fieldKey, type='text', required=false, placeholder='') => {
+    if (type === 'date') {
+      let displayVal = form[fieldKey] || '';
+      if (displayVal && /^\d{4}-\d{2}-\d{2}$/.test(displayVal)) {
+        const [y, m, d] = displayVal.split('-');
+        displayVal = `${d}/${m}/${y}`;
+      }
+      return (
+        <div key={fieldKey}>
+          <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor={`field-${fieldKey}`}>
+            {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              className="input-field w-full cursor-pointer pr-10"
+              placeholder="dd/mm/yyyy"
+              value={displayVal}
+              readOnly
+            />
+            <input
+              id={`field-${fieldKey}`}
+              type="date"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              value={form[fieldKey] || ''}
+              onChange={e => f(fieldKey, e.target.value)}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-cinema-muted">
+              📅
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={fieldKey}>
+        <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor={`field-${fieldKey}`}>
+          {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+        </label>
+        <input
+          id={`field-${fieldKey}`}
+          type={type}
+          className="input-field w-full"
+          placeholder={placeholder}
+          value={form[fieldKey] !== undefined ? form[fieldKey] : ''}
+          onChange={e => f(fieldKey, e.target.value)}
+          {...(type === 'number' ? { step: '0.1', min: '0', max: '10' } : {})}
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-cinema-black/80 backdrop-blur-sm">
