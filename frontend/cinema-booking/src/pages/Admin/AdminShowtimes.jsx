@@ -178,7 +178,12 @@ export default function AdminShowtimes() {
 
   // Lọc showtimes
   const filteredShowtimes = useMemo(() => {
+    const now = new Date();
     return showtimes.filter(st => {
+      // Bỏ qua các suất chiếu trong quá khứ
+      const stDateTime = new Date(`${st.date}T${st.time}`);
+      if (stDateTime < now) return false;
+
       const movie = movies.find(m => m.id === st.movieId);
       const matchSearch =
         (movie?.title || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -439,7 +444,7 @@ export default function AdminShowtimes() {
                                 {roomShowtimes.length === 0 ? (
                                   <p className="text-cinema-muted text-xs italic py-2 text-center">Chưa có suất chiếu</p>
                                 ) : (
-                                  <div className="space-y-3">
+                                  <div className="space-y-3 max-h-[640px] overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-cinema-border [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-primary/50">
                                     {[...roomShowtimes]
                                       .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`))
                                       .map(st => {
