@@ -172,7 +172,10 @@ export default function News() {
         }
       }
 
-      setArticles(content);
+      setArticles(content.map(a => ({
+        ...a,
+        title: getCleanExcerpt(a.title, 500)
+      })));
       setTotalPages(totalPages);
     } catch {
       setError('Không thể tải tin tức. Vui lòng thử lại!');

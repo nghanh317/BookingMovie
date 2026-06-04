@@ -69,11 +69,12 @@ function TopMovieRow({ movie, rank, stat, showRevenue = false, showTickets = fal
       {/* Poster */}
       <Link to={`/movies/${movie.id}`} className="flex-shrink-0 relative">
         <img
-          src={movie.poster}
+          src={movie.poster || `https://placehold.co/48x72/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title?.[0] || 'M')}`}
           alt={movie.title}
           className="w-12 h-[4.5rem] object-cover rounded-xl border border-cinema-border group-hover:border-primary/40 transition-colors duration-200"
           onError={(e) => {
-            e.target.src = `https://placehold.co/48x72/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title[0])}`;
+            e.target.onerror = null;
+            e.target.src = `https://placehold.co/48x72/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title?.[0] || 'M')}`;
           }}
         />
       </Link>
@@ -312,10 +313,11 @@ export default function TopMovies() {
       {heroMovie && (
         <div className="relative h-[50vh] min-h-[320px] overflow-hidden">
           <img
-            src={heroMovie.backdrop}
+            src={heroMovie.backdrop || `https://placehold.co/1920x1080/1A1A24/A0A0B4?text=Top+Phim`}
             alt={heroMovie.title}
             className="w-full h-full object-cover"
             onError={(e) => {
+              e.target.onerror = null;
               e.target.src = `https://placehold.co/1920x1080/1A1A24/A0A0B4?text=Top+Phim`;
             }}
           />
@@ -404,9 +406,13 @@ export default function TopMovies() {
                     </div>
                   </div>
                   <img
-                    src={movie.poster}
+                    src={movie.poster || `https://placehold.co/48x72/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title?.[0] || 'M')}`}
                     alt={movie.title}
                     className="w-12 h-[4.5rem] rounded-xl object-cover flex-shrink-0 border border-cinema-border"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = `https://placehold.co/48x72/1E1E2C/A0A0B4?text=${encodeURIComponent(movie.title?.[0] || 'M')}`;
+                    }}
                   />
                 </div>
               </motion.div>

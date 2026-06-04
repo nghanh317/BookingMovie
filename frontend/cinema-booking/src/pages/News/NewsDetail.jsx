@@ -64,6 +64,15 @@ export default function NewsDetail() {
       setError(null);
       try {
         const data = await newsService.getById(id);
+        if (data) {
+          data.title = (data.title || '')
+            .replace(/&lt;span.*?&gt;\[.*?\]&lt;\/span&gt;/gi, '')
+            .replace(/<span.*?>\[.*?\]<\/span>/gi, '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/&lt;[^&]*&gt;/gi, '')
+            .replace(/^\[(Tin tức|Review phim|Dự báo phim|Khuyến mãi)\]\s*/i, '')
+            .trim();
+        }
         if (!cancelled) setArticle(data);
       } catch {
         if (!cancelled) setError('Không thể tải bài viết. Vui lòng thử lại!');

@@ -28,7 +28,7 @@ public class NewService implements INewService{
 
 	@Override
 	public void createNew(CreateNewForm form) {
-		News createNew = new News(form.getContent(), form.getTitle());
+		News createNew = new News(form.getTitle(), form.getContent());
 		createNew.setImageUrl(form.getImageUrl());
 		newRepository.save(createNew);
 		

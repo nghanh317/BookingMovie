@@ -512,6 +512,13 @@ export default function AdminNews() {
       // Map sang format dùng trong Admin (thêm field published)
       setArticles(rawContent.map(n => ({
         ...n,
+        title: (n.title || '')
+                 .replace(/&lt;span.*?&gt;\[.*?\]&lt;\/span&gt;/gi, '')
+                 .replace(/<span.*?>\[.*?\]<\/span>/gi, '')
+                 .replace(/<[^>]*>/g, '')
+                 .replace(/&lt;[^&]*&gt;/gi, '')
+                 .replace(/^\[(Tin tức|Review phim|Dự báo phim|Khuyến mãi)\]\s*/i, '')
+                 .trim(),
         published: !n.isDeleted,
         // map fields cho ArticleRow
         coverImage: n.imageUrl || '',
