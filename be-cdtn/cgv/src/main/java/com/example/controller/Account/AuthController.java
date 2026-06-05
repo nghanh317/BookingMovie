@@ -33,6 +33,8 @@ import jakarta.validation.Valid;
 @Validated
 public class AuthController {
 
+    // Khi nào deploy lên server thật, chỉ cần đổi chỗ này thành true!
+    boolean isProduction = false; 
     @Autowired
     private AuthenticationManager authenticationManager;
 
@@ -86,39 +88,7 @@ public class AuthController {
                 .body(responseBody);
     }
 
-    // ── POST /api/v1/auth/refresh ────────────────────────────
-    /**
-     * Client gửi refreshToken (còn hạn 7 ngày) → nhận accessToken mới (15 phút).
-     * Không cần đăng nhập lại.
-     */
-    // @PostMapping("/refresh")
-    // public ResponseEntity<?> refresh(@CookieValue(name = "refreshToken", required = false) String refreshToken) {
-        
-    //     if (refreshToken == null || refreshToken.isEmpty()) {
-    //         return ResponseEntity
-    //                 .status(401)
-    //                 .body(Map.of(
-    //                     "message", "Không tìm thấy refresh token trong cookie. Vui lòng đăng nhập lại.",
-    //                     "code", 401));
-    //     }
-
-    //     // Kiểm tra refresh token hợp lệ và còn hạn
-    //     if (!jwtTokenService.isTokenValid(refreshToken)) {
-    //         return ResponseEntity
-    //                 .status(401)
-    //                 .body(Map.of(
-    //                     "message", "Refresh token không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.",
-    //                     "code", 401));
-    //     }
-
-    //     // Lấy username từ refresh token → tạo access token mới
-    //     String username    = jwtTokenService.getUsernameFromToken(refreshToken);
-    //     String accessToken = jwtTokenService.generateAccessToken(username);
-
-    //     return ResponseEntity.ok(Map.of("accessToken", accessToken));
-    // }
-
-    // ── POST /api/v1/auth/refresh ────────────────────────────
+    // ── POST /api/v1/auth/refresh 
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@CookieValue(name = "refreshToken", required = false) String refreshToken) {
         
@@ -139,26 +109,11 @@ public class AuthController {
                         "code", 401));
         }
 
-        // Lấy username từ refresh token
-        String username = jwtTokenService.getUsernameFromToken(refreshToken);
-        
-        // TẠO CẢ ACCESS TOKEN VÀ REFRESH TOKEN MỚI
+        // Lấy username từ refresh token → tạo access token mới (15 phút)
+        String username    = jwtTokenService.getUsernameFromToken(refreshToken);
         String accessToken = jwtTokenService.generateAccessToken(username);
-        String newRefreshToken = jwtTokenService.generateRefreshToken(username);
 
-        // Ghi đè Cookie mới để gia hạn thêm 7 ngày (Trượt thời gian sống)
-        boolean isProduction = false;
-        ResponseCookie springCookie = ResponseCookie.from("refreshToken", newRefreshToken)
-                .httpOnly(true)
-                .secure(isProduction)
-                .path("/")
-                .maxAge(7 * 24 * 60 * 60) // Gia hạn lại 7 ngày
-                .sameSite(isProduction ? "None" : "Lax")
-                .build();
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, springCookie.toString())
-                .body(Map.of("accessToken", accessToken));
+        return ResponseEntity.ok(Map.of("accessToken", accessToken));
     }
 
     // ── POST /api/v1/auth/register ───────────────────────────
@@ -170,8 +125,6 @@ public class AuthController {
     // ── POST /api/v1/auth/logout ─────────────────────────────
     @PostMapping("/logout")
     public ResponseEntity<?> logout() {
-        // Biến này phải khớp với cấu hình lúc cậu Login
-        boolean isProduction = false; 
 
         // Tạo một cookie đè lên cookie cũ, với maxAge = 0 để trình duyệt tự hủy nó
         ResponseCookie cleanCookie = ResponseCookie.from("refreshToken", "")

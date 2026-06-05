@@ -48,6 +48,8 @@ const useNotificationStore = create(
         )
       })),
 
+      clearAll: () => set({ notifications: [] }),
+
       getUnreadCount: (isAdmin = false) => get().notifications.filter(n => !n.read && !!n.isAdmin === isAdmin).length,
     }),
     {

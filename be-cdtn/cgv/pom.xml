@@ -137,15 +137,12 @@
 			<artifactId>payos-java</artifactId>
 			<version>2.0.1</version>
 		</dependency>
-		<!--kafka-->
+		<!--redis-->
 		<dependency>
-			<groupId>org.springframework.kafka</groupId>
-			<artifactId>spring-kafka</artifactId>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
-		<dependency>
-			<groupId>com.fasterxml.jackson.core</groupId>
-			<artifactId>jackson-databind</artifactId>
-</dependency>
+		
 	</dependencies>
 
 	<build>

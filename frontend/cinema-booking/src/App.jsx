@@ -1,4 +1,10 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+// 💡 IMPORT cái Zustand Store cậu vừa sửa ở bước trước vào đây
+// Cậu nhớ kiểm tra lại đường dẫn từ file App.jsx đến file authStore.js xem đã đúng chưa nhé (ví dụ: './store/authStore' hoặc './authStore')
+import useAuthStore from './store/authStore';
+
 import Layout from './components/layout/Layout';
 import ScrollToTop from './components/layout/ScrollToTop';
 import { RequireAuth, RequireAdmin } from './components/auth/ProtectedRoute';
@@ -43,6 +49,17 @@ import AdminNews from './pages/Admin/AdminNews';
 import AdminProducts from './pages/Admin/AdminProducts';
 
 function App() {
+  // 💡 Đọc accessToken và hàm setupActiveRefresh từ Zustand Store ra
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const setupActiveRefresh = useAuthStore((state) => state.setupActiveRefresh);
+
+  // 💡 Tự động kích hoạt lại lịch hẹn giờ đổi token mỗi khi user F5 tải lại trang
+  useEffect(() => {
+    if (accessToken) {
+      setupActiveRefresh(accessToken);
+    }
+  }, [accessToken, setupActiveRefresh]);
+
   return (
     <BrowserRouter>
       <ScrollToTop />
