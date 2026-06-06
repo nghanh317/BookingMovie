@@ -27,7 +27,7 @@ function StepIndicator({ current }) {
       {steps.map((step, i) => (
         <div key={step} className="flex items-center">
           <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${i + 1 === current ? 'bg-primary text-cinema-black' :
-              i + 1 < current ? 'text-primary' : 'text-cinema-muted'
+            i + 1 < current ? 'text-primary' : 'text-cinema-muted'
             }`}>
             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${i + 1 <= current ? 'bg-primary border-primary text-cinema-black' : 'border-cinema-border'
               }`}>{i + 1 < current ? '✓' : i + 1}</span>
@@ -63,7 +63,7 @@ export default function SeatSelection() {
   const fetchSeatStatus = useCallback(async (isInitial = false) => {
     if (!showtimeId) return;
     if (isInitial) setLoadingSeats(true);
-    
+
     try {
       const data = await seatService.getSlotStatus(showtimeId, accountId || '');
       // Sắp xếp ghế
@@ -120,10 +120,10 @@ export default function SeatSelection() {
   const rows = Object.keys(seatsByRow).sort();
 
   const pricePerSeat = showtime?.price || 0;
-  
+
   // Những ghế đang nằm trong Set selected hoặc đã bị account này lock trên db
   const selectedSeatObjects = seats.filter(s => selected.has(s.seatId) || s.lockedByMe);
-  
+
   const totalPrice = selectedSeatObjects.reduce((sum, seat) => {
     const meta = getSeatMeta(seat.seatTypeName);
     if (meta === SEAT_TYPE_META.VIP) return sum + (showtime?.vipPrice || pricePerSeat * 1.3);
@@ -135,10 +135,10 @@ export default function SeatSelection() {
   const toggleSeat = (seatId) => {
     const seat = seats.find(s => s.seatId === seatId);
     if (!seat) return;
-    
+
     // Nếu ghế đã book chính thức
     if (seat.status === 'booked') return;
-    
+
     // Nếu ghế đang bị lock bởi người khác
     if (seat.status === 'locked' && !seat.lockedByMe) {
       const label = `${seat.seatRow}${seat.seatNumber}`;
@@ -146,10 +146,10 @@ export default function SeatSelection() {
       setTimeout(() => setError(''), 3000);
       return;
     }
-    
+
     // Nếu ghế do chính mình lock trên server, nhưng mình muốn bỏ tick
     // Chỗ này hơi tricky, cứ allow bỏ chọn local, lúc bấm Tiếp tục server sẽ đè lên
-    
+
     setSelected(prev => {
       const next = new Set(prev);
       if (next.has(seatId) || seat.lockedByMe) {
@@ -157,7 +157,7 @@ export default function SeatSelection() {
         // Nếu nó đang lockedByMe trên server, việc delete này chỉ tác dụng local (sẽ bị reset sau 5s nếu server vẫn trả về lockedByMe).
         // Tốt nhất nếu nó đã lock, user nhấn vào sẽ nhả ghế khỏi DB luôn
         if (seat.lockedByMe) {
-          seatLockService.releaseSeats(accountId, showtimeId).catch(()=>{});
+          seatLockService.releaseSeats(accountId, showtimeId).catch(() => { });
         }
       } else {
         next.add(seatId);
@@ -181,10 +181,14 @@ export default function SeatSelection() {
       try {
         const result = await seatLockService.lockSeats(accountId, showtimeId, idsToLock);
         if (result?.success) {
-          lockExpiresAt = result.expiresAt;
+          // Tránh lỗi timezone khi parse LocalDateTime của Spring Boot, ta tự set 10 phút từ client
+          lockExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
         }
-      } catch {
-        // Silent
+      } catch (err) {
+        const msg = err?.response?.data?.message || 'Không thể khóa ghế lúc này. Vui lòng thử lại.';
+        setError(msg);
+        setLockLoading(false);
+        return; // Dừng lại, không sang trang SnackSelection
       }
     }
 
@@ -271,7 +275,7 @@ export default function SeatSelection() {
                       {seatsByRow[row].map(seat => {
                         const seatId = seat.seatId;
                         const meta = getSeatMeta(seat.seatTypeName);
-                        
+
                         const isBooked = seat.status === 'booked';
                         const isLockedOther = seat.status === 'locked' && !seat.lockedByMe;
                         const isSelected = selected.has(seatId) || seat.lockedByMe;

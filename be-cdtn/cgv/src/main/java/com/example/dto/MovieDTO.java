@@ -2,13 +2,14 @@ package com.example.dto;
 
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.Date;
 
 import com.example.entity.Movies.Status;
 import com.example.entity.Movies.AgeRating;
 
 @Data
-public class MovieDTO {
+public class MovieDTO implements Serializable{
 	private Integer id;
 		
 	private String title;

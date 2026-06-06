@@ -65,6 +65,17 @@ public class ExceptionConfiguration extends ResponseEntityExceptionHandler {
 				exception);
 		return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
 	}
+
+	// Login failed exception
+	@ExceptionHandler({ org.springframework.security.authentication.BadCredentialsException.class, org.springframework.security.core.userdetails.UsernameNotFoundException.class })
+	public ResponseEntity<Object> handleBadCredentials(Exception exception) {
+		Map<String, Object> response = new HashMap<>();
+		response.put("success", false);
+		response.put("code", 401);
+		response.put("message", "Đăng nhập thất bại");
+		response.put("detailMessage", "Tài khoản hoặc mật khẩu không chính xác");
+		return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
+	}
 	
 	// Not found url handler
 	@Override

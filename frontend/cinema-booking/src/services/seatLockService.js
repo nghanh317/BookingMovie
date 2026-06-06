@@ -48,6 +48,15 @@ const seatLockService = {
     const res = await api.get('/v1/seat-locks/my-expiry', { params: { accountId, slotId } });
     return res.data;
   },
+
+  /**
+   * Gia hạn lock ghế thêm 10 phút — gọi khi user bấm "Tiếp tục" / "Thanh toán"
+   * @returns {{ success, expiresAt, message }}
+   */
+  extendLock: async (accountId, slotId) => {
+    const res = await api.post('/v1/seat-locks/extend', { accountId, slotId });
+    return res.data;
+  },
 };
 
 export default seatLockService;

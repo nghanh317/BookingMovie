@@ -13,6 +13,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import com.example.dto.DateDTO;
@@ -28,6 +29,9 @@ import com.example.specification.MovieSpecification;
 
 @Service
 public class MovieService implements IMovieService {
+
+	@Autowired
+	private RedisTemplate<String, Object> redisTemplate;
 
 	@Autowired
 	private MovieRepository movieRepository;
@@ -70,6 +74,13 @@ public class MovieService implements IMovieService {
 
 	@Override
 	public MovieDTO getById(Integer id) {
+		String cacheKey = "movie:detail:" + id;
+		//kiem tra Redis truoc
+		MovieDTO cacheDto = (MovieDTO) redisTemplate.opsForValue().get(cacheKey);
+		if(cacheDto != null) {
+			return cacheDto;
+		}
+
 		Movies movie = movieRepository.findById(id).get();
 		MovieDTO dto = modelMapper.map(movie, MovieDTO.class);
 		
@@ -85,6 +96,8 @@ public class MovieService implements IMovieService {
 		}
 		dto.setRating(count == 0 ? 0.0 : Math.round((sum / count) * 10.0) / 10.0);
 		
+		// luu redis de lan sau dung voi thoi gian song 10p
+		redisTemplate.opsForValue().set(cacheKey, dto, java.time.Duration.ofMinutes(10));
 		return dto;
 	}
 
@@ -150,6 +163,8 @@ public class MovieService implements IMovieService {
         }
 
 		movieRepository.save(updateMovie);
+		// XÓA CACHE ĐỂ LẦN SAU HỆ THỐNG PHẢI LOAD LẠI TỪ MYSQL
+    	redisTemplate.delete("movie:detail:" + id);
 
 	}
 
@@ -159,5 +174,7 @@ public class MovieService implements IMovieService {
 		delete.setIsDeleted(true);
 		movieRepository.save(delete);
 
+		// XÓA CACHE
+    	redisTemplate.delete("movie:detail:" + id);
 	}
 }

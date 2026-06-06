@@ -18,7 +18,7 @@ import com.example.repository.SeatRepository;
 @Service
 public class SeatLockService {
 
-    private static final int LOCK_MINUTES = 10; // Thời gian giữ ghế: 10 phút
+    private static final int LOCK_MINUTES = 10; // Giữ ghế 10 phút (bao gồm cả chọn bỏng nước + thanh toán)
 
     @Autowired
     private SeatLockRepository seatLockRepository;
@@ -33,16 +33,19 @@ public class SeatLockService {
      * Khoá danh sách ghế cho một user trong một slot.
      * Gọi khi user nhấn "Tiếp tục" sau khi chọn ghế.
      *
-     * @param accountId  ID user đang đặt
-     * @param slotId     ID suất chiếu
-     * @param seatIds    Danh sách ID ghế cần khoá
+     * @param accountId ID user đang đặt
+     * @param slotId    ID suất chiếu
+     * @param seatIds   Danh sách ID ghế cần khoá
      * @return lockedUntil — thời điểm hết hạn
      */
     @Transactional
     public LocalDateTime lockSeats(Integer accountId, Integer slotId, List<Integer> seatIds) {
         LocalDateTime now = LocalDateTime.now();
 
-        // 1. Giải phóng lock cũ của user trong slot này (nếu có)
+        // 1. Dọn dẹp tất cả các lock đã hết hạn (chuyển is_active = null) để tránh xung đột unique
+        seatLockRepository.releaseExpired(now);
+
+        // 2. Giải phóng lock cũ của user trong slot này (nếu có)
         seatLockRepository.releaseByAccountIdAndSlotId(accountId, slotId);
 
         // 2. Kiểm tra từng ghế có bị người khác lock không
@@ -61,12 +64,13 @@ public class SeatLockService {
 
         LocalDateTime expiresAt = now.plusMinutes(LOCK_MINUTES);
 
-        // 4. Tạo lock record cho từng ghế
+        // 4. Tạo lock record mới cho từng ghế
         for (Integer seatId : seatIds) {
             Seats seat = seatRepository.findById(seatId)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy ghế: " + seatId));
 
             SeatLocks lock = new SeatLocks();
+
             lock.setSeat(seat);
             lock.setAccount(account);
             lock.setSlotId(slotId);
@@ -88,6 +92,7 @@ public class SeatLockService {
         seatLockRepository.releaseByAccountIdAndSlotId(accountId, slotId);
     }
 
+
     /**
      * Lấy danh sách ghế đang bị lock trong một slot.
      * Dùng để hiển thị ghế "đang được giữ" cho tất cả user.
@@ -101,21 +106,23 @@ public class SeatLockService {
                 lock.getSeat().getId(),
                 lock.getAccount().getId(),
                 lock.getSlotId(),
-                lock.getExpiresAt()
-        )).collect(Collectors.toList());
+                lock.getExpiresAt())).collect(Collectors.toList());
     }
 
     /**
      * Lấy thời gian còn lại của lock ghế của một user trong slot.
+     * 
      * @return expiresAt nếu còn active, null nếu không có lock
      */
     public LocalDateTime getLockExpiry(Integer accountId, Integer slotId) {
         LocalDateTime now = LocalDateTime.now();
         List<SeatLocks> myLocks = seatLockRepository.findActiveByAccountIdAndSlotId(accountId, slotId, now);
-        if (myLocks.isEmpty()) return null;
+        if (myLocks.isEmpty())
+            return null;
         return myLocks.get(0).getExpiresAt();
     }
 
     // ── DTO ────────────────────────────────────────────────────────────
-    public record SeatLockDTO(Integer seatId, Integer accountId, Integer slotId, LocalDateTime expiresAt) {}
+    public record SeatLockDTO(Integer seatId, Integer accountId, Integer slotId, LocalDateTime expiresAt) {
+    }
 }

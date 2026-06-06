@@ -28,13 +28,17 @@ public interface SeatLockRepository extends JpaRepository<SeatLocks, Integer> {
 
     /** Giải phóng tất cả lock của user trong slot (khi hủy chọn hoặc thanh toán xong) */
     @Modifying
-    @Query("UPDATE SeatLocks sl SET sl.isActive = false WHERE sl.account.id = :accountId AND sl.slotId = :slotId AND sl.isActive = true")
+    @Query("UPDATE SeatLocks sl SET sl.isActive = false WHERE sl.account.id = :accountId AND sl.slotId = :slotId")
     void releaseByAccountIdAndSlotId(@Param("accountId") Integer accountId, @Param("slotId") Integer slotId);
 
     /** Giải phóng lock đã hết hạn (cho scheduler chạy định kỳ) */
     @Modifying
-    @Query("UPDATE SeatLocks sl SET sl.isActive = false WHERE sl.isActive = true AND sl.expiresAt <= :now")
+    @Query("UPDATE SeatLocks sl SET sl.isActive = false WHERE sl.expiresAt <= :now")
     int releaseExpired(@Param("now") LocalDateTime now);
+
+    /** Tìm lock hiện tại của ghế (để tái sử dụng, tránh lỗi Duplicate entry) */
+    @Query("SELECT sl FROM SeatLocks sl WHERE sl.seat.id = :seatId AND sl.slotId = :slotId")
+    List<SeatLocks> findBySeatIdAndSlotId(@Param("seatId") Integer seatId, @Param("slotId") Integer slotId);
 
     /** Kiểm tra ghế đã bị lock bởi người khác chưa */
     @Query("SELECT COUNT(sl) > 0 FROM SeatLocks sl WHERE sl.seat.id = :seatId AND sl.slotId = :slotId AND sl.account.id <> :accountId AND sl.isActive = true AND sl.expiresAt > :now")

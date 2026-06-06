@@ -38,7 +38,7 @@ public class SeatLockController {
     @PostMapping("/lock")
     public ResponseEntity<?> lockSeats(@RequestBody LockRequest req) {
         try {
-            LocalDateTime expiresAt = seatLockService.lockSeats(req.accountId(), req.slotId(), req.seatIds());
+            LocalDateTime expiresAt = seatLockService.lockSeats(req.getAccountId(), req.getSlotId(), req.getSeatIds());
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "expiresAt", expiresAt.toString(),
@@ -86,6 +86,19 @@ public class SeatLockController {
         return ResponseEntity.ok(Map.of("expiresAt", expiry.toString()));
     }
 
-    // ── Request record ─────────────────────────────────────────────────
-    public record LockRequest(Integer accountId, Integer slotId, List<Integer> seatIds) {}
+    // ── Request DTOs ────────────────────────────────────────────────────
+    public static class LockRequest {
+        private Integer accountId;
+        private Integer slotId;
+        private List<Integer> seatIds;
+
+        public Integer getAccountId() { return accountId; }
+        public void setAccountId(Integer accountId) { this.accountId = accountId; }
+
+        public Integer getSlotId() { return slotId; }
+        public void setSlotId(Integer slotId) { this.slotId = slotId; }
+
+        public List<Integer> getSeatIds() { return seatIds; }
+        public void setSeatIds(List<Integer> seatIds) { this.seatIds = seatIds; }
+    }
 }

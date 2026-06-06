@@ -3,21 +3,19 @@ import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import productService from '../../services/productService';
 import promotionService from '../../services/promotionService';
+import seatLockService from '../../services/seatLockService';
 import useAuthStore from '../../store/authStore';
 
-const HOLD_MINUTES = 10; // Thời gian giữ ghế (phút)
 
 const STEPS = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
 
-// Map category enum từ backend → icon + label + màu
 const CATEGORY_META = {
-  FOOD: { icon: '🍿', label: 'Bỏng Rang', color: 'from-yellow-500/10 to-orange-500/10 border-yellow-700/30' },
-  DRINK: { icon: '🥤', label: 'Nước Uống', color: 'from-blue-500/10 to-cyan-500/10 border-blue-700/30' },
-  COMBO: { icon: '🎉', label: 'Combo Tiết Kiệm', color: 'from-primary/10 to-accent/10 border-primary/30' },
-  VOUCHER: { icon: '🎫', label: 'Khác', color: 'from-cinema-surface/10 to-cinema-card/10 border-cinema-border' },
+  FOOD:    { icon: '🍿', label: 'Bỏng Rang',       color: 'from-yellow-500/10 to-orange-500/10 border-yellow-700/30' },
+  DRINK:   { icon: '🥤', label: 'Nước Uống',        color: 'from-blue-500/10 to-cyan-500/10 border-blue-700/30' },
+  COMBO:   { icon: '🎉', label: 'Combo Tiết Kiệm',  color: 'from-primary/10 to-accent/10 border-primary/30' },
+  VOUCHER: { icon: '🎫', label: 'Khác',             color: 'from-cinema-surface/10 to-cinema-card/10 border-cinema-border' },
 };
 
-// Chuẩn hoá category string từ backend (object hoặc string)
 function parseCategory(cat) {
   if (!cat) return 'FOOD';
   if (typeof cat === 'string') return cat.toUpperCase();
@@ -35,9 +33,7 @@ function StepIndicator({ current }) {
             i + 1 < current ? 'text-primary' : 'text-cinema-muted'
           }`}>
             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${
-              i + 1 < current ? 'bg-primary border-primary text-cinema-black' :
-              i + 1 === current ? 'bg-primary border-primary text-cinema-black' :
-              'border-cinema-border'
+              i + 1 <= current ? 'bg-primary border-primary text-cinema-black' : 'border-cinema-border'
             }`}>{i + 1 < current ? '✓' : i + 1}</span>
             {step}
           </div>
@@ -64,43 +60,65 @@ function QuantityControl({ value, onChange }) {
   );
 }
 
+// Format seconds → mm:ss
+function formatCountdown(secs) {
+  if (secs <= 0) return '00:00';
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 export default function SnackSelection() {
-  const { movieId } = useParams();
-  const location    = useLocation();
-  const navigate    = useNavigate();
+  const { movieId }  = useParams();
+  const location     = useLocation();
+  const navigate     = useNavigate();
   const {
     movie, showtime, cinema, seats, totalPrice,
     showtimeId, slotId, lockExpiresAt,
   } = location.state || {};
-  
+
   const { user } = useAuthStore();
+  const accountId = user?.id || user?.userId;
 
-  // ── Khởi tạo thời gian hết hạn ──
-  // Nếu backend đã trả lockExpiresAt (ISO string) thì dùng luôn,
-  // nếu chưa (chưa restart backend) thì tạo local 10 phút từ bây giờ.
-  const expiresAtRef = useRef(
-    lockExpiresAt || new Date(Date.now() + HOLD_MINUTES * 60 * 1000).toISOString()
-  );
-  const [holdExpired, setHoldExpired] = useState(false);
+  // ── Đồng hồ đếm ngược ──────────────────────────────────────────────
+  const calcRemaining = () =>
+    lockExpiresAt ? Math.max(0, Math.round((new Date(lockExpiresAt) - Date.now()) / 1000)) : 0;
 
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [quantities, setQuantities] = useState({});
-  const [vouchers, setVouchers] = useState([]);
-  const [selectedVoucher, setSelectedVoucher] = useState(null);
+  const [remainSecs, setRemainSecs]       = useState(calcRemaining);
+  const [holdExpired, setHoldExpired]     = useState(false); // hết hạn → hiện popup
+
+  // Bộ đếm ngược mỗi giây
+  useEffect(() => {
+    if (!lockExpiresAt) return;
+    const id = setInterval(() => {
+      const rem = calcRemaining();
+      setRemainSecs(rem);
+      if (rem === 0 && !holdExpired) {
+        setHoldExpired(true);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [holdExpired, lockExpiresAt]);
+
+  // ── State chính ──
+  const [products, setProducts]           = useState([]);
+  const [loading, setLoading]             = useState(true);
+  const [quantities, setQuantities]       = useState({});
+  const [vouchers, setVouchers]           = useState([]);
+  const [selectedVoucher, setSelectedVoucher]     = useState(null);
   const [showVoucherDropdown, setShowVoucherDropdown] = useState(false);
 
-  // Fetch products và vouchers từ API
+  // ── Fetch products & vouchers ──
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [resProducts, resPromotions] = await Promise.all([
           productService.getAll({ size: 200 }),
-          promotionService.getAll({ size: 100 })
+          promotionService.getAll({ size: 100 }),
         ]);
-        
+
         let items = [];
-        if (resProducts?.content) items = resProducts.content;
+        if (resProducts?.content)            items = resProducts.content;
         else if (resProducts?.data?.content) items = resProducts.data.content;
         else if (Array.isArray(resProducts?.data)) items = resProducts.data;
         else if (Array.isArray(resProducts)) items = resProducts;
@@ -111,15 +129,13 @@ export default function SnackSelection() {
         setQuantities(initial);
 
         let promoItems = [];
-        if (resPromotions?.content) promoItems = resPromotions.content;
+        if (resPromotions?.content)            promoItems = resPromotions.content;
         else if (resPromotions?.data?.content) promoItems = resPromotions.data.content;
         else if (Array.isArray(resPromotions?.data)) promoItems = resPromotions.data;
         else if (Array.isArray(resPromotions)) promoItems = resPromotions;
 
-        // Vouchers thông thường (không yêu cầu điểm)
         const generalVouchers = promoItems.filter(v => v.status === 'ACTIVE' && (!v.requiredPoints || v.requiredPoints <= 0));
-        
-        // Vouchers người dùng đã đổi từ điểm
+
         let userOwned = [];
         try {
           const saved = localStorage.getItem(`ownedVouchers_${user?.id || user?.userId}`);
@@ -129,28 +145,21 @@ export default function SnackSelection() {
           }
         } catch (e) {}
 
-        const allAvailable = [...generalVouchers, ...userOwned];
-        
-        // Lọc bỏ các voucher đã hết hạn
         const now = new Date();
-        const validVouchersOnly = allAvailable.filter(v => {
+        const validVouchers = [...generalVouchers, ...userOwned].filter(v => {
           if (!v.endDate) return true;
-          let end = null;
+          let end;
           if (typeof v.endDate === 'string' && v.endDate.includes('-') && v.endDate.split('-')[0].length === 2) {
-             const [datePart, timePart] = v.endDate.split(' ');
-             const [dd, mm, yyyy] = datePart.split('-');
-             end = new Date(`${yyyy}-${mm}-${dd}T${timePart || '23:59:59'}`);
+            const [datePart, timePart] = v.endDate.split(' ');
+            const [dd, mm, yyyy] = datePart.split('-');
+            end = new Date(`${yyyy}-${mm}-${dd}T${timePart || '23:59:59'}`);
           } else {
-             end = new Date(v.endDate);
+            end = new Date(v.endDate);
           }
           return end > now;
         });
 
-        // Xóa trùng lặp theo ID
-        const uniqueVouchers = Array.from(new Map(validVouchersOnly.map(v => [v.id, v])).values());
-        
-        setVouchers(uniqueVouchers);
-
+        setVouchers(Array.from(new Map(validVouchers.map(v => [v.id, v])).values()));
       } catch (err) {
         console.error('[SnackSelection] fetch data error:', err.message);
         setProducts([]);
@@ -162,6 +171,7 @@ export default function SnackSelection() {
     fetchData();
   }, []);
 
+  // ── Guard ──
   if (!movie || !seats) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -173,12 +183,7 @@ export default function SnackSelection() {
     );
   }
 
-  // Khi lock hết hạn: hiển modal rồi đưa về chọn ghế
-  const handleExpired = () => {
-    setHoldExpired(true);
-    setTimeout(() => navigate(`/booking/${movieId}/seats`, { state: { movie, showtime, cinema, slotId: showtimeId || slotId } }), 3000);
-  };
-
+  // ── Tính tiền ──
   const setQty = (id, val) => setQuantities(prev => ({ ...prev, [id]: val }));
 
   const selectedSnacks = products
@@ -191,81 +196,116 @@ export default function SnackSelection() {
       name: p.productName,
     }));
 
-  const snackTotal = selectedSnacks.reduce((sum, s) => sum + s.subtotal, 0);
+  const snackTotal      = selectedSnacks.reduce((sum, s) => sum + s.subtotal, 0);
+  const subTotalAmount  = totalPrice + snackTotal;
 
-  const subTotalAmount = totalPrice + snackTotal;
-  
   let discountAmount = 0;
-  if (selectedVoucher) {
-    if (subTotalAmount >= (selectedVoucher.minOrderAmount || 0)) {
-      if (selectedVoucher.discountType === 'PERCENTAGE') {
-        discountAmount = subTotalAmount * (selectedVoucher.discountValue / 100);
-        if (selectedVoucher.maxDiscountAmount) {
-          discountAmount = Math.min(discountAmount, selectedVoucher.maxDiscountAmount);
-        }
-      } else {
-        discountAmount = selectedVoucher.discountValue;
+  if (selectedVoucher && subTotalAmount >= (selectedVoucher.minOrderAmount || 0)) {
+    if (selectedVoucher.discountType === 'PERCENTAGE') {
+      discountAmount = subTotalAmount * (selectedVoucher.discountValue / 100);
+      if (selectedVoucher.maxDiscountAmount) {
+        discountAmount = Math.min(discountAmount, selectedVoucher.maxDiscountAmount);
       }
+    } else {
+      discountAmount = selectedVoucher.discountValue;
     }
   }
   const finalTotal = Math.max(0, subTotalAmount - discountAmount);
 
-  const handleSkip = () => {
+  // ── Navigate sang Checkout ──
+  const navigateToCheckout = () => {
     navigate(`/booking/${movieId}/checkout`, {
-      state: { movie, showtime, cinema, seats, totalPrice, snacks: [], selectedVoucher, lockExpiresAt: expiresAtRef.current },
+      state: {
+        movie, showtime, cinema, seats, totalPrice,
+        snacks: selectedSnacks,
+        selectedVoucher,
+        lockExpiresAt, // Truyền nguyên thời gian 10p qua Checkout
+        showtimeId,
+        slotId
+      },
     });
   };
 
-  const handleContinue = () => {
-    navigate(`/booking/${movieId}/checkout`, {
-      state: { movie, showtime, cinema, seats, totalPrice, snacks: selectedSnacks, selectedVoucher, lockExpiresAt: expiresAtRef.current },
-    });
-  };
+  const handleSkip = () => navigateToCheckout();
 
-  // Group products theo category
   const categories = Object.keys(CATEGORY_META);
-  const grouped = categories.map(catKey => ({
-    key: catKey,
-    meta: CATEGORY_META[catKey],
-    items: products.filter(p => parseCategory(p.category) === catKey),
-  })).filter(g => g.items.length > 0);
+  const grouped = categories
+    .map(catKey => ({
+      key: catKey,
+      meta: CATEGORY_META[catKey],
+      items: products.filter(p => parseCategory(p.category) === catKey),
+    }))
+    .filter(g => g.items.length > 0);
+
+  // Màu đồng hồ: đỏ khi còn dưới 1 phút, vàng dưới 2 phút, xanh lá bình thường
+  const timerColor = remainSecs <= 60
+    ? 'text-red-400 animate-pulse'
+    : remainSecs <= 120
+      ? 'text-yellow-400'
+      : 'text-green-400';
 
   return (
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
         <StepIndicator current={4} />
 
-        {/* Modal hết hạn */}
+        {/* ── POPUP HẾT HẠN (Giai đoạn 1) ─────────────────────────── */}
         <AnimatePresence>
           {holdExpired && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4"
             >
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
+                initial={{ scale: 0.85, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 24 }}
                 className="card p-8 max-w-sm w-full text-center"
               >
-                <p className="text-5xl mb-4">⏰</p>
-                <h2 className="font-heading font-bold text-xl text-white mb-2">Hết thời gian giữ ghế!</h2>
-                <p className="text-cinema-muted text-sm mb-4">
-                  Ghế bạn đã chọn đã được giải phóng. Đang đưa bạn về trang chọn ghế...
+                <p className="text-6xl mb-4">⏰</p>
+                <h2 className="font-heading font-bold text-2xl text-white mb-3">
+                  Hết thời gian giữ ghế!
+                </h2>
+                <p className="text-cinema-muted text-sm mb-6 leading-relaxed">
+                  Rất tiếc, thời gian giữ ghế của bạn đã hết.<br />
+                  Vui lòng chọn lại ghế.
                 </p>
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                <button
+                  onClick={() =>
+                    navigate(`/booking/${movieId}/seats`, {
+                      state: { movie, showtime, cinema, slotId: showtimeId || slotId },
+                    })
+                  }
+                  className="w-full btn-primary py-3 font-bold text-base"
+                >
+                  ← Chọn lại ghế
+                </button>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
 
+        {/* ── TIÊU ĐỀ + ĐẾM NGƯỢC ──────────────────────────────────── */}
         <div className="text-center mb-8">
-          <h1 className="font-heading font-extrabold text-3xl text-white mb-2">Chọn Bỏng &amp; Nước 🍿</h1>
-          <p className="text-cinema-muted">Thêm bỏng rang và nước uống để trải nghiệm rạp chiếu thêm trọn vẹn!</p>
+          <h1 className="font-heading font-extrabold text-3xl text-white mb-2">
+            Chọn Bỏng &amp; Nước 🍿
+          </h1>
+          <p className="text-cinema-muted mb-3">
+            Thêm bỏng rang và nước uống để trải nghiệm rạp chiếu thêm trọn vẹn!
+          </p>
+
+          {/* Đồng hồ đếm ngược 3 phút */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cinema-card border border-cinema-border">
+            <span className="text-cinema-muted text-sm">⏳ Thời gian giữ ghế còn:</span>
+            <span className={`font-mono font-extrabold text-lg ${timerColor}`}>
+              {formatCountdown(remainSecs)}
+            </span>
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left – Items */}
+          {/* Left – Danh sách sản phẩm */}
           <div className="lg:col-span-2 space-y-6">
             {loading ? (
               <div className="flex items-center justify-center py-20">
@@ -292,15 +332,13 @@ export default function SnackSelection() {
                         animate={{ opacity: 1, x: 0 }}
                         className={`bg-gradient-to-r ${catMeta.color} border rounded-xl p-4 flex items-center gap-4 hover:shadow-lg transition-all`}
                       >
-                        {/* Ảnh hoặc icon */}
                         <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-cinema-dark border border-cinema-border flex items-center justify-center">
                           {item.imageUrl ? (
                             <img src={item.imageUrl} alt={item.productName} className="w-full h-full object-cover"
-                              onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+                              onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
                           ) : null}
                           <span className="text-3xl" style={{ display: item.imageUrl ? 'none' : 'flex' }}>{catMeta.icon}</span>
                         </div>
-
                         <div className="flex-1 min-w-0">
                           <p className="text-white font-semibold">{item.productName}</p>
                           {item.description && (
@@ -322,10 +360,9 @@ export default function SnackSelection() {
             ))}
           </div>
 
-          {/* Right – Summary */}
+          {/* Right – Tóm tắt đơn */}
           <div className="lg:col-span-1">
             <div className="card p-5 sticky top-24 space-y-4">
-
               <h3 className="font-heading font-bold text-white">Tóm tắt đơn</h3>
 
               {/* Movie info */}
@@ -339,11 +376,13 @@ export default function SnackSelection() {
                 <div>
                   <p className="text-white font-semibold text-sm leading-snug">{movie.title}</p>
                   {showtime && <p className="text-cinema-muted text-xs mt-1">{showtime.time} · {showtime.type}</p>}
-                  <p className="text-cinema-muted text-xs">Ghế: {seats.join(', ')}</p>
+                  <p className="text-cinema-muted text-xs">
+                    Ghế: {seats.map(s => s.label || `${s.seatRow}${s.seatNumber}`).join(', ')}
+                  </p>
                 </div>
               </div>
 
-              {/* Snack list */}
+              {/* Price breakdown */}
               <div className="space-y-2 text-sm mb-4">
                 <div className="flex justify-between">
                   <span className="text-cinema-muted">Tiền vé ({seats.length} ghế)</span>
@@ -369,20 +408,18 @@ export default function SnackSelection() {
                 </div>
               )}
 
-              {/* Voucher Selection */}
+              {/* Voucher */}
               <div className="border-t border-cinema-border pt-4 mb-4">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-white font-semibold text-sm">🎟 Khuyến mãi</span>
                   {selectedVoucher && (
-                    <button 
+                    <button
                       onClick={() => setSelectedVoucher(null)}
                       className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                    >
-                      Bỏ chọn
-                    </button>
+                    >Bỏ chọn</button>
                   )}
                 </div>
-                
+
                 {vouchers.length === 0 ? (
                   <p className="text-cinema-muted text-xs">Không có khuyến mãi khả dụng</p>
                 ) : (
@@ -391,12 +428,11 @@ export default function SnackSelection() {
                       onClick={() => setShowVoucherDropdown(!showVoucherDropdown)}
                       className="w-full flex items-center justify-between p-3 rounded-xl border border-cinema-border bg-cinema-dark hover:border-primary/50 transition-all text-sm"
                     >
-                      <span className={selectedVoucher ? "text-primary font-bold" : "text-cinema-muted"}>
-                        {selectedVoucher ? selectedVoucher.promotionName : "Chọn khuyến mãi..."}
+                      <span className={selectedVoucher ? 'text-primary font-bold' : 'text-cinema-muted'}>
+                        {selectedVoucher ? selectedVoucher.promotionName : 'Chọn khuyến mãi...'}
                       </span>
                       <span className="text-xs">▼</span>
                     </button>
-
                     <AnimatePresence>
                       {showVoucherDropdown && (
                         <motion.div
@@ -411,10 +447,7 @@ export default function SnackSelection() {
                               <button
                                 key={v.id}
                                 disabled={!isEligible}
-                                onClick={() => {
-                                  setSelectedVoucher(v);
-                                  setShowVoucherDropdown(false);
-                                }}
+                                onClick={() => { setSelectedVoucher(v); setShowVoucherDropdown(false); }}
                                 className={`w-full text-left p-3 border-b border-cinema-border last:border-0 transition-colors ${
                                   !isEligible ? 'opacity-50 cursor-not-allowed bg-cinema-surface/30' : 'hover:bg-cinema-surface'
                                 }`}
@@ -428,7 +461,7 @@ export default function SnackSelection() {
                                   </span>
                                 </div>
                                 <p className="text-xs text-cinema-muted">
-                                  {v.minOrderAmount ? `Đơn tối thiểu ${(v.minOrderAmount).toLocaleString('vi-VN')}đ` : 'Áp dụng mọi đơn'}
+                                  {v.minOrderAmount ? `Đơn tối thiểu ${v.minOrderAmount.toLocaleString('vi-VN')}đ` : 'Áp dụng mọi đơn'}
                                 </p>
                               </button>
                             );
@@ -440,7 +473,7 @@ export default function SnackSelection() {
                 )}
               </div>
 
-              {/* Total Calculation */}
+              {/* Total */}
               <div className="space-y-2 border-t border-cinema-border pt-4 mb-5">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-cinema-muted">Tổng cộng</span>
@@ -460,10 +493,19 @@ export default function SnackSelection() {
                 </div>
               </div>
 
-              <button onClick={handleContinue} className="w-full btn-primary py-3 text-sm font-bold mb-2">
-                {selectedSnacks.length > 0 ? `Tiếp tục với bỏng nước →` : 'Tiếp tục →'}
+              {/* Buttons — disable khi đã hết giờ */}
+              <button
+                onClick={navigateToCheckout}
+                disabled={holdExpired}
+                className="w-full btn-primary py-3 text-sm font-bold mb-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {selectedSnacks.length > 0 ? 'Tiếp tục với bỏng nước →' : 'Tiếp tục →'}
               </button>
-              <button onClick={handleSkip} className="w-full py-2.5 rounded-xl border border-cinema-border text-cinema-muted hover:text-white hover:border-cinema-muted transition-all text-sm">
+              <button
+                onClick={handleSkip}
+                disabled={holdExpired}
+                className="w-full py-2.5 rounded-xl border border-cinema-border text-cinema-muted hover:text-white hover:border-cinema-muted transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Bỏ qua, không mua
               </button>
             </div>

@@ -6,6 +6,7 @@ import useAuthStore from '../../store/authStore';
 import { sendBookingConfirmEmail } from '../../services/emailService';
 import ticketService from '../../services/ticketService';
 import payosService from '../../services/payosService';
+import seatLockService from '../../services/seatLockService';
 
 function StepIndicator({ current }) {
   const steps = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
@@ -107,7 +108,10 @@ export default function Checkout() {
   const { movieId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { movie, showtime, cinema, seats, totalPrice, snacks = [], selectedVoucher } = location.state || {};
+  const { 
+    movie, showtime, cinema, seats, totalPrice, snacks = [], selectedVoucher,
+    lockExpiresAt, showtimeId, slotId 
+  } = location.state || {};
 
   const { user } = useAuthStore();
 
@@ -123,7 +127,38 @@ export default function Checkout() {
   const [success, setSuccess] = useState(false);
   const [booking, setBooking] = useState(null);
   const [payosData, setPayosData] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(0);
+
+  // ── Đồng hồ giữ ghế (tiếp nối từ SeatSelection / SnackSelection) ──
+  const seatExpiresAt = lockExpiresAt ? new Date(lockExpiresAt) : null;
+  const calcSeatRemain = () =>
+    seatExpiresAt ? Math.max(0, Math.round((seatExpiresAt - Date.now()) / 1000)) : 0;
+  const [seatRemain, setSeatRemain] = useState(calcSeatRemain);
+  const [seatExpired, setSeatExpired] = useState(false);
+
+  useEffect(() => {
+    if (!seatExpiresAt) return;
+    const id = setInterval(() => {
+      const r = calcSeatRemain();
+      setSeatRemain(r);
+      if (r === 0) {
+        setSeatExpired(true);
+        clearInterval(id);
+        // Hủy giao dịch nếu đang mở QR và nhả ghế
+        const uid = user?.id || user?.userId;
+        const sid = showtimeId || slotId;
+        if (uid && sid) {
+          seatLockService.releaseSeats(uid, sid).catch(() => {});
+        }
+        setPayosData(prev => {
+          if (prev?.ticketId) {
+            ticketService.update(prev.ticketId, { status: 'CANCELLED', paymentStatus: 'UNPAID' }).catch(() => {});
+          }
+          return null;
+        });
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [lockExpiresAt]);
 
   const snackTotal = (snacks || []).reduce((sum, s) => sum + (s.subtotal || 0), 0);
   const subTotalAmount = (totalPrice || 0) + snackTotal;
@@ -144,26 +179,6 @@ export default function Checkout() {
 
   const serviceFee = Math.round(subTotalAmount * 0.05);
   const grandTotal = Math.max(0, subTotalAmount - discountAmount) + serviceFee;
-
-  // 1. Countdown timer
-  useEffect(() => {
-    let timer;
-    if (payosData && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft(prev => prev - 1);
-      }, 1000);
-    } else if (timeLeft <= 0 && payosData) {
-      if (payosData?.ticketId) {
-        ticketService.update(payosData.ticketId, { status: 'CANCELLED', paymentStatus: 'UNPAID' }).catch(err => console.error(err));
-      }
-      setPayosData(null);
-      alert('Đã hết thời gian thanh toán (10 phút). Giao dịch đã bị huỷ!');
-      navigate('/');
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [payosData, timeLeft, navigate]);
 
   // 2. Polling kiểm tra trạng thái vé mỗi 3s
   useEffect(() => {
@@ -273,9 +288,8 @@ export default function Checkout() {
         const payosResponse = await payosService.createPaymentLink(createdTicket.id);
         
         if (payosResponse && payosResponse.qrCode) {
-          // Hiện màn hình QR và bắt đầu đếm ngược 10p (600 giây)
+          // Hiện màn hình QR — đồng hồ đếm ngược là seatRemain tiếp tục chạy, KHÔNG reset
           setPayosData({ ...payosResponse, ticketId: createdTicket.id });
-          setTimeLeft(600);
         } else {
           throw new Error('Không tạo được mã QR thanh toán PayOS!');
         }
@@ -320,8 +334,8 @@ export default function Checkout() {
   };
 
   if (payosData) {
-    const minutes = Math.floor(timeLeft / 60);
-    const seconds = timeLeft % 60;
+    const minutes = Math.floor(seatRemain / 60);
+    const seconds = seatRemain % 60;
 
     return (
       <div className="min-h-screen py-12 flex items-center justify-center relative">
@@ -359,16 +373,20 @@ export default function Checkout() {
           </div>
 
           <div className="flex flex-col items-center justify-center gap-2 mb-6">
-            <p className="text-cinema-muted text-sm">Thời gian còn lại:</p>
-            <div className={`text-4xl font-mono font-bold ${timeLeft <= 60 ? 'text-red-500 animate-pulse' : 'text-primary'}`}>
-              {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
+            <p className="text-cinema-muted text-sm">Thời gian thanh toán còn lại:</p>
+            <div className={`text-4xl font-mono font-bold ${seatExpired || seatRemain <= 60 ? 'text-red-500 animate-pulse' : 'text-primary'}`}>
+              {seatExpired ? '00:00' : `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`}
             </div>
-            <div className="flex items-center gap-2 mt-2">
-              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-xs text-cinema-muted">
-                Hệ thống đang chờ bạn thanh toán...
-              </p>
-            </div>
+            {seatExpired ? (
+              <p className="text-red-400 text-sm font-semibold mt-2">⚠️ Hết thời gian! Giao dịch đã bị huỷ.</p>
+            ) : (
+              <div className="flex items-center gap-2 mt-2">
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-xs text-cinema-muted">
+                  Hệ thống đang chờ bạn thanh toán...
+                </p>
+              </div>
+            )}
           </div>
           
           <button 
@@ -379,6 +397,11 @@ export default function Checkout() {
                 } catch (err) {
                   console.error('Lỗi khi hủy vé:', err);
                 }
+              }
+              const uid = user?.id || user?.userId;
+              const sid = showtimeId || slotId;
+              if (uid && sid) {
+                seatLockService.releaseSeats(uid, sid).catch(() => {});
               }
               setPayosData(null); 
               navigate('/'); 
@@ -396,6 +419,41 @@ export default function Checkout() {
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
         <StepIndicator current={5} />
+
+        {/* ── Banner đếm ngược giữ ghế ── */}
+        {seatExpiresAt && (
+          <div className={`flex items-center justify-between gap-4 mb-6 px-5 py-3 rounded-xl border ${
+            seatExpired ? 'bg-red-500/10 border-red-500/40' : seatRemain <= 60 ? 'bg-red-500/10 border-red-500/40' : seatRemain <= 120 ? 'bg-yellow-500/10 border-yellow-500/40' : 'bg-green-500/10 border-green-500/40'
+          }`}>
+            <div className="flex items-center gap-3">
+              <span className="text-xl">⏳</span>
+              <div>
+                <p className="text-white text-sm font-semibold">
+                  {seatExpired ? 'Ghế đã hết hạn!' : 'Vui lòng thanh toán trong vòng'}
+                </p>
+                {!seatExpired && (
+                  <p className="text-cinema-muted text-xs">Ghế sẽ được giải phóng khi hết thời gian</p>
+                )}
+              </div>
+            </div>
+            {!seatExpired ? (
+              <span className={`font-mono font-extrabold text-2xl ${
+                seatRemain <= 60 ? 'text-red-400 animate-pulse' : seatRemain <= 120 ? 'text-yellow-400' : 'text-green-400'
+              }`}>
+                {String(Math.floor(seatRemain / 60)).padStart(2, '0')}:{String(seatRemain % 60).padStart(2, '0')}
+              </span>
+            ) : (
+              <button
+                onClick={() => navigate(`/booking/${movieId}/seats`, {
+                  state: { movie, showtime, cinema, slotId: showtimeId || slotId },
+                })}
+                className="btn-primary text-sm px-4 py-1.5"
+              >
+                Chọn lại ghế
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="grid md:grid-cols-5 gap-6">
           {/* Left: Form */}
