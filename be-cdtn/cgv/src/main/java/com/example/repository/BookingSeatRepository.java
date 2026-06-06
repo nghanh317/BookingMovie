@@ -25,8 +25,7 @@ public interface BookingSeatRepository
 	@Query("SELECT bs FROM BookingSeats bs " +
 	       "WHERE bs.tickets.slots.id = :slotId " +
 	       "AND bs.isDeleted = false " +
-	       "AND (bs.tickets.status = com.example.entity.Tickets.Status.CONFIRMED " +
-	       "OR (bs.tickets.status = com.example.entity.Tickets.Status.PENDING AND bs.tickets.ticketsDate > :tenMinsAgo))")
+	       "AND bs.tickets.status = com.example.entity.Tickets.Status.CONFIRMED")
 	List<BookingSeats> findUnavailableBySlotId(@Param("slotId") Integer slotId, @Param("tenMinsAgo") java.util.Date tenMinsAgo);
 }
 
