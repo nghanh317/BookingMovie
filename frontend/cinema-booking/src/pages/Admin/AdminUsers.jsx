@@ -183,6 +183,20 @@ export default function AdminUsers() {
   const [filterLevel, setFilterLevel] = useState('all');
   const [editingUser, setEditingUser] = useState(null);
 
+  const normalizeUser = (u) => ({
+    ...u,
+    name: u.name || u.fullName || u.userName || '',
+    userName: u.userName || '',
+    fullName: u.fullName || '',
+    joinDate: u.joinDate || u.createDate || '',
+    bookings: u.bookings ?? (u.tickets?.filter(t => t.paymentStatus === 'PAID')?.length ?? 0),
+    spent: u.spent || 0,
+    level: u.level || 'Bronze',
+    points: u.points || 0,
+    status: u.status || 'active',
+    role: u.role || 'USER',
+  });
+
   // ── Fetch tài khoản từ API ─────────────────────────────
   useEffect(() => {
     setLoading(true);
@@ -190,21 +204,7 @@ export default function AdminUsers() {
       .then((data) => {
         // Nếu data từ backend không rỗng thì dùng, ngược lại fallback
         if (Array.isArray(data) && data.length > 0) {
-          // Normalize: backend có thể dùng fullName thay vì name
-          const normalized = data.map(u => ({
-            ...u,
-            name: u.name || u.fullName || u.userName || '',
-            userName: u.userName || '',
-            fullName: u.fullName || '',
-            joinDate: u.joinDate || u.createDate || '',
-            bookings: u.bookings || (u.tickets?.length ?? 0),
-            spent: u.spent || 0,
-            level: u.level || 'Bronze',
-            points: u.points || 0,
-            status: u.status || 'active',
-            role: u.role || 'USER',
-          }));
-          setUsers(normalized);
+          setUsers(data.map(normalizeUser));
         } else {
           setUsers(MOCK_USERS);
         }
@@ -234,20 +234,7 @@ export default function AdminUsers() {
       // Đồng bộ lại danh sách tài khoản từ backend
       const freshData = await accountService.getAll();
       if (Array.isArray(freshData) && freshData.length > 0) {
-        const normalized = freshData.map(u => ({
-          ...u,
-          name: u.name || u.fullName || u.userName || '',
-          userName: u.userName || '',
-          fullName: u.fullName || '',
-          joinDate: u.joinDate || u.createDate || '',
-          bookings: u.bookings || (u.tickets?.length ?? 0),
-          spent: u.spent || 0,
-          level: u.level || 'Bronze',
-          points: u.points || 0,
-          status: u.status || 'active',
-          role: u.role || 'USER',
-        }));
-        setUsers(normalized);
+        setUsers(freshData.map(normalizeUser));
       } else {
         // Fallback local update if backend returns empty
         setUsers(prev => prev.map(u => u.id === id ? {
@@ -287,20 +274,7 @@ export default function AdminUsers() {
       // Đồng bộ lại danh sách tài khoản từ backend
       const freshData = await accountService.getAll();
       if (Array.isArray(freshData) && freshData.length > 0) {
-        const normalized = freshData.map(u => ({
-          ...u,
-          name: u.name || u.fullName || u.userName || '',
-          userName: u.userName || '',
-          fullName: u.fullName || '',
-          joinDate: u.joinDate || u.createDate || '',
-          bookings: u.bookings || (u.tickets?.length ?? 0),
-          spent: u.spent || 0,
-          level: u.level || 'Bronze',
-          points: u.points || 0,
-          status: u.status || 'active',
-          role: u.role || 'USER',
-        }));
-        setUsers(normalized);
+        setUsers(freshData.map(normalizeUser));
       } else {
         setUsers(prev => prev.filter(u => u.id !== id));
       }
