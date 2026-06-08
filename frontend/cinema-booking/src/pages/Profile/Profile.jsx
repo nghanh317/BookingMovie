@@ -218,8 +218,8 @@ export default function Profile() {
           phone: data.phone || '',
           joinDate: parsedJoinDate,
           points: data.points || 0, // Dùng điểm tính toán sẵn từ backend
-          totalBookings: 0,
-          totalSpent: 0,
+          totalBookings: data.bookings || 0, // Dùng số liệu chuẩn từ backend thay vì tự đếm
+          totalSpent: data.spent || 0,
         };
         setUserData(info);
         setFormData(info);
@@ -323,10 +323,6 @@ export default function Profile() {
         normalized.sort((a, b) => b.ticketId - a.ticketId);
         
         setBookings(normalized);
-        // Cập nhật stats
-        const paid = normalized.filter(t => t.rawPaymentStatus === 'PAID');
-        const totalSpent = paid.reduce((sum, t) => sum + t.total, 0);
-        setUserData(prev => prev ? { ...prev, totalBookings: paid.length, totalSpent } : prev);
       })
       .catch(err => console.error('[Profile] fetch tickets error:', err.message))
       .finally(() => setBookingsLoading(false));
