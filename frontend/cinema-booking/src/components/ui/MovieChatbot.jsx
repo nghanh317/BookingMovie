@@ -153,12 +153,20 @@ export default function MovieChatbot() {
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    // Format the current chat history for the backend
+    const chatHistory = messages
+      .filter((m) => m.text)
+      .map((m) => ({
+        role: m.type === 'bot' ? 'model' : 'user',
+        text: m.text,
+      }));
+
     addUserMessage(trimmed);
     setInput('');
     setIsTyping(true);
 
     try {
-      const response = await chatbotService.chat(trimmed);
+      const response = await chatbotService.chat(trimmed, chatHistory);
       setIsTyping(false);
       addBotMessage({ text: response });
     } catch (error) {

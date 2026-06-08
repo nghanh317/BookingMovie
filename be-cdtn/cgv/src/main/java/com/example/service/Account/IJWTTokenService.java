@@ -20,4 +20,10 @@ public interface IJWTTokenService {
 
     /** Parse access token từ request → trả về Authentication */
     Authentication parseAccessToken(HttpServletRequest request);
+
+    /** Tạo token reset password (15 phút) */
+    String generateResetPasswordToken(String email, String passwordHash);
+
+    /** Lấy Claims từ token */
+    io.jsonwebtoken.Claims getClaimsFromToken(String token);
 }

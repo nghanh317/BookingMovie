@@ -4,6 +4,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetailsService;
 
 import com.example.dto.AccountDTO;
+import com.example.entity.Accounts;
 import com.example.form.Account.AccountFilterForm;
 import com.example.form.Account.CreateAccountForm;
 import com.example.form.Account.UpdateAccountForm;
@@ -11,6 +12,10 @@ import com.example.form.Account.UpdateAccountForm;
 public interface IAccountService extends UserDetailsService {
 	
 	public AccountDTO getAccountByUserName(String usernName);
+	
+	public Accounts getAccountByEmail(String email);
+	
+	public void updatePasswordHash(Integer id, String newPasswordHash);
 	
 	Page<AccountDTO> getAllAccount (Pageable pageable , AccountFilterForm accountForm);
 	

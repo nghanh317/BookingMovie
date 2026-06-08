@@ -15,8 +15,8 @@ const chatbotService = {
    * @param {string} prompt - Câu hỏi/tin nhắn của người dùng
    * @returns {Promise<string>} Phản hồi từ AI
    */
-  chat: async (prompt) => {
-    const res = await api.post('/v1/ai/chat', { prompt });
+  chat: async (prompt, history = []) => {
+    const res = await api.post('/v1/ai/chat', { prompt, history });
     const data = res.data?.data || res.data;
     return data.response || data;
   },

@@ -22,9 +22,13 @@ import com.example.dto.AccountDTO;
 import com.example.dto.LoginResponse;
 import com.example.form.Account.AccountForm;
 import com.example.form.Account.CreateAccountForm;
+import com.example.form.Account.ForgotPasswordForm;
+import com.example.form.Account.ResetPasswordForm;
 import com.example.form.Account.RefreshTokenForm;
 import com.example.service.Account.IAccountService;
+import com.example.service.Account.IAuthService;
 import com.example.service.Account.IJWTTokenService;
+import com.example.service.Mail.EmailService;
 
 import jakarta.validation.Valid;
 
@@ -45,7 +49,13 @@ public class AuthController {
     private IAccountService accountService;
 
     @Autowired
+    private IAuthService authService;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private EmailService emailService;
 
     // ── POST /api/v1/auth/login ──────────────────────────────
     @PostMapping("/login")
@@ -121,6 +131,7 @@ public class AuthController {
     public void register(@RequestBody @Valid CreateAccountForm form) {
         form.setPasswordHash(passwordEncoder.encode(form.getPasswordHash()));
         accountService.createAccount(form);
+        emailService.sendWelcomeEmail(form.getEmail(), form.getFullName());
     }
     // ── POST /api/v1/auth/logout ─────────────────────────────
     @PostMapping("/logout")
@@ -138,5 +149,29 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cleanCookie.toString())
                 .body(Map.of("message", "Đăng xuất thành công"));
+    }
+    // ── POST /api/v1/auth/forgot-password ────────────────────
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody @Valid ForgotPasswordForm form) {
+        try {
+            String token = authService.processForgotPassword(form.getEmail());
+            return ResponseEntity.ok(Map.of(
+                "message", "Vui lòng kiểm tra email để đặt lại mật khẩu.",
+                "token", token
+            ));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    // ── POST /api/v1/auth/reset-password ─────────────────────
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody @Valid ResetPasswordForm form) {
+        try {
+            authService.processResetPassword(form.getToken(), form.getNewPassword());
+            return ResponseEntity.ok(Map.of("message", "Đặt lại mật khẩu thành công."));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 }

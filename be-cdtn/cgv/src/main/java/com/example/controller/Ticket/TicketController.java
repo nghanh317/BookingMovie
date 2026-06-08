@@ -16,6 +16,8 @@ import com.example.dto.TicketDTO;
 import com.example.form.Tickets.CreateTicketForm;
 import com.example.form.Tickets.TicketFilterForm;
 import com.example.form.Tickets.UpdateTicketForm;
+import com.example.form.Tickets.BookingConfirmEmailForm;
+import com.example.service.Mail.EmailService;
 import com.example.service.Tickets.ITicketService;
 
 @RestController
@@ -24,6 +26,9 @@ public class TicketController {
 	
 	@Autowired
 	private ITicketService ticketService;
+
+	@Autowired
+	private EmailService emailService;
 	
 	@GetMapping
 	public Page<TicketDTO> getAllTicket (Pageable pageable,TicketFilterForm filterForm){
@@ -47,5 +52,11 @@ public class TicketController {
 	@DeleteMapping ("/{id}")
 	public void deleteTicket (@PathVariable Integer id) {
 		ticketService.deleteTicket(id);
+	}
+
+	@PostMapping("/send-confirm-email")
+	public org.springframework.http.ResponseEntity<?> sendConfirmEmail(@RequestBody BookingConfirmEmailForm form) {
+		emailService.sendBookingConfirmEmail(form);
+		return org.springframework.http.ResponseEntity.ok(java.util.Map.of("message", "Đã gửi email xác nhận"));
 	}
 }

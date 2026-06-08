@@ -57,6 +57,18 @@ public class JWTTokenService implements IJWTTokenService {
                 .compact();
     }
 
+    @Override
+    public String generateResetPasswordToken(String email, String passwordHash) {
+        return Jwts.builder()
+                .setSubject(email)
+                .claim("purpose", "password_reset")
+                .claim("user_password_hash", passwordHash)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + ACCESS_EXPIRATION))
+                .signWith(SignatureAlgorithm.HS512, SECRET)
+                .compact();
+    }
+
     // ── Lấy username từ token ────────────────────────────────
     @Override
     public String getUsernameFromToken(String token) {
@@ -117,5 +129,14 @@ public class JWTTokenService implements IJWTTokenService {
                 .setSigningKey(SECRET)
                 .parseClaimsJws(token)
                 .getBody();
+    }
+
+    @Override
+    public Claims getClaimsFromToken(String token) {
+        try {
+            return getClaims(token);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

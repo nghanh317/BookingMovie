@@ -1,6 +1,9 @@
 package com.example.service.ChatBotAI;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,7 +45,7 @@ public class AIService {
 		this.client = Client.builder().apiKey(apiKey).build();
 	}
 
-	public String askGemini(String prompt) {
+	public String askGemini(String prompt, List<Map<String, String>> history) {
 		try {
 			StringBuilder contextBuilder = new StringBuilder();
 			contextBuilder
@@ -81,7 +84,10 @@ public class AIService {
 
 			String systemInstructionText = "Bạn là trợ lý ảo thông minh của rạp chiếu phim CGV. "
 					+ "Nhiệm vụ của bạn là hỗ trợ khách hàng tìm kiếm phim, lịch chiếu, giá vé và giải đáp các thắc mắc về dịch vụ của CGV. "
-					+ "Hãy trả lời một cách thân thiện, chuyên nghiệp và ngắn gọn.\n\n" + contextBuilder.toString();
+					+ "Hãy trả lời một cách thân thiện, chuyên nghiệp và ngắn gọn. Bạn chỉ được trả lời dựa trên thông tin có trong database. "
+					+ "Nếu khách hàng hỏi những câu không liên quan đến rạp phim hoặc nằm ngoài database, hãy phản hồi lịch sự: "
+					+ "'Dạ, hiện tại em chỉ có thể hỗ trợ các thông tin liên quan đến phim ảnh và dịch vụ của rạp chiếu phim CGV thôi ạ. Bạn có cần em hỗ trợ gì thêm về lịch chiếu hay giá vé không?'.\n\n" 
+					+ contextBuilder.toString();
 
 			// Define system instruction
 			Content systemInstruction = Content.fromParts(Part.fromText(systemInstructionText));
@@ -89,9 +95,28 @@ public class AIService {
 			// Configure the request
 			GenerateContentConfig config = GenerateContentConfig.builder().systemInstruction(systemInstruction).build();
 
+			// Prepare conversation history
+			List<Content> contents = new ArrayList<>();
+			if (history != null) {
+				for (Map<String, String> msg : history) {
+					String role = msg.get("role");
+					String text = msg.get("text");
+					if (text != null && !text.isEmpty() && role != null) {
+						contents.add(Content.builder()
+								.role(role)
+								.parts(Collections.singletonList(Part.fromText(text)))
+								.build());
+					}
+				}
+			}
+			// Add the current prompt
+			contents.add(Content.builder()
+					.role("user")
+					.parts(Collections.singletonList(Part.fromText(prompt)))
+					.build());
+
 			// Using gemini-1.5-flash for fast responses
-			GenerateContentResponse response = client.models.generateContent("gemini-robotics-er-1.6-preview", prompt,
-					config);
+			GenerateContentResponse response = client.models.generateContent("gemini-robotics-er-1.6-preview", contents, config);
 			return response.text();
 		} catch (Exception e) {
 			e.printStackTrace();

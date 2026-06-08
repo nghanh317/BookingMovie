@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { sendWelcomeEmail } from '../../services/emailService';
 import { registerApi } from '../../api/authApi';
 
 // ✅ Khai báo NGOÀI component để tránh bị tạo lại mỗi lần render (gây mất focus)
@@ -54,14 +53,6 @@ export default function Register() {
 
     try {
       await registerApi(form.userName, form.password, form.email, form.phone, form.fullName);
-      
-      // Gửi email chào mừng (không block UI nếu lỗi)
-      try {
-        await sendWelcomeEmail(form.fullName, form.email);
-      } catch (err) {
-        console.warn('Không thể gửi email chào mừng:', err);
-      }
-      
       setLoading(false);
       navigate('/login');
     } catch (error) {

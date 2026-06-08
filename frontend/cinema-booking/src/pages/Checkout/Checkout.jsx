@@ -3,7 +3,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAuthStore from '../../store/authStore';
-import { sendBookingConfirmEmail } from '../../services/emailService';
+import api from '../../services/api';
 import ticketService from '../../services/ticketService';
 import payosService from '../../services/payosService';
 import seatLockService from '../../services/seatLockService';
@@ -207,7 +207,7 @@ export default function Checkout() {
 
             // Gửi email xác nhận đặt vé (sau khi PayOS xác nhận)
             try {
-              await sendBookingConfirmEmail({
+              await api.post('/v1/tickets/send-confirm-email', {
                 to_name:      form.name,
                 to_email:     form.email,
                 booking_code: ticket.ticketsCode,
@@ -309,7 +309,7 @@ export default function Checkout() {
 
         // Gửi email xác nhận đặt vé
         try {
-          await sendBookingConfirmEmail({
+          await api.post('/v1/tickets/send-confirm-email', {
             to_name:      form.name,
             to_email:     form.email,
             booking_code: bookingCode,

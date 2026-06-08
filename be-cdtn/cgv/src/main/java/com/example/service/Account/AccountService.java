@@ -35,6 +35,7 @@ public class AccountService implements IAccountService{
 	
 	@Autowired
 	private ModelMapper modelMapper;
+
 	@Override
 	public UserDetails loadUserByUsername(String userName) throws UsernameNotFoundException {
 
@@ -106,6 +107,18 @@ public class AccountService implements IAccountService{
 		AccountDTO dto = modelMapper.map(account, AccountDTO.class);
 		calculateAccountMetrics(account, dto);
 		return dto;
+	}
+
+	@Override
+	public Accounts getAccountByEmail(String email) {
+		return accountRepository.findByEmail(email);
+	}
+
+	@Override
+	public void updatePasswordHash(Integer id, String newPasswordHash) {
+		Accounts account = accountRepository.findById(id).get();
+		account.setPasswordHash(newPasswordHash);
+		accountRepository.save(account);
 	}
 	
 	@Override

@@ -19,6 +19,7 @@ import Checkout from './pages/Checkout/Checkout';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
 import ForgotPassword from './pages/Auth/ForgotPassword';
+import ResetPassword from './pages/Auth/ResetPassword';
 import Profile from './pages/Profile/Profile';
 import Offers from './pages/Offers/Offers';
 import CinemaDetail from './pages/Cinema/CinemaDetail';
@@ -77,6 +78,7 @@ function App() {
         <Route path="/login" element={<Layout><Login /></Layout>} />
         <Route path="/register" element={<Layout><Register /></Layout>} />
         <Route path="/forgot-password" element={<Layout><ForgotPassword /></Layout>} />
+        <Route path="/reset-password" element={<Layout><ResetPassword /></Layout>} />
         <Route path="/faq" element={<Layout><FAQ /></Layout>} />
         <Route path="/refund-policy" element={<Layout><RefundPolicy /></Layout>} />
         <Route path="/terms" element={<Layout><Terms /></Layout>} />
