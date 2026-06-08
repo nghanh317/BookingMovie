@@ -98,17 +98,17 @@ CREATE TABLE `chat_messages` (
   `sender_role` enum('user','bot','agent') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `metadata` json DEFAULT NULL COMMENT 'Lưu trữ payload JSON mở rộng cho giao diện Chat',
-  `related_movie_id` int unsigned DEFAULT NULL COMMENT 'ID phim nếu nội dung chat đang tư vấn về 1 bộ phim cụ thể',
-  `related_tickets_id` int unsigned DEFAULT NULL COMMENT 'ID vé nếu user đang hỏi/khiếu nại về 1 mã vé cụ thể',
+  `movie_id` int unsigned DEFAULT NULL COMMENT 'ID phim nếu nội dung chat đang tư vấn về 1 bộ phim cụ thể',
+  `tickets_id` int unsigned DEFAULT NULL COMMENT 'ID vé nếu user đang hỏi/khiếu nại về 1 mã vé cụ thể',
   `create_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT '0',
   PRIMARY KEY (`id`),
   KEY `idx_chat_messages_session_id` (`session_id`),
-  KEY `idx_chat_messages_movie` (`related_movie_id`),
-  KEY `idx_chat_messages_tickets` (`related_tickets_id`),
+  KEY `idx_chat_messages_movie` (`movie_id`),
+  KEY `idx_chat_messages_tickets` (`tickets_id`),
   CONSTRAINT `chat_messages_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `chat_sessions` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `chat_messages_ibfk_2` FOREIGN KEY (`related_movie_id`) REFERENCES `movies` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `chat_messages_ibfk_3` FOREIGN KEY (`related_tickets_id`) REFERENCES `tickets` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT `chat_messages_ibfk_2` FOREIGN KEY (`movie_id`) REFERENCES `movies` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `chat_messages_ibfk_3` FOREIGN KEY (`tickets_id`) REFERENCES `tickets` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

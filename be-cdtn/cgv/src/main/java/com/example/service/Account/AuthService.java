@@ -70,8 +70,24 @@ public class AuthService implements IAuthService {
             throw new IllegalStateException("Link này đã được sử dụng.");
         }
 
-        String encodedPassword = passwordEncoder.encode(newPassword);
-        account.setPasswordHash(encodedPassword);
+        account.setPasswordHash(passwordEncoder.encode(newPassword));
+        accountRepository.save(account);
+    }
+
+    @Override
+    public void changePassword(String userName, String oldPassword, String newPassword) {
+        Accounts account = accountRepository.findByUserName(userName);
+        if (account == null) {
+            throw new IllegalStateException("Người dùng không tồn tại.");
+        }
+        
+        // So sánh mật khẩu cũ
+        if (!passwordEncoder.matches(oldPassword, account.getPasswordHash())) {
+            throw new IllegalStateException("Mật khẩu cũ không chính xác.");
+        }
+        
+        // Mã hóa và cập nhật mật khẩu mới
+        account.setPasswordHash(passwordEncoder.encode(newPassword));
         accountRepository.save(account);
     }
 }

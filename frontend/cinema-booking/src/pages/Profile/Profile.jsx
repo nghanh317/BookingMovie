@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAuthStore from '../../store/authStore';
 import useFavoriteStore from '../../store/favoriteStore';
@@ -132,16 +132,23 @@ const TABS = [
 ];
 
 export default function Profile() {
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const { favorites } = useFavoriteStore();
   const { addNotification } = useNotificationStore();
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const tabParam = searchParams.get('tab');
 
   const [activeTab, setActiveTab] = useState(tabParam || 'overview');
   const [filterStatus, setFilterStatus] = useState('all');
   const [editMode, setEditMode] = useState(false);
+  
+  const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   // Real data state
   const [userData, setUserData] = useState(null);
@@ -238,7 +245,7 @@ export default function Profile() {
   useEffect(() => {
     const userId = user?.id || user?.userId;
     if (!userId) { setBookingsLoading(false); return; }
-    ticketService.getAll({ accountId: userId, size: 200 })
+    ticketService.getAll({ accountId: userId, size: 50 })
       .then(res => {
         const list = Array.isArray(res?.content) ? res.content
           : Array.isArray(res?.data?.content) ? res.data.content
@@ -486,6 +493,44 @@ export default function Profile() {
     }
     setUserData({ ...formData });
     setEditMode(false);
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('Xác nhận mật khẩu mới không khớp.');
+      return;
+    }
+
+    if (passwordForm.oldPassword === passwordForm.newPassword) {
+      setPasswordError('Mật khẩu mới không được trùng với mật khẩu cũ.');
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      await api.post('/v1/auth/change-password', {
+        oldPassword: passwordForm.oldPassword,
+        newPassword: passwordForm.newPassword,
+        confirmPassword: passwordForm.confirmPassword
+      });
+      setPasswordSuccess(true);
+      
+      // Logout and redirect after a short delay
+      setTimeout(() => {
+        setPasswordSuccess(false);
+        setIsChangingPassword(false);
+        logout();
+        navigate('/login');
+      }, 2500);
+      
+    } catch (err) {
+      setPasswordError(err.response?.data?.message || 'Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu cũ.');
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   const handleOpenReview = (booking) => {
@@ -1020,9 +1065,14 @@ export default function Profile() {
                 <div className="flex items-center justify-between mb-5">
                   <h3 className="font-heading font-bold text-white">Thông tin cá nhân</h3>
                   {!editMode ? (
-                    <button onClick={() => setEditMode(true)} className="btn-outline text-sm px-4 py-2">
-                      ✏️ Chỉnh sửa
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => { setIsChangingPassword(true); setPasswordSuccess(false); setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' }); }} className="btn-outline text-sm px-4 py-2 border-primary text-primary hover:bg-primary/10">
+                        🔒 Đổi mật khẩu
+                      </button>
+                      <button onClick={() => setEditMode(true)} className="btn-outline text-sm px-4 py-2">
+                        ✏️ Chỉnh sửa
+                      </button>
+                    </div>
                   ) : (
                     <div className="flex gap-2">
                       <button onClick={() => { setEditMode(false); setFormData({ ...userData }); }} className="btn-outline text-sm px-4 py-2">Huỷ</button>
@@ -1069,22 +1119,8 @@ export default function Profile() {
                 )}
               </div>
 
-              {/* Change Password */}
-              <div className="card p-6">
-                <h3 className="font-heading font-bold text-white mb-4">Đổi mật khẩu</h3>
-                <div className="space-y-3">
-                  {['Mật khẩu hiện tại', 'Mật khẩu mới', 'Xác nhận mật khẩu mới'].map(label => (
-                    <div key={label}>
-                      <label className="block text-cinema-muted text-xs mb-1.5">{label}</label>
-                      <input type="password" placeholder="••••••••" className="input-field" />
-                    </div>
-                  ))}
-                  <button className="btn-primary w-full py-2.5 mt-2 text-sm">Cập nhật mật khẩu</button>
-                </div>
-              </div>
-
               {/* Notification Settings */}
-              <div className="card p-6">
+              <div className="card p-6 md:col-span-2">
                 <h3 className="font-heading font-bold text-white mb-4">Thông báo</h3>
                 <div className="space-y-3">
                   {[
@@ -1358,6 +1394,73 @@ export default function Profile() {
               >
                 Hủy thanh toán
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Change Password Modal */}
+      <AnimatePresence>
+        {isChangingPassword && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-cinema-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-cinema-card border border-cinema-border rounded-2xl p-6 w-full max-w-md shadow-2xl relative"
+            >
+              <button
+                onClick={() => { setIsChangingPassword(false); setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' }); }}
+                className="absolute top-4 right-4 text-cinema-muted hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <h3 className="font-heading font-bold text-xl text-white mb-6">Đổi mật khẩu</h3>
+              
+              {passwordSuccess ? (
+                <div className="text-center py-8">
+                  <div className="text-5xl mb-4">✅</div>
+                  <h4 className="text-white font-bold text-lg mb-2">Đổi mật khẩu thành công!</h4>
+                  <p className="text-cinema-muted text-sm">Hệ thống sẽ tự động đăng xuất sau vài giây để bạn đăng nhập lại với mật khẩu mới.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                  {passwordError && (
+                    <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm flex items-start gap-2">
+                      <span className="mt-0.5">⚠️</span>
+                      <p>{passwordError}</p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-cinema-muted text-sm mb-1.5">Mật khẩu hiện tại</label>
+                    <input type="password" placeholder="••••••••" className="input-field" 
+                           value={passwordForm.oldPassword} 
+                           onChange={e => { setPasswordForm({...passwordForm, oldPassword: e.target.value}); setPasswordError(''); }} 
+                           required />
+                  </div>
+                  <div>
+                    <label className="block text-cinema-muted text-sm mb-1.5">Mật khẩu mới</label>
+                    <input type="password" placeholder="••••••••" className="input-field" 
+                           value={passwordForm.newPassword} 
+                           onChange={e => { setPasswordForm({...passwordForm, newPassword: e.target.value}); setPasswordError(''); }} 
+                           required minLength={6} />
+                  </div>
+                  <div>
+                    <label className="block text-cinema-muted text-sm mb-1.5">Xác nhận mật khẩu mới</label>
+                    <input type="password" placeholder="••••••••" className="input-field" 
+                           value={passwordForm.confirmPassword} 
+                           onChange={e => { setPasswordForm({...passwordForm, confirmPassword: e.target.value}); setPasswordError(''); }} 
+                           required minLength={6} />
+                  </div>
+                  <button type="submit" disabled={passwordLoading} className="btn-primary w-full py-3 mt-4 text-sm disabled:opacity-50 flex justify-center items-center">
+                    {passwordLoading ? (
+                      <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    ) : 'Xác nhận đổi'}
+                  </button>
+                </form>
+              )}
             </motion.div>
           </div>
         )}

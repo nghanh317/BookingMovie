@@ -1,8 +1,13 @@
 package com.example.controller.Account;
 
 import java.util.Map;
+import java.security.Principal;
+
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,6 +26,7 @@ import org.springframework.http.ResponseCookie;
 import com.example.dto.AccountDTO;
 import com.example.dto.LoginResponse;
 import com.example.form.Account.AccountForm;
+import com.example.form.Account.ChangePasswordForm;
 import com.example.form.Account.CreateAccountForm;
 import com.example.form.Account.ForgotPasswordForm;
 import com.example.form.Account.ResetPasswordForm;
@@ -170,6 +176,38 @@ public class AuthController {
         try {
             authService.processResetPassword(form.getToken(), form.getNewPassword());
             return ResponseEntity.ok(Map.of("message", "Đặt lại mật khẩu thành công."));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    // ── POST /api/v1/auth/change-password ────────────────────
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody @Valid ChangePasswordForm form, Principal principal, HttpServletResponse response) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Chưa đăng nhập."));
+        }
+
+        if (!form.getNewPassword().equals(form.getConfirmPassword())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Xác nhận mật khẩu mới không khớp."));
+        }
+
+        if (form.getOldPassword().equals(form.getNewPassword())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Mật khẩu mới phải khác mật khẩu cũ."));
+        }
+        
+        try {
+            authService.changePassword(principal.getName(), form.getOldPassword(), form.getNewPassword());
+            
+            // Xóa Refresh Token Cookie để buộc đăng nhập lại
+            Cookie cookie = new Cookie("refreshToken", "");
+            cookie.setHttpOnly(true);
+            cookie.setSecure(true);
+            cookie.setPath("/");
+            cookie.setMaxAge(0);
+            response.addCookie(cookie);
+
+            return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công!"));
         } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
