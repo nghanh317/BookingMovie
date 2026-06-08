@@ -262,7 +262,7 @@ export default function AdminTickets() {
   const [page, setPage]                 = useState(0);
   const [totalPages, setTotalPages]     = useState(0);
   const [totalElements, setTotalElements] = useState(0);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   // Filters
   const [search, setSearch]             = useState('');
@@ -443,7 +443,7 @@ export default function AdminTickets() {
         </div>
 
         {/* Pagination */}
-        {!loading && totalPages > 1 && (
+        {!loading && totalPages > 0 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-cinema-border">
             <p className="text-cinema-muted text-xs">
               Trang {page + 1} / {totalPages} · {totalElements} vé

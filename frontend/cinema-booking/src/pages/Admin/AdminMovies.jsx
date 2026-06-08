@@ -149,6 +149,10 @@ export default function AdminMovies() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [modal, setModal] = useState(null); // null | 'add' | movieObj
   const [deleteId, setDeleteId] = useState(null);
+  
+  // Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const navigate = useNavigate();
@@ -186,6 +190,15 @@ export default function AdminMovies() {
     const matchStatus = filterStatus === 'all' || m.status === filterStatus;
     return matchSearch && matchStatus;
   });
+
+  // Đặt lại trang 1 khi filter thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterStatus]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filtered.slice(startIndex, startIndex + itemsPerPage);
 
   const handleSave = async (form) => {
     if (!isAuthenticated) {
@@ -292,7 +305,7 @@ export default function AdminMovies() {
               </tr>
             </thead>
             <tbody className="divide-y divide-cinema-border/50">
-              {filtered.map(movie => (
+              {paginatedData.map(movie => (
                 <motion.tr key={movie.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   className="hover:bg-cinema-card/50 transition-colors">
                   <td className="px-4 py-3">
@@ -358,6 +371,39 @@ export default function AdminMovies() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 0 && (
+          <div className="flex justify-center items-center gap-2 p-5 border-t border-cinema-border">
+            <button 
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              className="px-3 py-1.5 rounded-lg bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              Trước
+            </button>
+            <div className="flex gap-1">
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                    currentPage === i + 1 ? 'bg-primary text-cinema-black' : 'bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white'
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+            <button 
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              className="px-3 py-1.5 rounded-lg bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              Sau
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Movie Form Modal */}

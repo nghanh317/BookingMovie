@@ -107,6 +107,10 @@ export default function AdminProducts() {
   const [modal, setModal] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [saving, setSaving] = useState(false);
+  
+  // Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const { addNotification } = useNotificationStore();
 
@@ -197,6 +201,15 @@ export default function AdminProducts() {
     p.productName?.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Đặt lại trang 1 khi filter thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filtered.slice(startIndex, startIndex + itemsPerPage);
+
   const getCategoryBadge = (cat) => {
     const c = (typeof cat === 'string' ? cat : (cat?.value || cat?.name || '')).toUpperCase();
     switch(c) {
@@ -242,7 +255,7 @@ export default function AdminProducts() {
                 <tr>
                   <td colSpan="4" className="px-4 py-10 text-center text-cinema-muted">Không tìm thấy sản phẩm nào</td>
                 </tr>
-              ) : filtered.map(product => (
+              ) : paginatedData.map(product => (
                 <tr key={product.id} className="hover:bg-cinema-card/50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -280,6 +293,39 @@ export default function AdminProducts() {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination */}
+        {totalPages > 0 && (
+          <div className="flex justify-center items-center gap-2 p-5 border-t border-cinema-border">
+            <button 
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              className="px-3 py-1.5 rounded-lg bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              Trước
+            </button>
+            <div className="flex gap-1">
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                    currentPage === i + 1 ? 'bg-primary text-cinema-black' : 'bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white'
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+            <button 
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              className="px-3 py-1.5 rounded-lg bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              Sau
+            </button>
+          </div>
+        )}
       </div>
 
       <AnimatePresence>

@@ -83,6 +83,10 @@ export default function AdminReviews() {
   const searchRef = useRef(null);
   const { addNotification } = useNotificationStore();
 
+  // Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -218,6 +222,16 @@ export default function AdminReviews() {
     }
     return map;
   }, [filtered, activeTab]);
+
+  // Đặt lại trang 1 khi tab hoặc search thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, search]);
+
+  const groupedEntries = Object.entries(grouped);
+  const totalPages = Math.ceil(groupedEntries.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedEntries = groupedEntries.slice(startIndex, startIndex + itemsPerPage);
 
   // Actions
   const handleHide = (id) => {
@@ -366,7 +380,7 @@ export default function AdminReviews() {
         </div>
       ) : (
         <div className="space-y-6">
-          {Object.entries(grouped).map(([entityId, entityReviews]) => {
+          {paginatedEntries.map(([entityId, entityReviews]) => {
             let entityName, entityImg;
             if (activeTab === 'movie') {
               const m = movies.find(x => x.id === +entityId);
@@ -446,6 +460,39 @@ export default function AdminReviews() {
               </div>
             );
           })}
+          
+          {/* Pagination */}
+          {totalPages > 0 && (
+            <div className="flex justify-center items-center gap-2 p-5 border-t border-cinema-border mt-6">
+              <button 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                className="px-3 py-1.5 rounded-lg bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white disabled:opacity-50 transition-colors text-sm font-medium"
+              >
+                Trước
+              </button>
+              <div className="flex gap-1">
+                {Array.from({ length: totalPages }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                      currentPage === i + 1 ? 'bg-primary text-cinema-black' : 'bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+              <button 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                className="px-3 py-1.5 rounded-lg bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white disabled:opacity-50 transition-colors text-sm font-medium"
+              >
+                Sau
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

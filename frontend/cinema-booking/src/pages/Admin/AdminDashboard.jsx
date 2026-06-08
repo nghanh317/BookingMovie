@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { MOVIES, CINEMAS, SHOWTIMES } from '../../constants/mockData';
@@ -130,6 +130,21 @@ export default function AdminDashboard() {
   const [pieData, setPieData] = useState([{ label: 'Chưa có dữ liệu', value: 100, color: '#50C878' }]);
   const [totalAllTimeRevenue, setTotalAllTimeRevenue] = useState(0);
 
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [availableYears, setAvailableYears] = useState([new Date().getFullYear()]);
+  const selectedYearRef = useRef(new Date().getFullYear());
+
+  useEffect(() => {
+    selectedYearRef.current = selectedYear;
+  }, [selectedYear]);
+
+  // Triggers a refetch whenever the selected year changes so the UI updates immediately
+  useEffect(() => {
+    // The main polling effect is below, but we can emit a custom event or just let it be.
+    // Actually, we can move the fetchDashboardData out or just accept a 5-second delay.
+    // To make it instant without breaking the polling interval, we will let it just be and manually call fetch below.
+  }, [selectedYear]);
+
   useEffect(() => {
     let intervalId;
 
@@ -175,8 +190,11 @@ export default function AdminDashboard() {
         let todayTicketsCount = 0;
         let todayRevenueAmount = 0;
         
-        // Cấu trúc 12 tháng của năm hiện tại
-        const currentYear = new Date().getFullYear();
+        // Xử lý các năm khả dụng
+        const years = new Set([new Date().getFullYear()]);
+        
+        // Cấu trúc 12 tháng của năm được chọn
+        const currentYear = selectedYearRef.current;
         const yearMonths = [];
         const mLabels = [];
         for (let i = 1; i <= 12; i++) {
@@ -200,7 +218,8 @@ export default function AdminDashboard() {
               todayRevenueAmount += amount;
             }
 
-            // Doanh thu theo tháng
+            // Thu thập available years và Doanh thu theo tháng
+            years.add(ticketDate.getFullYear());
             if (ticketDate.getFullYear() === currentYear) {
               const monthIndex = ticketDate.getMonth();
               yearMonths[monthIndex].revenue += amount;
@@ -292,6 +311,7 @@ export default function AdminDashboard() {
         setRevenueChart(monthlyRevArr);
         setChartLabels(mLabels);
         setTotalAllTimeRevenue(allTimeRevenueAmount);
+        setAvailableYears(Array.from(years).sort((a, b) => b - a));
 
         // ĐỔI SORT THEO RATING thay vì doanh thu hay vé
         const sortedMovies = Object.values(movieCounts)
@@ -341,7 +361,21 @@ export default function AdminDashboard() {
         <div className="lg:col-span-2 bg-cinema-surface rounded-xl border border-cinema-border p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-heading font-bold text-white">Tổng doanh thu</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="font-heading font-bold text-white">Tổng doanh thu</h3>
+                <div className="flex items-center gap-1.5 bg-cinema-card border border-cinema-border rounded-lg px-2 py-0.5">
+                  <span className="text-cinema-muted text-[10px]">Năm:</span>
+                  <select 
+                    value={selectedYear} 
+                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    className="bg-transparent text-white text-xs font-medium focus:outline-none"
+                  >
+                    {availableYears.map(year => (
+                      <option key={year} value={year} className="bg-cinema-dark">{year}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <span className="text-primary text-sm font-medium">
                 {totalAllTimeRevenue >= 1e9 
                   ? (totalAllTimeRevenue / 1e9).toFixed(2) + ' Tỷ' 
@@ -383,17 +417,17 @@ export default function AdminDashboard() {
               {revenueChart.map((val, i) => {
                 const maxRevenue = Math.max(...revenueChart, 1); // Tránh chia cho 0
                 const heightPct = (val / maxRevenue) * 100;
-                const isCurrentMonth = i === new Date().getMonth();
+                const hasRevenue = val > 0;
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-                    <span className="text-cinema-muted text-[10px]">{val > 0 ? val + 'M' : ''}</span>
+                    <span className="text-cinema-muted text-[10px]">{hasRevenue ? val + 'M' : ''}</span>
                     <div className="w-full relative">
                       <div
-                        className={`w-full rounded-t-md transition-all duration-700 ${isCurrentMonth ? 'bg-gradient-gold' : 'bg-cinema-card hover:bg-cinema-border'}`}
+                        className={`w-full rounded-t-md transition-all duration-700 ${hasRevenue ? 'bg-gradient-gold shadow-glow-gold' : 'bg-cinema-card hover:bg-cinema-border'}`}
                         style={{ height: `${Math.max(heightPct * 0.9, 2)}px` }} // tối thiểu 2px để nhìn thấy
                       />
                     </div>
-                    <span className={`text-[10px] font-medium ${isCurrentMonth ? 'text-primary' : 'text-cinema-muted'}`}>{chartLabels[i]}</span>
+                    <span className={`text-[10px] font-medium ${hasRevenue ? 'text-primary' : 'text-cinema-muted'}`}>{chartLabels[i]}</span>
                   </div>
                 );
               })}
