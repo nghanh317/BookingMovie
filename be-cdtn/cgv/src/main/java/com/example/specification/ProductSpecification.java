@@ -28,6 +28,10 @@ public static Specification<Products> buildWhere (ProductFilterForm filterform) 
 		CustomSpecification categorySpecification = new CustomSpecification ("category", filterform.getCategory());
 		where = where.and(categorySpecification);
 	}
+	
+	CustomSpecification notDeletedSpecification = new CustomSpecification ("isDeleted", false);
+	where = where.and(notDeletedSpecification);
+	
 	return where;
 } 
 
@@ -53,6 +57,9 @@ public Predicate toPredicate (
 		}
 		if (field.equalsIgnoreCase("category")) {
 			return criteriaBuilder.equal(root.get("category"), value);
+		}
+		if (field.equalsIgnoreCase("isDeleted")) {
+			return criteriaBuilder.equal(root.get("isDeleted"), value);
 		}
 		return null;
 	}

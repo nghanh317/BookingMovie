@@ -66,8 +66,11 @@ public class ProductService implements IProductService{
 
 	@Override
 	public void deleteProduct(Integer id) {
-		productRepository.deleteById(id);
-		
+		Products product = productRepository.findById(id).orElse(null);
+		if (product != null) {
+			product.setIsDeleted(true);
+			productRepository.save(product);
+		}
 	}
 	
 
