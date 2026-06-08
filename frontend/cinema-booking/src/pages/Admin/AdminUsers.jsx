@@ -197,8 +197,7 @@ export default function AdminUsers() {
     role: u.role || 'USER',
   });
 
-  // ── Fetch tài khoản từ API ─────────────────────────────
-  useEffect(() => {
+  const fetchUsers = () => {
     setLoading(true);
     accountService.getAll()
       .then((data) => {
@@ -211,6 +210,11 @@ export default function AdminUsers() {
       })
       .catch(() => setUsers(MOCK_USERS))
       .finally(() => setLoading(false));
+  };
+
+  // ── Fetch tài khoản từ API ─────────────────────────────
+  useEffect(() => {
+    fetchUsers();
   }, []);
 
   const filtered = users.filter(u => {
@@ -327,8 +331,13 @@ export default function AdminUsers() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="🔍 Tìm theo tên hoặc email..." className="input-field max-w-xs" />
+        <div className="flex flex-1 gap-2">
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="🔍 Tìm theo tên hoặc email..." className="input-field max-w-xs" />
+          <button onClick={fetchUsers} disabled={loading} className="px-4 py-2 rounded-lg bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white transition-colors flex items-center gap-2">
+            <span className={loading ? 'animate-spin' : ''}>🔄</span> Làm mới
+          </button>
+        </div>
         <div className="flex gap-1 bg-cinema-surface rounded-lg p-1 border border-cinema-border">
           {['all', 'Bronze', 'Silver', 'Gold', 'Diamond'].map(level => (
             <button key={level} onClick={() => setFilterLevel(level)}

@@ -32,6 +32,12 @@ export default function AdminRevenue() {
   const [movieRevenue, setMovieRevenue] = useState([]);
   const [cinemaRevenue, setCinemaRevenue] = useState([]);
 
+  const [allTickets, setAllTickets] = useState([]);
+  const [allMoviesState, setAllMoviesState] = useState([]);
+  
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [availableYears, setAvailableYears] = useState([new Date().getFullYear()]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -41,86 +47,20 @@ export default function AdminRevenue() {
         ]);
         
         const tickets = Array.isArray(ticketsRes) ? ticketsRes : ticketsRes?.content || ticketsRes?.data || [];
-        const allMovies = moviesRes || [];
+        const movies = moviesRes || [];
         
-        let sumRevenue = 0;
-        let sumTickets = 0;
-        
-        const currentYear = new Date().getFullYear();
-        const months = Array.from({ length: 12 }, (_, i) => ({ month: `T${i + 1}/${currentYear}`, value: 0 }));
-        
-        const movieMap = {};
-        const cinemaMap = {};
-        
-        tickets.forEach(ticket => {
-          if (ticket.paymentStatus === 'PAID') {
-            const amount = ticket.finalAmount || ticket.totalAmount || 0;
-            const tDate = safeParseDate(ticket.ticketsDate || ticket.createDate || Date.now());
-            const seatsCount = ticket.seats?.length || 1;
-            
-            sumRevenue += amount;
-            sumTickets += seatsCount;
-            
-            if (tDate.getFullYear() === currentYear) {
-              months[tDate.getMonth()].value += amount;
-            }
-            
-            if (ticket.movieId) {
-              if (!movieMap[ticket.movieId]) {
-                const dbMovie = allMovies.find(m => m.id === ticket.movieId);
-                movieMap[ticket.movieId] = {
-                  id: ticket.movieId,
-                  title: ticket.movieName || dbMovie?.title || 'Unknown',
-                  poster: ticket.posterUrl || dbMovie?.poster || '',
-                  tickets: 0,
-                  revenue: 0
-                };
-              }
-              movieMap[ticket.movieId].tickets += seatsCount;
-              movieMap[ticket.movieId].revenue += amount;
-            }
-            
-            const cName = ticket.cinemaName || 'Hệ thống rạp'; 
-            if (!cinemaMap[cName]) cinemaMap[cName] = { cinema: cName, revenue: 0 };
-            cinemaMap[cName].revenue += amount;
+        // Find available years
+        const years = new Set([new Date().getFullYear()]);
+        tickets.forEach(t => {
+          if (t.paymentStatus === 'PAID') {
+             const tDate = safeParseDate(t.ticketsDate || t.createDate || Date.now());
+             years.add(tDate.getFullYear());
           }
         });
         
-        setTotalRevenue(sumRevenue);
-        setTotalTickets(sumTickets);
-        
-        let maxM = months[0];
-        months.forEach(m => { if(m.value > maxM.value) maxM = m; });
-        setBestMonth({ label: maxM.month, value: maxM.value });
-        
-        // Show only last 7 months relative to current month
-        const currMonthIdx = new Date().getMonth();
-        let displayMonths = [];
-        for (let i = 6; i >= 0; i--) {
-          let idx = currMonthIdx - i;
-          if (idx < 0) {
-             // previous year (simplified, just take from end of array)
-             displayMonths.push({ month: `T${12 + idx + 1}/${currentYear - 1}`, value: 0 }); // No data for prev year right now
-          } else {
-             displayMonths.push(months[idx]);
-          }
-        }
-        // If we want to strictly show the 12 months, let's just show 12 months
-        setMonthlyRevenue(months);
-        
-        const sortedMovies = Object.values(movieMap).sort((a, b) => b.revenue - a.revenue);
-        const maxMovieRev = sortedMovies.length > 0 ? sortedMovies[0].revenue : 1;
-        setMovieRevenue(sortedMovies.slice(0, 5).map(m => ({
-           ...m,
-           pct: Math.round((m.revenue / maxMovieRev) * 100)
-        })));
-        
-        const sortedCinemas = Object.values(cinemaMap).sort((a, b) => b.revenue - a.revenue);
-        setCinemaRevenue(sortedCinemas.slice(0, 5).map(c => ({
-           ...c,
-           pct: Math.round((c.revenue / (sumRevenue || 1)) * 100)
-        })));
-        
+        setAllTickets(tickets);
+        setAllMoviesState(movies);
+        setAvailableYears(Array.from(years).sort((a, b) => b - a));
       } catch (err) {
         console.error("Error fetching revenue:", err);
       } finally {
@@ -131,12 +71,94 @@ export default function AdminRevenue() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (allTickets.length === 0) return;
+
+    let sumRevenue = 0;
+    let sumTickets = 0;
+    
+    const months = Array.from({ length: 12 }, (_, i) => ({ month: `T${i + 1}/${selectedYear}`, value: 0 }));
+    
+    const movieMap = {};
+    const cinemaMap = {};
+    
+    allTickets.forEach(ticket => {
+      if (ticket.paymentStatus === 'PAID') {
+        const amount = ticket.finalAmount || ticket.totalAmount || 0;
+        const tDate = safeParseDate(ticket.ticketsDate || ticket.createDate || Date.now());
+        const seatsCount = ticket.seats?.length || 1;
+        
+        // Filter by selected year for summary stats
+        if (tDate.getFullYear() === selectedYear) {
+          sumRevenue += amount;
+          sumTickets += seatsCount;
+          months[tDate.getMonth()].value += amount;
+          
+          if (ticket.movieId) {
+            if (!movieMap[ticket.movieId]) {
+              const dbMovie = allMoviesState.find(m => m.id === ticket.movieId);
+              movieMap[ticket.movieId] = {
+                id: ticket.movieId,
+                title: ticket.movieName || dbMovie?.title || 'Unknown',
+                poster: ticket.posterUrl || dbMovie?.poster || '',
+                tickets: 0,
+                revenue: 0
+              };
+            }
+            movieMap[ticket.movieId].tickets += seatsCount;
+            movieMap[ticket.movieId].revenue += amount;
+          }
+          
+          const cName = ticket.cinemaName || 'Hệ thống rạp'; 
+          if (!cinemaMap[cName]) cinemaMap[cName] = { cinema: cName, revenue: 0 };
+          cinemaMap[cName].revenue += amount;
+        }
+      }
+    });
+    
+    setTotalRevenue(sumRevenue);
+    setTotalTickets(sumTickets);
+    
+    let maxM = months[0];
+    months.forEach(m => { if(m.value > maxM.value) maxM = m; });
+    setBestMonth({ label: maxM.month, value: maxM.value });
+    
+    setMonthlyRevenue(months);
+    
+    const sortedMovies = Object.values(movieMap).sort((a, b) => b.revenue - a.revenue);
+    const maxMovieRev = sortedMovies.length > 0 ? sortedMovies[0].revenue : 1;
+    setMovieRevenue(sortedMovies.slice(0, 5).map(m => ({
+       ...m,
+       pct: Math.round((m.revenue / maxMovieRev) * 100)
+    })));
+    
+    const sortedCinemas = Object.values(cinemaMap).sort((a, b) => b.revenue - a.revenue);
+    setCinemaRevenue(sortedCinemas.slice(0, 5).map(c => ({
+       ...c,
+       pct: Math.round((c.revenue / (sumRevenue || 1)) * 100)
+    })));
+  }, [allTickets, allMoviesState, selectedYear]);
+
   const formatM = (val) => (val / 1000000).toFixed(1);
   const maxMonth = Math.max(...monthlyRevenue.map(r => r.value), 1);
 
   return (
     <div className="space-y-6">
-      <h2 className="font-heading font-extrabold text-2xl text-white">Báo Cáo Doanh Thu</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="font-heading font-extrabold text-2xl text-white">Báo Cáo Doanh Thu</h2>
+        <div className="flex items-center gap-2 bg-cinema-surface border border-cinema-border rounded-lg px-3 py-1.5">
+          <span className="text-cinema-muted text-sm">Năm:</span>
+          <select 
+            value={selectedYear} 
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="bg-transparent text-white text-sm font-medium focus:outline-none"
+          >
+            {availableYears.map(year => (
+              <option key={year} value={year} className="bg-cinema-dark">{year}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -161,20 +183,20 @@ export default function AdminRevenue() {
         <div className="flex items-end gap-1 md:gap-3 h-48">
           {monthlyRevenue.map((item, i) => {
             const heightPct = (item.value / maxMonth) * 100;
-            const isLast = i === monthlyRevenue.length - 1;
+            const hasRevenue = item.value > 0;
             return (
               <div key={item.month} className="flex-1 flex flex-col items-center gap-2">
-                <span className="text-cinema-muted text-[9px] md:text-[11px] font-medium">{item.value > 0 ? formatM(item.value) + 'M' : ''}</span>
+                <span className="text-cinema-muted text-[9px] md:text-[11px] font-medium">{hasRevenue ? formatM(item.value) + 'M' : ''}</span>
                 <div className="w-full relative group cursor-pointer">
                   <div
-                    className={`w-full rounded-t-lg transition-all duration-700 ${isLast ? 'bg-gradient-gold shadow-glow-gold' : 'bg-cinema-card hover:bg-cinema-border'}`}
+                    className={`w-full rounded-t-lg transition-all duration-700 ${hasRevenue ? 'bg-gradient-gold shadow-glow-gold' : 'bg-cinema-card hover:bg-cinema-border'}`}
                     style={{ height: `${Math.max(heightPct * 1.2, 2)}px` }}
                   />
                   <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-cinema-dark border border-cinema-border rounded px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
                     {item.value.toLocaleString('vi-VN')} VNĐ
                   </div>
                 </div>
-                <span className={`text-[9px] md:text-[10px] font-medium text-center ${isLast ? 'text-primary' : 'text-cinema-muted'}`}>
+                <span className={`text-[9px] md:text-[10px] font-medium text-center ${hasRevenue ? 'text-primary' : 'text-cinema-muted'}`}>
                   {item.month}
                 </span>
               </div>

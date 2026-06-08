@@ -214,6 +214,8 @@ export default function Profile() {
 
         const info = {
           name: data.fullName || data.userName || 'Người dùng',
+          userName: data.userName || '',
+          role: data.role || 'USER',
           email: data.email || '',
           phone: data.phone || '',
           joinDate: parsedJoinDate,
@@ -228,6 +230,8 @@ export default function Profile() {
         // Fallback từ user trong store
         const info = {
           name: user?.fullName || user?.userName || 'Người dùng',
+          userName: user?.userName || '',
+          role: user?.role || 'USER',
           email: user?.email || '',
           phone: user?.phone || '',
           joinDate: '',
@@ -478,6 +482,8 @@ export default function Profile() {
     if (userId) {
       try {
         await accountService.update(userId, {
+          userName: formData.userName,
+          role: formData.role,
           fullName: formData.name,
           email: formData.email,
           phone: formData.phone,
