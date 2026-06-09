@@ -306,6 +306,9 @@ export default function AdminVouchers() {
   const [editingVoucher, setEditingVoucher] = useState(null);
   const { addNotification } = useNotificationStore();
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const fetchAll = useCallback(async () => {
     try {
       const data = await promotionService.getAll({ size: 500 });
@@ -332,6 +335,14 @@ export default function AdminVouchers() {
       return matchSearch && matchStatus;
     });
   }, [vouchers, search, filterStatus]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterStatus]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filtered.slice(startIndex, startIndex + itemsPerPage);
 
   const stats = useMemo(() => ({
     total: vouchers.length,
@@ -477,7 +488,7 @@ export default function AdminVouchers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-cinema-border/50">
-              {filtered.map(v => {
+              {paginatedData.map(v => {
                 const isExpired = v.expiry && new Date(v.expiry) < new Date();
                 const daysLeft = v.expiry ? Math.ceil((new Date(v.expiry) - new Date()) / 86400000) : 0;
                 const statusColor = !v.active
@@ -540,6 +551,39 @@ export default function AdminVouchers() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 0 && (
+          <div className="flex justify-center items-center gap-2 p-5 border-t border-cinema-border">
+            <button 
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              className="px-3 py-1.5 rounded-lg bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              Trước
+            </button>
+            <div className="flex gap-1 flex-wrap">
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                    currentPage === i + 1 ? 'bg-primary text-cinema-black' : 'bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white'
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+            <button 
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              className="px-3 py-1.5 rounded-lg bg-cinema-surface border border-cinema-border text-cinema-muted hover:text-white disabled:opacity-50 transition-colors text-sm font-medium"
+            >
+              Sau
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Modals */}
