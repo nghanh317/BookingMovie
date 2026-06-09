@@ -95,10 +95,13 @@ export default function SnackSelection() {
       setRemainSecs(rem);
       if (rem === 0 && !holdExpired) {
         setHoldExpired(true);
+        if (accountId && (showtimeId || slotId)) {
+           seatLockService.releaseSeats(accountId, showtimeId || slotId).catch(() => {});
+        }
       }
     }, 1000);
     return () => clearInterval(id);
-  }, [holdExpired, lockExpiresAt]);
+  }, [holdExpired, lockExpiresAt, accountId, showtimeId, slotId]);
 
   // ── State chính ──
   const [products, setProducts]           = useState([]);

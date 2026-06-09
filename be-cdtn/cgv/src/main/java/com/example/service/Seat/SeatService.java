@@ -49,7 +49,7 @@ public class SeatService implements ISeatService {
 	private BookingSeatRepository bookingSeatRepository;
 
 	@Autowired
-	private SeatLockRepository seatLockRepository;
+	private com.example.service.SeatLock.SeatLockService redisSeatLockService;
 
 	@Autowired
 	private SlotRepository slotRepository;
@@ -170,15 +170,8 @@ public class SeatService implements ISeatService {
 				.map(bs -> bs.getSeats().getId())
 				.collect(Collectors.toSet());
 
-		// 4. Ghế đang bị lock tạm thời (is_active=true, expires_at > NOW)
-		LocalDateTime now = LocalDateTime.now();
-		List<SeatLocks> activeLocks = seatLockRepository.findActiveBySlotId(slotId, now);
-		Map<Integer, SeatLocks> lockMap = activeLocks.stream()
-				.collect(Collectors.toMap(
-						sl -> sl.getSeat().getId(),
-						sl -> sl,
-						(a, b) -> a // giữ cái đầu nếu trùng
-				));
+		// 4. Ghế đang bị lock tạm thời (từ Redis)
+		java.util.Map<Integer, Integer> lockMap = redisSeatLockService.getLockedSeatsWithOwners(slotId);
 
 		// 5. Build kết quả
 		List<Map<String, Object>> result = new ArrayList<>();
@@ -194,11 +187,9 @@ public class SeatService implements ISeatService {
 				item.put("status", "booked");
 				item.put("lockedByMe", false);
 			} else if (lockMap.containsKey(seat.getId())) {
-				SeatLocks lock = lockMap.get(seat.getId());
 				item.put("status", "locked");
-				item.put("expiresAt", lock.getExpiresAt().toString());
 				boolean isMine = currentAccountId != null
-						&& currentAccountId.equals(lock.getAccount().getId());
+						&& currentAccountId.equals(lockMap.get(seat.getId()));
 				item.put("lockedByMe", isMine);
 			} else {
 				item.put("status", "available");

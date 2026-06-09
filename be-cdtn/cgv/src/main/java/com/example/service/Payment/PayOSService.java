@@ -7,6 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.entity.Tickets;
 import com.example.repository.TicketRepository;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import com.example.dto.SeatLockDTO;
 
 import vn.payos.PayOS;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
@@ -30,6 +32,12 @@ public class PayOSService {
     @Autowired
     private com.example.repository.BookingSeatRepository bookingSeatRepository;
 
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+
+    @Autowired
+    private com.example.service.SeatLock.SeatLockService redisSeatLockService;
+
     @Transactional
     public void cancelTicketAndReleaseSeats(Tickets ticket) {
         if (ticket.getStatus() == Tickets.Status.CANCELLED) return;
@@ -51,6 +59,12 @@ public class PayOSService {
                 }
                 slot.setEmptySeats(slot.getEmptySeats() + count);
                 slotRepository.save(slot);
+                
+                // Giải phóng SeatLocks trên Redis ngay lập tức
+                if (ticket.getAccounts() != null) {
+                    redisSeatLockService.releaseSeats(ticket.getAccounts().getId(), slot.getId());
+                }
+                
                 System.out.printf("[PayOSService] Nhả %d ghế cho suất chiếu %d%n", count, slot.getId());
             }
         }
@@ -165,6 +179,7 @@ public class PayOSService {
             ticket.setPaymentStatus(Tickets.PaymentStatus.PAID);
             ticket.setStatus(Tickets.Status.CONFIRMED);
             ticketRepository.save(ticket);
+            broadcastBookedSuccess(ticket);
         } else {
             cancelTicketAndReleaseSeats(ticket);
         }
@@ -186,6 +201,7 @@ public class PayOSService {
                 ticket.setPaymentStatus(Tickets.PaymentStatus.PAID);
                 ticket.setStatus(Tickets.Status.CONFIRMED);
                 ticketRepository.save(ticket);
+                broadcastBookedSuccess(ticket);
             } else if ("CANCELLED".equalsIgnoreCase(status) || "EXPIRED".equalsIgnoreCase(status)) {
                 cancelTicketAndReleaseSeats(ticket);
             }
@@ -196,5 +212,23 @@ public class PayOSService {
 
     public boolean isTestMode() {
         return testMode;
+    }
+
+    private void broadcastBookedSuccess(Tickets ticket) {
+        com.example.entity.Slots slot = ticket.getSlots();
+        if (slot == null) return;
+        java.util.List<com.example.entity.BookingSeats> bookingSeats = 
+            bookingSeatRepository.findByTickets_IdAndIsDeleted(ticket.getId(), false);
+        if (bookingSeats != null && !bookingSeats.isEmpty()) {
+            for (com.example.entity.BookingSeats bs : bookingSeats) {
+                SeatLockDTO payload = new SeatLockDTO();
+                payload.setSeatId(bs.getSeats().getId());
+                payload.setUserId(ticket.getAccounts() != null ? ticket.getAccounts().getId() : null);
+                payload.setSlotId(slot.getId());
+                payload.setAction("BOOKED_SUCCESS");
+                payload.setMessage("Ghế đã được bán");
+                messagingTemplate.convertAndSend("/topic/slot/" + slot.getId(), payload);
+            }
+        }
     }
 }

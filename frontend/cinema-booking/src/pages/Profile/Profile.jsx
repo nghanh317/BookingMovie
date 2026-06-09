@@ -142,6 +142,8 @@ export default function Profile() {
 
   const [activeTab, setActiveTab] = useState(tabParam || 'overview');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [editMode, setEditMode] = useState(false);
   
   const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
@@ -249,34 +251,15 @@ export default function Profile() {
   useEffect(() => {
     const userId = user?.id || user?.userId;
     if (!userId) { setBookingsLoading(false); return; }
-    ticketService.getAll({ accountId: userId, size: 50 })
+    ticketService.getAll({ accountId: userId, size: 100, sort: 'id,desc', _t: Date.now() })
       .then(res => {
         const list = Array.isArray(res?.content) ? res.content
           : Array.isArray(res?.data?.content) ? res.data.content
           : Array.isArray(res?.data) ? res.data
           : Array.isArray(res) ? res : [];
           
-        // Lọc bỏ vé "pending" (chờ thanh toán) nếu đã quá 10 phút kể từ lúc tạo (ticketsDate)
-        const now = new Date();
-        const validList = list.filter(t => {
-          if (t.paymentStatus !== 'PAID' && t.status !== 'CONFIRMED') {
-            let tDate = null;
-            if (t.ticketsDate) {
-              if (typeof t.ticketsDate === 'string' && t.ticketsDate.includes('-') && t.ticketsDate.split('-')[0].length === 2) {
-                const [datePart, timePart] = t.ticketsDate.split(' ');
-                const [dd, mm, yyyy] = datePart.split('-');
-                tDate = new Date(`${yyyy}-${mm}-${dd}T${timePart || '00:00:00'}`);
-              } else {
-                tDate = new Date(t.ticketsDate);
-              }
-            }
-            if (tDate) {
-              const diffMinutes = (now - tDate) / 1000 / 60;
-              if (diffMinutes > 10) return false; // xoá / ẩn đi
-            }
-          }
-          return true;
-        });
+        // Bỏ logic lọc vé quá 10 phút vì user muốn thấy các vé chờ thanh toán / lỗi thanh toán
+        const validList = list;
 
         // Normalize ticket → BookingCard format
         const normalized = validList.map(t => {
@@ -470,6 +453,13 @@ export default function Profile() {
   const filteredBookings = filterStatus === 'all'
     ? bookings
     : bookings.filter(b => b.status === filterStatus);
+
+  const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
+  const currentBookings = filteredBookings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus]);
 
   useEffect(() => {
     if (tabParam) setActiveTab(tabParam);
@@ -784,13 +774,14 @@ export default function Profile() {
               <div className="flex gap-2 mb-5 flex-wrap">
                 {[
                   { value: 'all', label: 'Tất cả' },
+                  { value: 'pending', label: '⏳ Chờ thanh toán' },
                   { value: 'upcoming', label: '🕐 Sắp tới' },
                   { value: 'completed', label: '✅ Đã xem' },
                   { value: 'cancelled', label: '❌ Đã hủy' },
                 ].map(f => (
                   <button
                     key={f.value}
-                    onClick={() => setFilterStatus(f.value)}
+                    onClick={() => { setFilterStatus(f.value); setCurrentPage(1); }}
                     className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all duration-200 ${
                       filterStatus === f.value
                         ? 'bg-primary border-primary text-cinema-black'
@@ -810,7 +801,46 @@ export default function Profile() {
                     <span className="text-cinema-muted ml-3 text-sm">Đang tải vé...</span>
                   </div>
                 ) : filteredBookings.length > 0 ? (
-                  filteredBookings.map(b => <BookingCard key={b.id} booking={b} onViewDetail={(b) => setTicketDetailModal({ open: true, booking: b })} onRate={handleOpenReview} onPay={handlePay} onCancel={handleCancel} allMovies={allMovies} />)
+                  <>
+                    <div className="space-y-3">
+                      {currentBookings.map(b => (
+                        <BookingCard key={b.id} booking={b} onViewDetail={(b) => setTicketDetailModal({ open: true, booking: b })} onRate={handleOpenReview} onPay={handlePay} onCancel={handleCancel} allMovies={allMovies} />
+                      ))}
+                    </div>
+                    
+                    {/* Pagination Controls */}
+                    <div className="flex justify-center items-center gap-2 mt-8 pb-4">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 rounded-lg border border-cinema-border bg-cinema-surface text-cinema-muted hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        &larr;
+                      </button>
+                      
+                      {Array.from({ length: Math.max(1, totalPages) }, (_, i) => i + 1).map(page => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-8 h-8 rounded-lg text-sm font-semibold transition-colors ${
+                            currentPage === page 
+                              ? 'bg-primary text-cinema-black' 
+                              : 'border border-cinema-border bg-cinema-surface text-cinema-muted hover:text-white hover:border-cinema-muted'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.max(1, totalPages)))}
+                        disabled={currentPage >= totalPages}
+                        className="px-3 py-1.5 rounded-lg border border-cinema-border bg-cinema-surface text-cinema-muted hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        &rarr;
+                      </button>
+                    </div>
+                  </>
                 ) : (
                   <div className="text-center py-16">
                     <div className="text-5xl mb-3">🎟️</div>

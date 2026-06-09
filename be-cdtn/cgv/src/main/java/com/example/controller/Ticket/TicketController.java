@@ -34,8 +34,12 @@ public class TicketController {
 	public Page<TicketDTO> getAllTicket (Pageable pageable,TicketFilterForm filterForm){
 		return ticketService.getAllTicket(pageable, filterForm);
 	}
+	@Autowired
+	private com.example.service.Payment.PayOSService payOSService;
+
 	@GetMapping ("/{id}")
 	public TicketDTO getById (@PathVariable Integer id) {
+		payOSService.syncTicketStatusFromPayOS(id);
 		return ticketService.getById(id);
 	}
 	

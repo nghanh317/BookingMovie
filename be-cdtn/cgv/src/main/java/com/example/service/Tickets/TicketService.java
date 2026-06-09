@@ -47,7 +47,7 @@ public class TicketService implements ITicketService{
 	private SeatRepository seatRepository;
 
 	@Autowired
-	private SeatLockRepository seatLockRepository;
+	private com.example.service.SeatLock.SeatLockService redisSeatLockService;
 	
 	@Autowired
 	private TicketDetailRepository ticketDetailRepository;
@@ -402,9 +402,9 @@ public class TicketService implements ITicketService{
 					slot.setEmptySeats(slot.getEmptySeats() + count);
 					slotRepository.save(slot);
 					
-					// Giải phóng SeatLocks ngay lập tức để người khác có thể chọn ghế
+					// Giải phóng SeatLocks trên Redis ngay lập tức để người khác có thể chọn ghế và broadcast WebSocket
 					if (updateTicket.getAccounts() != null) {
-						seatLockRepository.releaseByAccountIdAndSlotId(updateTicket.getAccounts().getId(), slot.getId());
+						redisSeatLockService.releaseSeats(updateTicket.getAccounts().getId(), slot.getId());
 					}
 					
 					System.out.printf("[TicketService] Hủy vé %d, nhả %d ghế cho suất chiếu %d%n", id, count, slot.getId());

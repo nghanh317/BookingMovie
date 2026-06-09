@@ -114,6 +114,7 @@ public class SecurityConfiguration {
 						.requestMatchers(HttpMethod.POST, "/api/v1/payos/create-link").hasAnyAuthority("USER", "ADMIN")
 						.requestMatchers(HttpMethod.GET, "/api/v1/payos/**").hasAnyAuthority("USER", "ADMIN")
 						.requestMatchers("/api/v1/webhook/**").permitAll()
+						.requestMatchers("/ws/**").permitAll()
 						.requestMatchers("/error").permitAll()
 						.requestMatchers("/api/v1/**").hasAuthority("ADMIN")
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

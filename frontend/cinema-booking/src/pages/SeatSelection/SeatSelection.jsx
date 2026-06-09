@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useAuthStore from '../../store/authStore';
 import seatService from '../../services/seatService';
 import seatLockService from '../../services/seatLockService';
+import SockJS from 'sockjs-client';
+import { Client } from '@stomp/stompjs';
 
 // ─── Seat type meta ───────────────────────────────────────────────────
 const SEAT_TYPE_META = {
@@ -54,10 +56,16 @@ export default function SeatSelection() {
   const [selected, setSelected] = useState(new Set()); // IDs of seats user wants to pick
   const [lockLoading, setLockLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isSocketConnected, setIsSocketConnected] = useState(true);
 
-  const pollRef = useRef(null);
+  const stompClientRef = useRef(null);
   const showtimeId = slotId || showtime?.id;
   const accountId = user?.id || user?.userId;
+
+  const selectedRef = useRef(selected);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
 
   // ── Fetch trạng thái toàn bộ ghế từ 1 API ──
   const fetchSeatStatus = useCallback(async (isInitial = false) => {
@@ -80,16 +88,69 @@ export default function SeatSelection() {
   }, [showtimeId, accountId]);
 
   useEffect(() => {
-    fetchSeatStatus(true);
-    pollRef.current = setInterval(() => fetchSeatStatus(false), 5000);
-    return () => clearInterval(pollRef.current);
-  }, [fetchSeatStatus]);
+    if (!showtimeId || !accountId) return;
 
-  // ── Khi trang đóng / rời đi: giải phóng lock ──
+    fetchSeatStatus(true);
+
+    const client = new Client({
+      webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+      reconnectDelay: 5000,
+      onConnect: () => {
+        setIsSocketConnected(true);
+        // Có mạng lại -> Nạp lại ghế để tránh bị lọt tin nhắn lúc offline
+        fetchSeatStatus(false);
+
+        client.subscribe(`/topic/slot/${showtimeId}`, (message) => {
+          if (message.body) {
+            const data = JSON.parse(message.body);
+            setSeats(prevSeats => prevSeats.map(seat => {
+              if (seat.seatId === data.seatId) {
+                if (data.action === 'LOCKED_SUCCESS') {
+                  return { ...seat, status: 'locked', lockedByMe: data.userId === accountId };
+                } else if (data.action === 'UNLOCKED_SUCCESS') {
+                  return { ...seat, status: 'available', lockedByMe: false };
+                } else if (data.action === 'BOOKED_SUCCESS') {
+                  return { ...seat, status: 'booked', lockedByMe: false };
+                }
+              }
+              return seat;
+            }));
+
+            // Nếu người khác khoanh trúng lúc mình đang định khoanh
+            if (data.action === 'LOCKED_FAILED' && data.userId === accountId) {
+              setError(data.message || 'Ghế này vừa bị người khác nhanh tay chọn mất!');
+              setTimeout(() => setError(''), 4000);
+              setSelected(prev => {
+                const next = new Set(prev);
+                next.delete(data.seatId);
+                return next;
+              });
+              setSeats(prevSeats => prevSeats.map(seat => 
+                seat.seatId === data.seatId ? { ...seat, status: 'locked', lockedByMe: false } : seat
+              ));
+            }
+          }
+        });
+      },
+      onWebSocketClose: () => setIsSocketConnected(false),
+      onStompError: () => setIsSocketConnected(false)
+    });
+
+    client.activate();
+    stompClientRef.current = client;
+
+    // Cleanup khi thoát trang: Chỉ ngắt kết nối socket, KHÔNG gửi UNLOCK vì nếu họ đang chuyển sang màn Snacks thì ta không được huỷ lock của họ
+    return () => {
+      if (client.connected) {
+        client.deactivate();
+      }
+    };
+  }, [showtimeId, accountId, fetchSeatStatus]);
+
+  // ── Khi trang đóng (F5/đóng tab) ──
   useEffect(() => {
     if (!accountId || !showtimeId) return;
     const release = () => {
-      // Gửi beacon khi trang đóng (best-effort)
       seatLockService.releaseSeats(accountId, showtimeId).catch(() => { });
     };
     window.addEventListener('beforeunload', release);
@@ -121,8 +182,8 @@ export default function SeatSelection() {
 
   const pricePerSeat = showtime?.price || 0;
 
-  // Những ghế đang nằm trong Set selected hoặc đã bị account này lock trên db
-  const selectedSeatObjects = seats.filter(s => selected.has(s.seatId) || s.lockedByMe);
+  // Những ghế đang nằm trong Set selected (ghế mới chọn trong giao dịch này)
+  const selectedSeatObjects = seats.filter(s => selected.has(s.seatId));
 
   const totalPrice = selectedSeatObjects.reduce((sum, seat) => {
     const meta = getSeatMeta(seat.seatTypeName);
@@ -139,31 +200,38 @@ export default function SeatSelection() {
     // Nếu ghế đã book chính thức
     if (seat.status === 'booked') return;
 
-    // Nếu ghế đang bị lock bởi người khác
-    if (seat.status === 'locked' && !seat.lockedByMe) {
+    // Nếu ghế đang bị lock từ DB (đã bấm Tiếp tục / Thanh toán trước đó)
+    // Phân biệt với ghế vừa chọn ở local bằng cách kiểm tra selected.has(seatId)
+    if (seat.status === 'locked' && !selected.has(seatId)) {
       const label = `${seat.seatRow}${seat.seatNumber}`;
-      setError(`Ghế ${label} đang được người khác giữ. Vui lòng chọn ghế khác.`);
-      setTimeout(() => setError(''), 3000);
+      if (seat.lockedByMe) {
+        setError(`Ghế ${label} đang được bạn giữ ở một giao dịch chờ thanh toán. Vui lòng huỷ vé trong mục Vé của tôi để chọn lại.`);
+      } else {
+        setError(`Ghế ${label} đang được người khác giữ. Vui lòng chọn ghế khác.`);
+      }
+      setTimeout(() => setError(''), 4000);
       return;
     }
 
-    // Nếu ghế do chính mình lock trên server, nhưng mình muốn bỏ tick
-    // Chỗ này hơi tricky, cứ allow bỏ chọn local, lúc bấm Tiếp tục server sẽ đè lên
+    const isCurrentlySelected = selected.has(seatId) || seat.lockedByMe;
 
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(seatId) || seat.lockedByMe) {
-        next.delete(seatId);
-        // Nếu nó đang lockedByMe trên server, việc delete này chỉ tác dụng local (sẽ bị reset sau 5s nếu server vẫn trả về lockedByMe).
-        // Tốt nhất nếu nó đã lock, user nhấn vào sẽ nhả ghế khỏi DB luôn
-        if (seat.lockedByMe) {
-          seatLockService.releaseSeats(accountId, showtimeId).catch(() => { });
-        }
-      } else {
-        next.add(seatId);
-      }
-      return next;
-    });
+    if (isCurrentlySelected) {
+       // Bỏ chọn
+       setSelected(prev => {
+         const next = new Set(prev);
+         next.delete(seatId);
+         return next;
+       });
+       setSeats(prev => prev.map(s => s.seatId === seatId ? { ...s, status: 'available', lockedByMe: false } : s));
+    } else {
+       // Chọn ghế (Chỉ chọn ở local - Draft Selection)
+       setSelected(prev => {
+         const next = new Set(prev);
+         next.add(seatId);
+         return next;
+       });
+       setSeats(prev => prev.map(s => s.seatId === seatId ? { ...s, status: 'locked', lockedByMe: true } : s));
+    }
     setError('');
   };
 
@@ -188,6 +256,8 @@ export default function SeatSelection() {
         const msg = err?.response?.data?.message || 'Không thể khóa ghế lúc này. Vui lòng thử lại.';
         setError(msg);
         setLockLoading(false);
+        // Có người nhanh tay hơn -> reload lại status ghế ngay lập tức để cập nhật UI
+        fetchSeatStatus(false);
         return; // Dừng lại, không sang trang SnackSelection
       }
     }
@@ -219,6 +289,17 @@ export default function SeatSelection() {
     <div className="min-h-screen py-8">
       <div className="container mx-auto px-4 max-w-5xl">
         <StepIndicator current={4} />
+
+        {/* Network Status Banner */}
+        <AnimatePresence>
+          {!isSocketConnected && (
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+              className="mb-4 p-2 bg-red-500/20 border border-red-500/40 rounded flex items-center justify-center gap-2 text-red-400 text-sm font-medium sticky top-20 z-50 shadow-lg backdrop-blur-md">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              Mất kết nối thời gian thực. Đang thử nối lại...
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Movie + showtime info */}
         <div className="card p-3 flex gap-3 mb-5 text-sm">
@@ -277,17 +358,19 @@ export default function SeatSelection() {
                         const meta = getSeatMeta(seat.seatTypeName);
 
                         const isBooked = seat.status === 'booked';
-                        const isLockedOther = seat.status === 'locked' && !seat.lockedByMe;
-                        const isSelected = selected.has(seatId) || seat.lockedByMe;
+                        const isLocked = seat.status === 'locked' && !selected.has(seatId);
+                        const isSelected = selected.has(seatId);
                         const label = `${seat.seatRow}${seat.seatNumber}`;
 
                         let icon, btnClass;
                         if (isBooked) {
                           icon = <span className="text-[18px] leading-none font-bold text-red-500/80">✕</span>;
                           btnClass = 'cursor-not-allowed opacity-30 bg-cinema-border/5 border-cinema-border/10';
-                        } else if (isLockedOther) {
+                        } else if (isLocked) {
                           icon = <span className="text-[14px] leading-none">🔒</span>;
-                          btnClass = 'cursor-not-allowed bg-orange-500/15 border-orange-500/40';
+                          btnClass = seat.lockedByMe 
+                            ? 'cursor-not-allowed bg-blue-500/15 border-blue-500/40' // Lock của mình thì màu xanh dương
+                            : 'cursor-not-allowed bg-orange-500/15 border-orange-500/40';
                         } else if (isSelected) {
                           icon = <span className="text-[14px] leading-none">✅</span>;
                           btnClass = 'bg-green-500/20 border-green-400 shadow-md shadow-green-500/20 scale-110';
@@ -302,16 +385,16 @@ export default function SeatSelection() {
 
                         const tooltip = isBooked
                           ? `${label} - Đã đặt`
-                          : isLockedOther
-                            ? `${label} - Đang được giữ`
+                          : isLocked
+                            ? (seat.lockedByMe ? `${label} - Bạn đang giữ` : `${label} - Đang được giữ`)
                             : `${label} - ${seat.seatTypeName || 'Thường'} - ${seatPrice > 0 ? seatPrice.toLocaleString('vi-VN') + 'đ' : ''}`;
 
                         return (
                           <motion.button
                             key={seatId}
-                            whileTap={(!isBooked && !isLockedOther) ? { scale: 0.88 } : {}}
+                            whileTap={(!isBooked && !isLocked) ? { scale: 0.88 } : {}}
                             onClick={() => toggleSeat(seatId)}
-                            disabled={isBooked || isLockedOther}
+                            disabled={isBooked || isLocked}
                             title={tooltip}
                             className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all duration-150 ${btnClass}`}
                           >{icon}</motion.button>
