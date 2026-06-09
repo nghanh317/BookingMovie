@@ -252,12 +252,11 @@ export default function AdminRevenue() {
       {/* Revenue by Type */}
       <div className="grid md:grid-cols-2 gap-5">
         <div className="bg-cinema-surface border border-cinema-border rounded-xl p-6">
-          <h3 className="font-heading font-bold text-white mb-4">Theo định dạng chiếu</h3>
+          <h3 className="font-heading font-bold text-white mb-4">Theo loại phòng chiếu</h3>
           <div className="space-y-3">
             {[
-              { type: '2D', pct: 45, revenue: '162M', color: 'bg-cinema-border' },
-              { type: '3D', pct: 35, revenue: '126M', color: 'bg-blue-500' },
-              { type: 'IMAX', pct: 20, revenue: '72M', color: 'bg-purple-500' },
+              { type: 'Phòng Standard', pct: 65, revenue: '234M', color: 'bg-cinema-border' },
+              { type: 'Phòng VIP', pct: 35, revenue: '126M', color: 'bg-yellow-500' },
             ].map(item => (
               <div key={item.type}>
                 <div className="flex justify-between text-sm mb-1.5">
