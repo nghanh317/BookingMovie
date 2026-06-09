@@ -80,7 +80,7 @@ export default function AdminShowtimes() {
   useEffect(() => {
     Promise.all([
       movieService.getAll(),
-      cinemaService.getAll(),
+      cinemaService.getAll({ size: 1000 }),
       roomService.getAll({ size: 500 }),
     ]).then(([moviesData, cinemasData, roomsData]) => {
       setMovies(Array.isArray(moviesData) ? moviesData : (moviesData?.content || moviesData?.data || []));
@@ -210,7 +210,13 @@ export default function AdminShowtimes() {
   // Lọc showtimes
   const filteredShowtimes = useMemo(() => {
     const now = new Date();
+    // Tạo danh sách tên rạp đang hoạt động để lọc các suất chiếu của rạp đã bị xoá mềm
+    const activeCinemaNames = new Set(cinemas.map(c => c.name || c.cinemaName));
+
     return showtimes.filter(st => {
+      // Ẩn suất chiếu nếu rạp đã bị xoá
+      if (!activeCinemaNames.has(st.cinemaName)) return false;
+
       // Bỏ qua các suất chiếu trong quá khứ
       const stDateTime = new Date(`${st.date}T${st.time}`);
       if (stDateTime < now) return false;
@@ -235,7 +241,9 @@ export default function AdminShowtimes() {
     const tree = {}; // { province -> { cinemaName -> { rooms: Set<roomId> } } }
 
     // Bước 1: thu thập tất cả tổ hợp province + cinemaName từ slots
+    const activeCinemaNames = new Set(cinemas.map(c => c.name || c.cinemaName));
     showtimes.forEach(st => {
+      if (!activeCinemaNames.has(st.cinemaName)) return; // Bỏ qua suất chiếu của rạp đã bị xoá
       const prov = st.provinceName || 'Khác';
       const cn = st.cinemaName || 'Không xác định';
       if (!tree[prov]) tree[prov] = {};
