@@ -328,7 +328,7 @@ export default function AdminShowtimes() {
           />
         </div>
         <div className="flex gap-1 bg-cinema-surface rounded-lg p-1 border border-cinema-border">
-          {[{ v: 'all', l: 'Tất cả' }, { v: '2D', l: '2D' }, { v: '3D', l: '3D' }, { v: 'IMAX', l: 'IMAX' }].map(tab => (
+          {[{ v: 'all', l: 'Tất cả' }, { v: 'Standard', l: 'Phòng Standard' }, { v: 'VIP', l: 'Phòng VIP' }].map(tab => (
             <button key={tab.v} onClick={() => setFormatFilter(tab.v)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${formatFilter === tab.v ? 'bg-primary text-cinema-black' : 'text-cinema-muted hover:text-white'}`}>
               {tab.l}
