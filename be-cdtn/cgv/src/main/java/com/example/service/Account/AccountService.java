@@ -23,16 +23,15 @@ import com.example.form.Account.UpdateAccountForm;
 import com.example.repository.AccountRepository;
 import com.example.specification.AccountSpecification;
 
-
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
-public class AccountService implements IAccountService{
-	
+public class AccountService implements IAccountService {
+
 	@Autowired
 	private AccountRepository accountRepository;
-	
+
 	@Autowired
 	private ModelMapper modelMapper;
 
@@ -46,18 +45,19 @@ public class AccountService implements IAccountService{
 		}
 
 		return new User(
-				account.getUserName(), 
-				account.getPasswordHash(), 
+				account.getUserName(),
+				account.getPasswordHash(),
 				AuthorityUtils.createAuthorityList(account.getRole().toString()));
 	}
-	
+
 	@Override
-	public Page<AccountDTO> getAllAccount (Pageable pageable, AccountFilterForm accountForm){
+	public Page<AccountDTO> getAllAccount(Pageable pageable, AccountFilterForm accountForm) {
 		Specification<Accounts> where = AccountSpecification.buildWhere(accountForm);
-		Page<Accounts> accountPage = accountRepository.findAll(where,pageable);
+		Page<Accounts> accountPage = accountRepository.findAll(where, pageable);
 		List<AccountDTO> dtos = modelMapper.map(
-				accountPage.getContent(), 
-				new TypeToken<List<AccountDTO>>() {}.getType());
+				accountPage.getContent(),
+				new TypeToken<List<AccountDTO>>() {
+				}.getType());
 
 		for (int i = 0; i < accountPage.getContent().size(); i++) {
 			calculateAccountMetrics(accountPage.getContent().get(i), dtos.get(i));
@@ -67,24 +67,25 @@ public class AccountService implements IAccountService{
 
 		return dtoPage;
 	}
-	
+
 	@Override
-	public AccountDTO getById (Integer id) {
+	public AccountDTO getById(Integer id) {
 		Accounts account = accountRepository.findById(id).get();
 		AccountDTO dto = modelMapper.map(account, AccountDTO.class);
 		calculateAccountMetrics(account, dto);
 		return dto;
 	}
-	
+
 	@Override
-	public void createAccount (CreateAccountForm form) {
-		Accounts accounts = new Accounts(form.getUserName(), form.getPasswordHash(), form.getEmail(), form.getPhone(), form.getFullName());
+	public void createAccount(CreateAccountForm form) {
+		Accounts accounts = new Accounts(form.getUserName(), form.getPasswordHash(), form.getEmail(), form.getPhone(),
+				form.getFullName());
 		accountRepository.save(accounts);
-		
+
 	}
-	
+
 	@Override
-	public void updateAccount (Integer id, UpdateAccountForm form) {
+	public void updateAccount(Integer id, UpdateAccountForm form) {
 		Accounts updateAccount = accountRepository.findById(id).get();
 		updateAccount.setUserName(form.getUserName());
 		updateAccount.setEmail(form.getEmail());
@@ -93,10 +94,10 @@ public class AccountService implements IAccountService{
 		updateAccount.setRole(form.getRole());
 		accountRepository.save(updateAccount);
 	}
-	
+
 	@Override
-	public void deleteAccount (Integer id) {
-		Accounts deleteAccount =  accountRepository.findById(id).get();
+	public void deleteAccount(Integer id) {
+		Accounts deleteAccount = accountRepository.findById(id).get();
 		deleteAccount.setIsDeleted(true);
 		accountRepository.save(deleteAccount);
 	}
@@ -120,20 +121,21 @@ public class AccountService implements IAccountService{
 		account.setPasswordHash(newPasswordHash);
 		accountRepository.save(account);
 	}
-	
+
 	@Override
 	public void redeemPoints(Integer id, Integer points) {
 		Accounts account = accountRepository.findById(id).get();
 		account.setHistoryPoints(account.getHistoryPoints() + points);
 		accountRepository.save(account);
 	}
-	
+
 	private void calculateAccountMetrics(Accounts account, AccountDTO dto) {
 		java.math.BigDecimal total = java.math.BigDecimal.ZERO;
 		int count = 0;
 		if (account.getTickets() != null) {
 			for (var ticket : account.getTickets()) {
-				if (ticket.getPaymentStatus() == com.example.entity.Tickets.PaymentStatus.PAID && (ticket.getIsDeleted() == null || !ticket.getIsDeleted())) {
+				if (ticket.getPaymentStatus() == com.example.entity.Tickets.PaymentStatus.PAID
+						&& (ticket.getIsDeleted() == null || !ticket.getIsDeleted())) {
 					count++;
 					if (ticket.getFinalAmount() != null) {
 						total = total.add(ticket.getFinalAmount());
@@ -146,15 +148,18 @@ public class AccountService implements IAccountService{
 		long totalEarned = total.divideToIntegralValue(new java.math.BigDecimal("10000")).longValue();
 		long history = account.getHistoryPoints() != null ? account.getHistoryPoints() : 0;
 		long currentPoints = totalEarned - history;
-		if (currentPoints < 0) currentPoints = 0;
+		if (currentPoints < 0)
+			currentPoints = 0;
 		dto.setPoints(currentPoints);
-		
+
 		String level = "Bronze";
-		if (totalEarned >= 1000) level = "Diamond";
-		else if (totalEarned >= 300) level = "Gold";
-		else if (totalEarned >= 100) level = "Silver";
+		if (totalEarned >= 1000)
+			level = "Diamond";
+		else if (totalEarned >= 300)
+			level = "Gold";
+		else if (totalEarned >= 100)
+			level = "Silver";
 		dto.setLevel(level);
 	}
-	
 
 }

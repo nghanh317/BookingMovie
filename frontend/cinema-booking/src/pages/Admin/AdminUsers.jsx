@@ -13,15 +13,6 @@ function fmtDate(d) {
   return `${day}/${m}/${y}`;
 }
 
-const MOCK_USERS = [
-  { id: 1, name: 'Nguyễn Văn An',  email: 'nguyenvanan@email.com', phone: '0912345678', joinDate: '2024-09-01',  bookings: 12, spent: 1450000, level: 'Gold',     points: 1250, status: 'active' },
-  { id: 2, name: 'Trần Thị Bình', email: 'tranthib@email.com',    phone: '0987654321', joinDate: '2024-11-15', bookings: 8,  spent: 960000,  level: 'Silver',   points: 380,  status: 'active' },
-  { id: 3, name: 'Lê Minh Châu',  email: 'lmchau@email.com',      phone: '0901234567', joinDate: '2025-01-20', bookings: 3,  spent: 375000,  level: 'Bronze',   points: 90,   status: 'active' },
-  { id: 4, name: 'Phạm Thị Dung', email: 'phamdung@email.com',   phone: '0976543210', joinDate: '2024-08-05',  bookings: 25, spent: 3200000, level: 'Diamond',  points: 3200, status: 'active' },
-  { id: 5, name: 'Hoàng Văn Em',  email: 'hoangemail@email.com',  phone: '0912000111', joinDate: '2025-03-01', bookings: 1,  spent: 79250,   level: 'Bronze',   points: 20,   status: 'inactive' },
-  { id: 6, name: 'Vũ Thị Phương', email: 'vuphuong@email.com',  phone: '0933456789', joinDate: '2024-12-10', bookings: 15, spent: 1800000, level: 'Gold',     points: 1680, status: 'active' },
-];
-
 const LEVEL_STYLE = {
   Bronze:  'bg-orange-500/20 border-orange-500/30 text-orange-400',
   Silver:  'bg-gray-400/20 border-gray-400/30 text-gray-300',
@@ -205,14 +196,17 @@ export default function AdminUsers() {
     setLoading(true);
     accountService.getAll()
       .then((data) => {
-        // Nếu data từ backend không rỗng thì dùng, ngược lại fallback
         if (Array.isArray(data) && data.length > 0) {
+          // Lấy toàn bộ dữ liệu từ DB, không lọc bỏ id 5 nữa
           setUsers(data.map(normalizeUser));
         } else {
-          setUsers(MOCK_USERS);
+          setUsers([]);
         }
       })
-      .catch(() => setUsers(MOCK_USERS))
+      .catch((error) => {
+        console.error("Lỗi khi tải danh sách người dùng:", error);
+        setUsers([]);
+      })
       .finally(() => setLoading(false));
   };
 
