@@ -456,10 +456,7 @@ export default function AdminShowtimes() {
                       {roomList.length === 0 ? (
                         <p className="text-cinema-muted text-sm italic">Chưa có phòng chiếu</p>
                       ) : (
-                        <div className={roomList.length > 3
-                          ? 'flex gap-4 overflow-x-auto pb-2'
-                          : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
-                        }>
+                        <div className="flex gap-4 overflow-x-auto pb-2">
                           {roomList.map(room => {
                             // Slots của phòng này, qua filter
                             const roomShowtimes = filteredShowtimes.filter(s =>
@@ -470,7 +467,7 @@ export default function AdminShowtimes() {
 
                             return (
                               <div key={room.id}
-                                className={`bg-cinema-card rounded-lg border border-cinema-border p-4 shadow-sm${roomList.length > 3 ? ' flex-shrink-0 w-72' : ''}`}
+                                className="bg-cinema-card rounded-lg border border-cinema-border p-4 shadow-sm flex-shrink-0 w-72"
                               >
                                 {/* Header phòng */}
                                 <h5 className="font-semibold text-white mb-3 text-sm border-b border-cinema-border pb-2 flex items-center justify-between">
