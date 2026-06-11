@@ -397,7 +397,22 @@ export default function CinemaDetail() {
                           {showtimes.map((s) => (
                             <Link
                               key={s.id}
-                              to={`/booking/${movie.id}`}
+                              to={`/booking/${movie.id}/seats`}
+                              state={{
+                                movie: movie,
+                                showtime: {
+                                  ...s,
+                                  date: parseShowTime(s.showTime),
+                                  time: getTimeOnly(s.showTime),
+                                  cinemaName: cinema.name,
+                                  hall: s.roomName,
+                                  price: s.price,
+                                  vipPrice: s.vipPrice,
+                                  couplePrice: s.couplePrice
+                                },
+                                cinema: { name: cinema.name, id: cinema.id },
+                                slotId: s.id,
+                              }}
                               className="group flex flex-col items-center px-3 py-2 rounded-xl border border-cinema-border bg-cinema-surface hover:border-primary hover:bg-primary/10 transition-all duration-200 min-w-[70px]"
                             >
                               <span className="text-white font-bold text-sm group-hover:text-primary transition-colors">

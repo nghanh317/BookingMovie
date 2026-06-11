@@ -45,7 +45,7 @@ public class AIService {
 		this.client = Client.builder().apiKey(apiKey).build();
 	}
 
-	public String askGemini(String prompt, List<Map<String, String>> history) {
+	public Map<String, Object> askGemini(String prompt, List<Map<String, String>> history) {
 		try {
 			StringBuilder contextBuilder = new StringBuilder();
 			contextBuilder
@@ -84,16 +84,23 @@ public class AIService {
 
 			String systemInstructionText = "Bạn là trợ lý ảo thông minh của rạp chiếu phim CGV. "
 					+ "Nhiệm vụ của bạn là hỗ trợ khách hàng tìm kiếm phim, lịch chiếu, giá vé và giải đáp các thắc mắc về dịch vụ của CGV. "
-					+ "Hãy trả lời một cách thân thiện, chuyên nghiệp và ngắn gọn. Bạn chỉ được trả lời dựa trên thông tin có trong database. "
-					+ "Nếu khách hàng hỏi những câu không liên quan đến rạp phim hoặc nằm ngoài database, hãy phản hồi lịch sự: "
-					+ "'Dạ, hiện tại em chỉ có thể hỗ trợ các thông tin liên quan đến phim ảnh và dịch vụ của rạp chiếu phim CGV thôi ạ. Bạn có cần em hỗ trợ gì thêm về lịch chiếu hay giá vé không?'.\n\n" 
+					+ "Bạn PHẢI LUÔN LUÔN trả lời dưới định dạng JSON (không dùng markdown code block, chỉ trả về JSON thô). Cấu trúc bắt buộc:\n"
+					+ "{\n"
+					+ "  \"response\": \"câu trả lời bằng văn bản của bạn\",\n"
+					+ "  \"movieIds\": [danh sách các ID phim (số nguyên) được nhắc đến hoặc gợi ý, ví dụ: 1, 2. Nếu không có thì để rỗng []],\n"
+					+ "  \"slotIds\": [danh sách các ID suất chiếu (số nguyên) được nhắc đến hoặc gợi ý, ví dụ: 10, 15. Nếu không có thì để rỗng []]\n"
+					+ "}\n\n"
+					+ "Nếu khách hàng hỏi những câu không liên quan đến rạp phim hoặc nằm ngoài database, hãy phản hồi lịch sự.\n\n" 
 					+ contextBuilder.toString();
 
 			// Define system instruction
 			Content systemInstruction = Content.fromParts(Part.fromText(systemInstructionText));
 
 			// Configure the request
-			GenerateContentConfig config = GenerateContentConfig.builder().systemInstruction(systemInstruction).build();
+			GenerateContentConfig config = GenerateContentConfig.builder()
+                    .systemInstruction(systemInstruction)
+                    .responseMimeType("application/json")
+                    .build();
 
 			// Prepare conversation history
 			List<Content> contents = new ArrayList<>();
@@ -116,11 +123,22 @@ public class AIService {
 					.build());
 
 			// Using gemini-1.5-flash for fast responses
-			GenerateContentResponse response = client.models.generateContent("gemini-robotics-er-1.6-preview", contents, config);
-			return response.text();
+			GenerateContentResponse response = client.models.generateContent("gemini-1.5-flash", contents, config);
+			String responseText = response.text();
+			
+			com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+			try {
+			    return mapper.readValue(responseText, Map.class);
+			} catch (Exception parseEx) {
+			    Map<String, Object> fallback = new java.util.HashMap<>();
+			    fallback.put("response", responseText);
+			    return fallback;
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
-			return "Xin lỗi, đã có lỗi xảy ra khi kết nối với AI: " + e.getMessage();
+			Map<String, Object> err = new java.util.HashMap<>();
+			err.put("response", "Xin lỗi, đã có lỗi xảy ra khi kết nối với AI: " + e.getMessage());
+			return err;
 		}
 	}
 }

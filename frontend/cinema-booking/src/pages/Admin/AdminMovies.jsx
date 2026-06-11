@@ -22,6 +22,19 @@ function MovieFormModal({ movie, onClose, onSave }) {
     }));
   };
 
+  useEffect(() => {
+    if (form.releaseDate) {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const relDate = new Date(form.releaseDate);
+      relDate.setHours(0,0,0,0);
+      const newStatus = relDate <= today ? 'now_showing' : 'coming_soon';
+      if (form.status !== newStatus) {
+        setForm(prev => ({ ...prev, status: newStatus }));
+      }
+    }
+  }, [form.releaseDate]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -80,11 +93,8 @@ function MovieFormModal({ movie, onClose, onSave }) {
               </select>
             </div>
             <div>
-              <label className="block text-cinema-muted text-xs mb-1.5">Trạng thái</label>
-              <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="input-field cursor-pointer">
-                <option value="now_showing">Đang chiếu</option>
-                <option value="coming_soon">Sắp chiếu</option>
-              </select>
+              <label className="block text-cinema-muted text-xs mb-1.5">Trạng thái (Tự động)</label>
+              <input value={form.status === 'now_showing' ? 'Đang chiếu' : 'Sắp chiếu'} disabled className="input-field cursor-not-allowed opacity-70 bg-cinema-dark" />
             </div>
             <div className="col-span-2">
               <label className="block text-cinema-muted text-xs mb-1.5">Thể loại</label>

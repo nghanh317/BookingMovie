@@ -229,7 +229,7 @@ export default function AdminCinemas() {
       setCinemas(cList);
       const provs = Array.isArray(provincesData) ? provincesData : (provincesData?.content || provincesData?.data || []);
       setProvinces(provs);
-      
+
       // Auto fetch rooms for all cinemas to display accurate count immediately
       cList.forEach(c => {
         if (c && c.id) {
@@ -288,7 +288,7 @@ export default function AdminCinemas() {
         const list = Array.isArray(data) ? data : (data?.content || data?.data || []);
         setSeatTypes(list);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const fetchSeatsForRoom = useCallback(async (roomId) => {
@@ -450,15 +450,15 @@ export default function AdminCinemas() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <input 
-          value={search} 
-          onChange={e => setSearch(e.target.value)} 
-          placeholder="🔍 Tìm theo tên hoặc địa chỉ rạp..." 
-          className="input-field max-w-xs" 
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="🔍 Tìm theo tên hoặc địa chỉ rạp..."
+          className="input-field max-w-xs"
         />
-        <select 
-          value={provinceFilter} 
-          onChange={e => setProvinceFilter(e.target.value)} 
+        <select
+          value={provinceFilter}
+          onChange={e => setProvinceFilter(e.target.value)}
           className="input-field max-w-[200px] cursor-pointer bg-cinema-surface"
         >
           <option value="all">Tất cả khu vực</option>
@@ -475,145 +475,145 @@ export default function AdminCinemas() {
             <div className="space-y-4">
               {groupCinemas.map(cinema => (
                 <div key={cinema.id} className="bg-cinema-surface border border-cinema-border rounded-xl overflow-hidden">
-            {/* Cinema Header */}
-            <div 
-              className="p-4 flex items-center justify-between cursor-pointer hover:bg-cinema-card transition-colors"
-              onClick={() => toggleCinema(cinema.id)}
-            >
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <img src={cinema.image || `https://placehold.co/100x100/1E1E2C/A0A0B4?text=${encodeURIComponent(cinema.name)}`} alt={cinema.name} className="w-16 h-16 object-cover rounded-lg" />
-                </div>
-                <div>
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    {cinema.name}
-                  </h3>
-                  <p className="text-cinema-muted text-sm">{cinema.address} • <span className="text-primary">{cinema.province}</span></p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex gap-2">
-                  <button onClick={(e) => openEditModal(cinema, e)} className="px-3 py-1 rounded text-xs bg-blue-500/10 text-blue-400 border border-blue-500/30 hover:bg-blue-500/20 transition-colors">
-                    ✏️ Sửa
-                  </button>
-                  <button onClick={(e) => handleDeleteCinema(cinema.id, e)} className="px-3 py-1 rounded text-xs border transition-colors bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20">
-                    🗑️ Xoá
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 text-cinema-muted ml-2 border-l border-cinema-border pl-4">
-                  <span className="text-sm">{roomsByCinema[cinema.id] ? roomsByCinema[cinema.id].length : (cinema.rooms || []).length} phòng chiếu</span>
-                  <svg className={`w-5 h-5 transition-transform ${expandedCinemaId === cinema.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Cinema Rooms Expanded Area */}
-            <AnimatePresence>
-              {expandedCinemaId === cinema.id && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="border-t border-cinema-border bg-cinema-dark/50"
-                >
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-white font-semibold text-sm">Danh sách phòng chiếu</h4>
-                      <button 
-                        onClick={() => setShowRoomForm(showRoomForm === cinema.id ? null : cinema.id)}
-                        className="text-primary text-sm hover:underline"
-                      >
-                        {showRoomForm === cinema.id ? 'Huỷ thêm' : '+ Thêm phòng chiếu'}
-                      </button>
+                  {/* Cinema Header */}
+                  <div
+                    className="p-4 flex items-center justify-between cursor-pointer hover:bg-cinema-card transition-colors"
+                    onClick={() => toggleCinema(cinema.id)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <img src={cinema.image || `https://placehold.co/100x100/1E1E2C/A0A0B4?text=${encodeURIComponent(cinema.name)}`} alt={cinema.name} className="w-16 h-16 object-cover rounded-lg" />
+                      </div>
+                      <div>
+                        <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                          {cinema.name}
+                        </h3>
+                        <p className="text-cinema-muted text-sm">{cinema.address} • <span className="text-primary">{cinema.province}</span></p>
+                      </div>
                     </div>
-
-                    {showRoomForm === cinema.id && (
-                      <div className="mb-4 bg-cinema-card p-4 rounded-lg border border-primary/30 flex items-end gap-3 flex-wrap">
-                        <div>
-                          <label className="block text-cinema-muted text-xs mb-1">Tên phòng *</label>
-                          <input value={roomForm.name} onChange={e => setRoomForm({...roomForm, name: e.target.value})} className="input-field py-1.5" placeholder="VD: Phòng 1" />
-                        </div>
-                        <div>
-                          <label className="block text-cinema-muted text-xs mb-1">Loại phòng</label>
-                          <select value={roomForm.roomType} onChange={e => setRoomForm({...roomForm, roomType: e.target.value})} className="input-field py-1.5 pr-8">
-                            {['Standard', 'VIP', 'IMAX', '4DX'].map(f => <option key={f} value={f}>{f}</option>)}
-                          </select>
-                        </div>
-                        <button onClick={() => handleAddRoom(cinema.id)} disabled={savingRoom} className="btn-primary px-4 py-1.5 text-sm h-[38px]">
-                          {savingRoom ? 'Đang lưu...' : 'Lưu'}
+                    <div className="flex items-center gap-4">
+                      <div className="flex gap-2">
+                        <button onClick={(e) => openEditModal(cinema, e)} className="px-3 py-1 rounded text-xs bg-blue-500/10 text-blue-400 border border-blue-500/30 hover:bg-blue-500/20 transition-colors">
+                          ✏️ Sửa
+                        </button>
+                        <button onClick={(e) => handleDeleteCinema(cinema.id, e)} className="px-3 py-1 rounded text-xs border transition-colors bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20">
+                          🗑️ Xoá
                         </button>
                       </div>
-                    )}
-
-                    {roomsLoading[cinema.id] ? (
-                      <p className="text-cinema-muted text-sm animate-pulse py-4 text-center">Đang tải phòng chiếu...</p>
-                    ) : (
-                      <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        {(roomsByCinema[cinema.id] || []).length === 0 ? (
-                          <p className="text-cinema-muted text-xs col-span-3 py-2">Chưa có phòng chiếu nào.</p>
-                        ) : (roomsByCinema[cinema.id] || []).map(room => (
-                          <div key={room.id} className="bg-cinema-card p-3 rounded-lg border border-cinema-border">
-                            {editingRoomId === room.id ? (
-                              <div className="space-y-2">
-                                <div>
-                                  <label className="text-cinema-muted text-xs">Tên phòng</label>
-                                  <input value={editRoomForm.roomName} onChange={e => setEditRoomForm({...editRoomForm, roomName: e.target.value})} className="input-field py-1 text-xs mt-1" />
-                                </div>
-                                <div>
-                                  <label className="text-cinema-muted text-xs">Loại phòng</label>
-                                  <select value={editRoomForm.roomType} onChange={e => setEditRoomForm({...editRoomForm, roomType: e.target.value})} className="input-field py-1 text-xs mt-1 w-full">
-                                    {['Standard', 'VIP', 'IMAX', '4DX'].map(f => <option key={f} value={f}>{f}</option>)}
-                                  </select>
-                                </div>
-                                <div className="flex gap-2">
-                                  <button onClick={() => saveEditRoom(cinema.id)} className="text-green-400 text-xs hover:underline">Lưu</button>
-                                  <button onClick={() => setEditingRoomId(null)} className="text-cinema-muted text-xs hover:underline">Huỷ</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <h5 className="text-white font-semibold text-sm">{room.roomName || room.name}</h5>
-                                  <p className="text-cinema-muted text-xs mt-1">Loại: <span className="text-primary">{room.roomType || 'Standard'}</span></p>
-                                  <p className="text-cinema-muted text-xs mt-0.5">Tổng ghế: <span className="text-white font-medium">{room.totalSeats ?? 0}</span></p>
-                                  <p className="text-cinema-muted text-xs mt-0.5">Trạng thái: <span className={room.status === 'active' ? 'text-green-400' : 'text-red-400'}>{room.status || 'active'}</span></p>
-                                </div>
-                                <div className="flex flex-col gap-1 items-end">
-                                  <button onClick={() => startEditRoom(room)} className="text-cinema-muted hover:text-primary text-xs">✏️</button>
-                                  <button onClick={() => handleDeleteRoom(room.id, cinema.id)} className="text-cinema-muted hover:text-red-400 text-xs">🗑️</button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                      <div className="flex items-center gap-2 text-cinema-muted ml-2 border-l border-cinema-border pl-4">
+                        <span className="text-sm">{roomsByCinema[cinema.id] ? roomsByCinema[cinema.id].length : (cinema.rooms || []).length} phòng chiếu</span>
+                        <svg className={`w-5 h-5 transition-transform ${expandedCinemaId === cinema.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                       </div>
-                    )}
-
-                    {/* Seats button per room */}
-                    {(roomsByCinema[cinema.id] || []).length > 0 && !roomsLoading[cinema.id] && (
-                      <div className="mt-3 pt-3 border-t border-cinema-border/50">
-                        <p className="text-cinema-muted text-xs mb-2">Nhấn vào phòng để quản lý ghế:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {(roomsByCinema[cinema.id] || []).map(room => (
-                            <button
-                              key={room.id}
-                              onClick={() => openSeatsModal(room)}
-                              className="text-xs px-2 py-1 rounded bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors"
-                            >
-                              💺 {room.roomName || room.name} ({room.totalSeats ?? 0} ghế)
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        ))}
+
+                  {/* Cinema Rooms Expanded Area */}
+                  <AnimatePresence>
+                    {expandedCinemaId === cinema.id && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="border-t border-cinema-border bg-cinema-dark/50"
+                      >
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-white font-semibold text-sm">Danh sách phòng chiếu</h4>
+                            <button
+                              onClick={() => setShowRoomForm(showRoomForm === cinema.id ? null : cinema.id)}
+                              className="text-primary text-sm hover:underline"
+                            >
+                              {showRoomForm === cinema.id ? 'Huỷ thêm' : '+ Thêm phòng chiếu'}
+                            </button>
+                          </div>
+
+                          {showRoomForm === cinema.id && (
+                            <div className="mb-4 bg-cinema-card p-4 rounded-lg border border-primary/30 flex items-end gap-3 flex-wrap">
+                              <div>
+                                <label className="block text-cinema-muted text-xs mb-1">Tên phòng *</label>
+                                <input value={roomForm.name} onChange={e => setRoomForm({ ...roomForm, name: e.target.value })} className="input-field py-1.5" placeholder="VD: Phòng 1" />
+                              </div>
+                              <div>
+                                <label className="block text-cinema-muted text-xs mb-1">Loại phòng</label>
+                                <select value={roomForm.roomType} onChange={e => setRoomForm({ ...roomForm, roomType: e.target.value })} className="input-field py-1.5 pr-8">
+                                  {['Standard', 'VIP', 'IMAX', '4DX'].map(f => <option key={f} value={f}>{f}</option>)}
+                                </select>
+                              </div>
+                              <button onClick={() => handleAddRoom(cinema.id)} disabled={savingRoom} className="btn-primary px-4 py-1.5 text-sm h-[38px]">
+                                {savingRoom ? 'Đang lưu...' : 'Lưu'}
+                              </button>
+                            </div>
+                          )}
+
+                          {roomsLoading[cinema.id] ? (
+                            <p className="text-cinema-muted text-sm animate-pulse py-4 text-center">Đang tải phòng chiếu...</p>
+                          ) : (
+                            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+                              {(roomsByCinema[cinema.id] || []).length === 0 ? (
+                                <p className="text-cinema-muted text-xs col-span-3 py-2">Chưa có phòng chiếu nào.</p>
+                              ) : (roomsByCinema[cinema.id] || []).map(room => (
+                                <div key={room.id} className="bg-cinema-card p-3 rounded-lg border border-cinema-border">
+                                  {editingRoomId === room.id ? (
+                                    <div className="space-y-2">
+                                      <div>
+                                        <label className="text-cinema-muted text-xs">Tên phòng</label>
+                                        <input value={editRoomForm.roomName} onChange={e => setEditRoomForm({ ...editRoomForm, roomName: e.target.value })} className="input-field py-1 text-xs mt-1" />
+                                      </div>
+                                      <div>
+                                        <label className="text-cinema-muted text-xs">Loại phòng</label>
+                                        <select value={editRoomForm.roomType} onChange={e => setEditRoomForm({ ...editRoomForm, roomType: e.target.value })} className="input-field py-1 text-xs mt-1 w-full">
+                                          {['Standard', 'VIP', 'IMAX', '4DX'].map(f => <option key={f} value={f}>{f}</option>)}
+                                        </select>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <button onClick={() => saveEditRoom(cinema.id)} className="text-green-400 text-xs hover:underline">Lưu</button>
+                                        <button onClick={() => setEditingRoomId(null)} className="text-cinema-muted text-xs hover:underline">Huỷ</button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <h5 className="text-white font-semibold text-sm">{room.roomName || room.name}</h5>
+                                        <p className="text-cinema-muted text-xs mt-1">Loại: <span className="text-primary">{room.roomType || 'Standard'}</span></p>
+                                        <p className="text-cinema-muted text-xs mt-0.5">Tổng ghế: <span className="text-white font-medium">{room.totalSeats ?? 0}</span></p>
+                                        <p className="text-cinema-muted text-xs mt-0.5">Trạng thái: <span className={room.status === 'active' ? 'text-green-400' : 'text-red-400'}>{room.status || 'active'}</span></p>
+                                      </div>
+                                      <div className="flex flex-col gap-1 items-end">
+                                        <button onClick={() => startEditRoom(room)} className="text-cinema-muted hover:text-primary text-xs">✏️</button>
+                                        <button onClick={() => handleDeleteRoom(room.id, cinema.id)} className="text-cinema-muted hover:text-red-400 text-xs">🗑️</button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Seats button per room */}
+                          {(roomsByCinema[cinema.id] || []).length > 0 && !roomsLoading[cinema.id] && (
+                            <div className="mt-3 pt-3 border-t border-cinema-border/50">
+                              <p className="text-cinema-muted text-xs mb-2">Nhấn vào phòng để quản lý ghế:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {(roomsByCinema[cinema.id] || []).map(room => (
+                                  <button
+                                    key={room.id}
+                                    onClick={() => openSeatsModal(room)}
+                                    className="text-xs px-2 py-1 rounded bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors"
+                                  >
+                                    💺 {room.roomName || room.name} ({room.totalSeats ?? 0} ghế)
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
             </div>
           </div>
         )) : (
@@ -739,7 +739,7 @@ function SeatManagementModal({ room, seats, loading, seatTypes, onClose, onRefre
           <div>
             <h3 className="font-heading font-bold text-white text-lg">💺 Quản lý ghế — {roomName}</h3>
             <p className="text-cinema-muted text-xs mt-0.5">
-              Loại: <span className="text-primary">{room.roomType || 'Standard'}</span> · 
+              Loại: <span className="text-primary">{room.roomType || 'Standard'}</span> ·
               Tổng ghế: <span className="text-white font-semibold">{seats.length}</span>
             </p>
           </div>
@@ -799,13 +799,12 @@ function SeatManagementModal({ room, seats, loading, seatTypes, onClose, onRefre
                           title={`${label} · ${seat.seatTypeName || 'N/A'} · ${isBooked ? '🔴 Đã đặt' : '🟢 Trống'}`}
                           disabled={isBooked || deletingId === seat.id}
                           onClick={() => !isBooked && handleDelete(seat.id, label)}
-                          className={`w-9 h-9 rounded-lg border text-[10px] font-mono font-bold transition-all ${
-                            deletingId === seat.id ? 'opacity-40 cursor-wait bg-cinema-border/20 border-cinema-border/30 text-cinema-muted'
-                            : isBooked ? 'bg-red-500/20 border-red-500/50 text-red-400 cursor-not-allowed'
-                            : isVip ? 'bg-yellow-900/30 border-yellow-600/50 text-yellow-400 hover:bg-red-500/20 hover:border-red-500/50 cursor-pointer'
-                            : isCouple ? 'bg-pink-900/30 border-pink-600/50 text-pink-400 hover:bg-red-500/20 hover:border-red-500/50 cursor-pointer'
-                            : 'bg-cinema-surface/80 border-cinema-border text-cinema-muted hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-400 cursor-pointer'
-                          }`}>
+                          className={`w-9 h-9 rounded-lg border text-[10px] font-mono font-bold transition-all ${deletingId === seat.id ? 'opacity-40 cursor-wait bg-cinema-border/20 border-cinema-border/30 text-cinema-muted'
+                              : isBooked ? 'bg-red-500/20 border-red-500/50 text-red-400 cursor-not-allowed'
+                                : isVip ? 'bg-yellow-900/30 border-yellow-600/50 text-yellow-400 hover:bg-red-500/20 hover:border-red-500/50 cursor-pointer'
+                                  : isCouple ? 'bg-pink-900/30 border-pink-600/50 text-pink-400 hover:bg-red-500/20 hover:border-red-500/50 cursor-pointer'
+                                    : 'bg-cinema-surface/80 border-cinema-border text-cinema-muted hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-400 cursor-pointer'
+                            }`}>
                           {deletingId === seat.id ? '...' : seat.seatNumber}
                         </button>
                       );
@@ -896,11 +895,10 @@ function SeatManagementModal({ room, seats, loading, seatTypes, onClose, onRefre
                       {rowPreview.map(s => (
                         <div key={s.key}
                           title={s.exists ? `${s.key} — đã tồn tại, bỏ qua` : `${s.key} — sẽ được tạo`}
-                          className={`w-9 h-9 rounded-lg border text-[10px] font-mono font-bold flex items-center justify-center ${
-                            s.exists
+                          className={`w-9 h-9 rounded-lg border text-[10px] font-mono font-bold flex items-center justify-center ${s.exists
                               ? 'bg-orange-500/10 border-orange-500/30 text-orange-400/60'
                               : 'bg-green-500/10 border-green-500/40 text-green-400'
-                          }`}>
+                            }`}>
                           {s.n}
                         </div>
                       ))}

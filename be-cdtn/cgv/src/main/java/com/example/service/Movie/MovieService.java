@@ -174,7 +174,35 @@ public class MovieService implements IMovieService {
 		delete.setIsDeleted(true);
 		movieRepository.save(delete);
 
-		// XÓA CACHE
+	// XÓA CACHE
     	redisTemplate.delete("movie:detail:" + id);
+	}
+
+	@jakarta.annotation.PostConstruct
+	public void init() {
+		System.out.println("[MovieService] Chạy cập nhật trạng thái phim lúc khởi động...");
+		updateMovieStatusesAutomatically();
+	}
+
+	@org.springframework.scheduling.annotation.Scheduled(cron = "0 0 0 * * ?") // Runs daily at midnight
+    // @org.springframework.scheduling.annotation.Scheduled(fixedRate = 60000) // Or uncomment this to test every minute
+	public void updateMovieStatusesAutomatically() {
+		List<Movies> allMovies = movieRepository.findAll();
+		java.util.Date today = new java.util.Date();
+		boolean updatedAny = false;
+		for (Movies movie : allMovies) {
+			if (movie.getStatus() == Movies.Status.COMING_SOON && movie.getReleaseDate() != null) {
+				// If release date is before or equal to today
+				if (!movie.getReleaseDate().after(today)) {
+					movie.setStatus(Movies.Status.NOW_SHOWING);
+					movieRepository.save(movie);
+					redisTemplate.delete("movie:detail:" + movie.getId());
+					updatedAny = true;
+				}
+			}
+		}
+		if (updatedAny) {
+			System.out.println("[Scheduler] Đã tự động cập nhật trạng thái các phim đến ngày khởi chiếu thành 'Đang chiếu'.");
+		}
 	}
 }

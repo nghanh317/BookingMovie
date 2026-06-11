@@ -1,14 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import chatbotService from '../../services/chatbotService';
+import movieService from '../../services/movieService';
+import slotService from '../../services/slotService';
+import roomService from '../../services/roomService';
+import cinemaService from '../../services/cinemaService';
 import { AGE_RATINGS } from '../../constants/mockData';
-
-
 
 // ── Chatbot Message Types ────────────────────────────────────
 
-function BotMessage({ text, movies, options, onOption }) {
+function BotMessage({ text, movies, showtimes, options, onOption }) {
+  const navigate = useNavigate();
+
   return (
     <div className="flex items-end gap-2 mb-3">
       {/* Bot avatar */}
@@ -75,6 +79,55 @@ function BotMessage({ text, movies, options, onOption }) {
           </div>
         )}
 
+        {/* Gợi ý suất chiếu */}
+        {showtimes && showtimes.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {showtimes.map((st, i) => (
+              <motion.div
+                key={st.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="bg-cinema-card border border-cinema-border rounded-xl p-3 flex flex-col gap-2 hover:border-primary/40 transition-colors"
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-white font-semibold text-xs">{st.movieTitle}</p>
+                    <p className="text-cinema-muted text-[10px]">{st.cinemaName} - {st.hall}</p>
+                  </div>
+                  <span className="text-primary font-bold text-xs bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                    {st.time}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center mt-1">
+                  <p className="text-cinema-muted text-[10px]">Ngày: {st.date}</p>
+                  <button
+                    onClick={() => {
+                      navigate(`/booking/${st.movieId}/seats`, {
+                        state: {
+                          movie: st.movieObj,
+                          showtime: {
+                            ...st.rawSlot,
+                            time: st.time,
+                            date: st.date,
+                            cinemaName: st.cinemaName,
+                            hall: st.hall,
+                          },
+                          cinema: { name: st.cinemaName, id: st.cinemaId },
+                          slotId: st.id,
+                        }
+                      });
+                    }}
+                    className="text-cinema-black bg-accent hover:bg-accent/80 px-3 py-1 rounded text-[10px] font-bold transition-colors"
+                  >
+                    🎟 Chọn Ghế
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+
         {/* Quick reply options */}
         {options && options.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
@@ -111,11 +164,34 @@ export default function MovieChatbot() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  
+  // Data for lookup
+  const [allMovies, setAllMovies] = useState([]);
+  const [allSlots, setAllSlots] = useState([]);
+  const [allRooms, setAllRooms] = useState([]);
+  const [allCinemas, setAllCinemas] = useState([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Khởi động chatbot
+  // Khởi động chatbot & fetch data
   useEffect(() => {
+    if (isOpen && !dataLoaded) {
+      Promise.all([
+        movieService.getAll(),
+        slotService.getAll({ size: 1000 }),
+        roomService.getAll(),
+        cinemaService.getAll()
+      ]).then(([m, s, r, c]) => {
+        setAllMovies(Array.isArray(m) ? m : (m?.content || []));
+        setAllSlots(Array.isArray(s) ? s : (s?.content || []));
+        setAllRooms(Array.isArray(r) ? r : (r?.content || []));
+        setAllCinemas(Array.isArray(c) ? c : (c?.content || []));
+        setDataLoaded(true);
+      }).catch(err => console.error("Error loading AI data:", err));
+    }
+
     if (isOpen && messages.length === 0) {
       setTimeout(() => {
         addBotMessage({
@@ -168,7 +244,49 @@ export default function MovieChatbot() {
     try {
       const response = await chatbotService.chat(trimmed, chatHistory);
       setIsTyping(false);
-      addBotMessage({ text: response });
+      
+      let botText = response.response || response;
+      let matchedMovies = [];
+      let matchedShowtimes = [];
+
+      // Map movieIds
+      if (response.movieIds && Array.isArray(response.movieIds)) {
+        matchedMovies = response.movieIds
+          .map(id => allMovies.find(m => m.id === id))
+          .filter(Boolean);
+      }
+
+      // Map slotIds
+      if (response.slotIds && Array.isArray(response.slotIds)) {
+        matchedShowtimes = response.slotIds
+          .map(id => {
+            const rawSlot = allSlots.find(s => s.id === id);
+            if (!rawSlot) return null;
+            const movie = allMovies.find(m => m.id === rawSlot.movieId);
+            const room = allRooms.find(r => r.id === rawSlot.roomId);
+            const cinema = allCinemas.find(c => c.id === room?.cinemaId);
+            
+            const [date, timeWithSec] = (rawSlot.showTime || '2024-01-01 00:00:00').split(' ');
+            const time = timeWithSec ? timeWithSec.substring(0, 5) : '';
+
+            return {
+              id: rawSlot.id,
+              movieId: rawSlot.movieId,
+              movieTitle: movie?.title || 'Phim',
+              movieObj: movie,
+              rawSlot: rawSlot,
+              roomId: rawSlot.roomId,
+              cinemaId: room?.cinemaId,
+              cinemaName: cinema?.name || 'Rạp',
+              date,
+              time,
+              hall: rawSlot.roomName || room?.name || 'Phòng chiếu',
+            };
+          })
+          .filter(Boolean);
+      }
+
+      addBotMessage({ text: botText, movies: matchedMovies, showtimes: matchedShowtimes });
     } catch (error) {
       setIsTyping(false);
       console.error('Chat error:', error);

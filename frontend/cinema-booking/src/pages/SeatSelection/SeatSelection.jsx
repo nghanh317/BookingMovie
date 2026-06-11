@@ -125,7 +125,7 @@ export default function SeatSelection() {
                 next.delete(data.seatId);
                 return next;
               });
-              setSeats(prevSeats => prevSeats.map(seat => 
+              setSeats(prevSeats => prevSeats.map(seat =>
                 seat.seatId === data.seatId ? { ...seat, status: 'locked', lockedByMe: false } : seat
               ));
             }
@@ -216,21 +216,21 @@ export default function SeatSelection() {
     const isCurrentlySelected = selected.has(seatId) || seat.lockedByMe;
 
     if (isCurrentlySelected) {
-       // Bỏ chọn
-       setSelected(prev => {
-         const next = new Set(prev);
-         next.delete(seatId);
-         return next;
-       });
-       setSeats(prev => prev.map(s => s.seatId === seatId ? { ...s, status: 'available', lockedByMe: false } : s));
+      // Bỏ chọn
+      setSelected(prev => {
+        const next = new Set(prev);
+        next.delete(seatId);
+        return next;
+      });
+      setSeats(prev => prev.map(s => s.seatId === seatId ? { ...s, status: 'available', lockedByMe: false } : s));
     } else {
-       // Chọn ghế (Chỉ chọn ở local - Draft Selection)
-       setSelected(prev => {
-         const next = new Set(prev);
-         next.add(seatId);
-         return next;
-       });
-       setSeats(prev => prev.map(s => s.seatId === seatId ? { ...s, status: 'locked', lockedByMe: true } : s));
+      // Chọn ghế (Chỉ chọn ở local - Draft Selection)
+      setSelected(prev => {
+        const next = new Set(prev);
+        next.add(seatId);
+        return next;
+      });
+      setSeats(prev => prev.map(s => s.seatId === seatId ? { ...s, status: 'locked', lockedByMe: true } : s));
     }
     setError('');
   };
@@ -368,7 +368,7 @@ export default function SeatSelection() {
                           btnClass = 'cursor-not-allowed opacity-30 bg-cinema-border/5 border-cinema-border/10';
                         } else if (isLocked) {
                           icon = <span className="text-[14px] leading-none">🔒</span>;
-                          btnClass = seat.lockedByMe 
+                          btnClass = seat.lockedByMe
                             ? 'cursor-not-allowed bg-blue-500/15 border-blue-500/40' // Lock của mình thì màu xanh dương
                             : 'cursor-not-allowed bg-orange-500/15 border-orange-500/40';
                         } else if (isSelected) {

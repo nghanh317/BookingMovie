@@ -148,7 +148,16 @@ function CinemaCard({ cinema, index, allMovies, allShowtimes }) {
                           {showtimes.map(s => (
                             <Link
                               key={s.id}
-                              to={`/booking/${movie.id}`}
+                              to={`/booking/${movie.id}/seats`}
+                              state={{
+                                movie: movie,
+                                showtime: {
+                                  ...s,
+                                  cinemaName: cinema.name,
+                                },
+                                cinema: { name: cinema.name, id: cinema.id },
+                                slotId: s.id,
+                              }}
                               className="flex items-center gap-1 px-2 py-1 rounded-lg border border-cinema-border bg-cinema-surface hover:border-primary hover:bg-primary/10 transition-all duration-150 group/st"
                             >
                               <span className="text-white text-xs font-bold group-hover/st:text-primary transition-colors">{s.time}</span>
@@ -235,6 +244,9 @@ export default function Cinemas() {
           time,
           hall: s.roomName || room?.name,
           type: '2D', // Default fallback
+          price: s.price,
+          vipPrice: s.vipPrice,
+          couplePrice: s.couplePrice
         };
       });
       setShowtimes(slots);

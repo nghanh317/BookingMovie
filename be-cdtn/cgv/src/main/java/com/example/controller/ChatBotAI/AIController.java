@@ -19,7 +19,7 @@ public class AIController {
 	private AIService aiService;
 
 	@PostMapping("/chat")
-	public Map<String, String> chat(@RequestBody Map<String, Object> payload) {
+	public Map<String, Object> chat(@RequestBody Map<String, Object> payload) {
 		String prompt = (String) payload.get("prompt");
 		@SuppressWarnings("unchecked")
 		java.util.List<Map<String, String>> history = (java.util.List<Map<String, String>>) payload.get("history");
@@ -27,7 +27,6 @@ public class AIController {
 		if (prompt == null || prompt.isEmpty()) {
 			return Collections.singletonMap("response", "Vui lòng nhập câu hỏi.");
 		}
-		String response = aiService.askGemini(prompt, history);
-		return Collections.singletonMap("response", response);
+		return aiService.askGemini(prompt, history);
 	}
 }
