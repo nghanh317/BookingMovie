@@ -214,7 +214,7 @@ export default function AdminDashboard() {
             allTimeRevenueAmount += amount;
 
             if (ticketDateStr === todayStr) {
-              todayTicketsCount += (ticket.seats?.length || 1);
+              todayTicketsCount += 1;
               todayRevenueAmount += amount;
             }
 
@@ -278,7 +278,7 @@ export default function AdminDashboard() {
         setStatsData([
           { label: 'Tổng phim', value: allMovies.length, icon: '🎬', change: 'Đang chiếu & Sắp chiếu', color: 'border-blue-500/30 bg-blue-500/5' },
           { label: 'Rạp chiếu phim', value: cinemasCount, icon: '🏟️', change: 'Đang hoạt động', color: 'border-green-500/30 bg-green-500/5' },
-          { label: 'Vé đã bán hôm nay', value: todayTicketsCount, icon: '🎟️', change: 'Realtime', color: 'border-primary/30 bg-primary/5' },
+          { label: 'Lượt đặt vé hôm nay', value: todayTicketsCount, icon: '🎟️', change: 'Realtime', color: 'border-primary/30 bg-primary/5' },
           { label: 'Doanh thu hôm nay', value: formattedRevenue, icon: '💰', change: 'Realtime', color: 'border-accent/30 bg-accent/5' },
         ]);
 

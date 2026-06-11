@@ -105,6 +105,7 @@ function TicketDetailModal({ ticket, onClose, onSave }) {
           <div className="grid grid-cols-2 gap-3">
             {[
               { label: 'Khách hàng', value: ticket.accountsFullName || '—' },
+              { label: 'Phim', value: ticket.movieName || '—' },
               { label: 'Ngày đặt', value: fmtDate(ticket.ticketsDate) },
               { label: 'Rạp chiếu', value: ticket.cinemaName || '—' },
               { label: 'Phòng chiếu', value: ticket.roomName || '—' },
@@ -267,7 +268,9 @@ export default function AdminTickets() {
   // Filters
   const [search, setSearch]             = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  // Modals logic removed
+  
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   // Debounce search
   const debounceRef = useRef(null);
@@ -344,7 +347,7 @@ export default function AdminTickets() {
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { icon: '🎟️', label: 'Tổng vé (trang này)', value: tickets.length, sub: `/${totalElements} tổng` },
+          { icon: '🎟️', label: 'Lượt đặt (trang này)', value: tickets.length, sub: `/${totalElements} tổng lượt` },
           { icon: '✅', label: 'Đã thanh toán', value: paidCount, sub: 'trang này' },
           { icon: '🎬', label: 'Đã xác nhận', value: confirmedCount, sub: 'trang này' },
           { icon: '💰', label: 'Doanh thu (trang)', value: fmtMoney(totalRevenue), sub: 'vé đã thanh toán' },
@@ -422,9 +425,12 @@ export default function AdminTickets() {
                   >
                     <td className="px-4 py-3 text-cinema-muted text-xs">#{ticket.id}</td>
                     <td className="px-4 py-3">
-                      <span className="font-mono text-primary text-xs">
+                      <button
+                        onClick={() => { setSelectedTicket(ticket); setShowDetailModal(true); }}
+                        className="font-mono text-primary text-xs hover:underline cursor-pointer text-left"
+                      >
                         {ticket.ticketsCode || `TK-${ticket.id}`}
-                      </span>
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-white font-medium">{ticket.accountsFullName || '—'}</span>
@@ -490,7 +496,19 @@ export default function AdminTickets() {
         )}
       </div>
 
-
+      <AnimatePresence>
+        {showDetailModal && selectedTicket && (
+          <TicketDetailModal
+            ticket={selectedTicket}
+            onClose={() => { setShowDetailModal(false); setSelectedTicket(null); }}
+            onSave={(updatedTicket) => {
+              setTickets(tickets.map(t => t.id === updatedTicket.id ? updatedTicket : t));
+              setShowDetailModal(false);
+              setSelectedTicket(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
