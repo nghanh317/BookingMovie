@@ -34,7 +34,7 @@ function Avatar({ name, size = 'lg' }) {
   );
 }
 
-function BookingCard({ booking, onRate, onViewDetail, onPay, onCancel, allMovies }) {
+function BookingCard({ booking, onRateMovie, onRateCinema, onViewDetail, onPay, onCancel, allMovies }) {
   const status = STATUS_CONFIG[booking.status] || { label: booking.status, color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
   
   // Find matching movie by checking if booking note includes movie title
@@ -97,9 +97,18 @@ function BookingCard({ booking, onRate, onViewDetail, onPay, onCancel, allMovies
               Chi tiết
             </button>
             {booking.status === 'completed' && (
-              <button onClick={() => onRate && onRate(booking)} className="text-accent hover:text-accent/80 text-xs transition-colors mt-1 font-semibold">
-                Đánh giá
-              </button>
+              <div className="flex flex-col gap-1 items-end mt-1">
+                {!localStorage.getItem('reviewed_movie_' + booking.ticketId) && (
+                  <button onClick={() => onRateMovie && onRateMovie(booking)} className="text-accent hover:text-accent/80 text-xs transition-colors font-semibold">
+                    Đánh giá phim
+                  </button>
+                )}
+                {!localStorage.getItem('reviewed_cinema_' + booking.ticketId) && (
+                  <button onClick={() => onRateCinema && onRateCinema(booking)} className="text-purple-400 hover:text-purple-300 text-xs transition-colors font-semibold">
+                    Đánh giá rạp
+                  </button>
+                )}
+              </div>
             )}
             <div className="flex justify-end mt-1">
               {booking.status === 'pending' && (
@@ -525,8 +534,14 @@ export default function Profile() {
     }
   };
 
-  const handleOpenReview = (booking) => {
-    setReviewModal({ open: true, booking });
+  const handleOpenMovieReview = (booking) => {
+    setReviewModal({ open: true, booking, type: 'movie' });
+    setReviewForm({ rating: 0, comment: '' });
+    setReviewSuccess(false);
+  };
+
+  const handleOpenCinemaReview = (booking) => {
+    setReviewModal({ open: true, booking, type: 'cinema' });
     setReviewForm({ rating: 0, comment: '' });
     setReviewSuccess(false);
   };
@@ -537,36 +552,59 @@ export default function Profile() {
     e.preventDefault();
     if (!reviewForm.rating || !reviewForm.comment.trim()) return;
     const userId = user?.id || user?.userId;
-    let movieId = reviewModal.booking?.movieId;
-
-    if (!movieId) {
-      // Fallback: Tìm ID phim trong danh sách phim dựa trên tên phim
-      const matchedMovie = allMovies?.find(m => 
-        reviewModal.booking?.movie && m.title && 
-        (reviewModal.booking.movie === m.title || reviewModal.booking.movie.includes(m.title))
-      );
-      movieId = matchedMovie?.id;
-    }
 
     if (!userId) {
       addNotification({ type: 'error', title: 'Lỗi', message: 'Vui lòng đăng nhập để đánh giá.' });
       return;
     }
-    
-    if (!movieId) {
-      addNotification({ type: 'error', title: 'Lỗi', message: 'Không tìm thấy thông tin phim của vé này. Backend có thể chưa được khởi động lại.' });
-      return;
-    }
 
     setSubmittingReview(true);
     try {
-      await api.post('/v1/movie-reviews', {
-        accountId: userId,
-        movieId: movieId,
-        ticketId: reviewModal.booking?.ticketId,
-        rating: reviewForm.rating,
-        comment: reviewForm.comment
-      });
+      if (reviewModal.type === 'movie') {
+        let movieId = reviewModal.booking?.movieId;
+        if (!movieId) {
+          const matchedMovie = allMovies?.find(m => 
+            reviewModal.booking?.movie && m.title && 
+            (reviewModal.booking.movie === m.title || reviewModal.booking.movie.includes(m.title))
+          );
+          movieId = matchedMovie?.id;
+        }
+
+        if (!movieId) {
+          addNotification({ type: 'error', title: 'Lỗi', message: 'Không tìm thấy thông tin phim của vé này.' });
+          setSubmittingReview(false);
+          return;
+        }
+
+        await api.post('/v1/movie-reviews', {
+          accountId: userId,
+          movieId: movieId,
+          ticketId: reviewModal.booking?.ticketId,
+          rating: reviewForm.rating,
+          comment: reviewForm.comment
+        });
+        localStorage.setItem('reviewed_movie_' + reviewModal.booking?.ticketId, 'true');
+      } else {
+        const cinemasRes = await api.get('/v1/cinemas').catch(() => ({ data: [] }));
+        let cinemas = [];
+        if (cinemasRes.data) {
+          if (Array.isArray(cinemasRes.data)) cinemas = cinemasRes.data;
+          else if (Array.isArray(cinemasRes.data.content)) cinemas = cinemasRes.data.content;
+          else if (Array.isArray(cinemasRes.data.data)) cinemas = cinemasRes.data.data;
+        }
+        const matchedCinema = cinemas.find(c => c.name === reviewModal.booking?.cinema || reviewModal.booking?.cinema?.includes(c.name));
+        const cinemaId = matchedCinema ? matchedCinema.id : 1;
+
+        await api.post('/v1/cinema-reviews', {
+          accountId: userId,
+          cinemaId: cinemaId,
+          ticketId: reviewModal.booking?.ticketId,
+          rating: reviewForm.rating,
+          comment: reviewForm.comment
+        });
+        localStorage.setItem('reviewed_cinema_' + reviewModal.booking?.ticketId, 'true');
+      }
+
       setReviewSuccess(true);
       setTimeout(() => {
         setReviewModal({ open: false, booking: null });
@@ -804,7 +842,7 @@ export default function Profile() {
                   <>
                     <div className="space-y-3">
                       {currentBookings.map(b => (
-                        <BookingCard key={b.id} booking={b} onViewDetail={(b) => setTicketDetailModal({ open: true, booking: b })} onRate={handleOpenReview} onPay={handlePay} onCancel={handleCancel} allMovies={allMovies} />
+                        <BookingCard key={b.id} booking={b} onViewDetail={(b) => setTicketDetailModal({ open: true, booking: b })} onRateMovie={handleOpenMovieReview} onRateCinema={handleOpenCinemaReview} onPay={handlePay} onCancel={handleCancel} allMovies={allMovies} />
                       ))}
                     </div>
                     
@@ -1213,9 +1251,13 @@ export default function Profile() {
                 </svg>
               </button>
 
-              <h3 className="font-heading font-bold text-xl text-white mb-2">Đánh giá phim</h3>
+              <h3 className="font-heading font-bold text-xl text-white mb-2">
+                {reviewModal.type === 'movie' ? 'Đánh giá phim' : 'Đánh giá rạp'}
+              </h3>
               <p className="text-cinema-muted text-sm mb-6 flex items-center gap-2">
-                <span className="font-semibold text-white">{reviewModal.booking?.movie}</span>
+                <span className="font-semibold text-white">
+                  {reviewModal.type === 'movie' ? reviewModal.booking?.movie : reviewModal.booking?.cinema}
+                </span>
               </p>
 
               {reviewSuccess ? (
@@ -1249,7 +1291,7 @@ export default function Profile() {
                     <textarea
                       value={reviewForm.comment}
                       onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
-                      placeholder="Chia sẻ vài dòng về bộ phim..."
+                      placeholder={reviewModal.type === 'movie' ? "Chia sẻ vài dòng về bộ phim..." : "Chia sẻ vài dòng về rạp..."}
                       rows={4}
                       className="input-field resize-none w-full"
                       required

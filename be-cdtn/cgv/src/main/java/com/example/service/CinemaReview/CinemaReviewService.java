@@ -55,6 +55,7 @@ public class CinemaReviewService implements ICinemaReviewService{
 		}
 
 		CinemaReviews createReview = new CinemaReviews(form.getRating(), form.getComment());
+		createReview.setTicketId(form.getTicketId());
 		
 		Accounts account = new Accounts();
 		account.setId(form.getAccountId());

@@ -23,4 +23,6 @@ public class CinemaReviewDTO {
 	
 	private Date updateDate;
 	
+	private Integer ticketId;
+	
 }

@@ -88,36 +88,38 @@ function StarPicker({ value, onChange }) {
 
 // ─── Rating Section Component ────────────────────────────────────
 function CinemaRatingSection({ cinemaId, cinemaName }) {
-  const { isLoggedIn, user } = useAuthStore();
-  const [reviews, setReviews] = useState([
-    { id: 1, author: 'Nguyễn Văn A', rating: 5, comment: 'Rạp rất sạch sẽ, ghế ngồi thoải mái, âm thanh đỉnh!', date: '2025-04-20' },
-    { id: 2, author: 'Trần Thị B', rating: 4, comment: 'Phiên chếu đúng giờ, nhân viên nhiệt tình. Món ăn nhẹ nhà bán hơi mắc.', date: '2025-04-18' },
-    { id: 3, author: 'Lê Văn C',   rating: 4, comment: 'Gần nhà, đặt vé dễ dàng qua app.', date: '2025-04-15' },
-  ]);
-  const [myRating, setMyRating]   = useState(0);
-  const [myComment, setMyComment] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    import('../../services/api').then(({ default: api }) => {
+      api.get('/v1/cinema-reviews', { params: { size: 1000 } })
+        .then(res => {
+          let cReviewsData = [];
+          if (Array.isArray(res.data)) cReviewsData = res.data;
+          else if (Array.isArray(res.data?.data)) cReviewsData = res.data.data;
+          else if (Array.isArray(res.data?.content)) cReviewsData = res.data.content;
+          else if (Array.isArray(res.data?.data?.content)) cReviewsData = res.data.data.content;
+          
+          const filtered = cReviewsData.filter(r => r.cinemaId === cinemaId);
+          const mapped = filtered.map(r => ({
+            id: r.id,
+            author: r.accountFullName || 'Khán giả',
+            rating: r.rating || 5,
+            comment: r.comment,
+            date: r.createDate ? new Date(r.createDate).toLocaleDateString('vi-VN') : 'Mới đây'
+          })).reverse();
+          
+          setReviews(mapped);
+        })
+        .catch(err => console.error(err))
+        .finally(() => setLoading(false));
+    });
+  }, [cinemaId]);
 
   const avgRating = reviews.length
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
     : 0;
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (myRating === 0) return;
-    const newReview = {
-      id: Date.now(),
-      author: user?.fullName || user?.userName || 'Khách',
-      rating: myRating,
-      comment: myComment.trim(),
-      date: new Date().toISOString().split('T')[0],
-    };
-    setReviews(prev => [newReview, ...prev]);
-    setMyRating(0);
-    setMyComment('');
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3500);
-  };
 
   return (
     <motion.div
@@ -137,73 +139,38 @@ function CinemaRatingSection({ cinemaId, cinemaName }) {
         </div>
       </div>
 
-      {/* Input form */}
-      {isLoggedIn && user ? (
-        <form onSubmit={handleSubmit} className="mb-5 space-y-3 border-b border-cinema-border pb-5">
-          <p className="text-cinema-muted text-xs text-center">Chọn số sao của bạn</p>
-          <StarPicker value={myRating} onChange={setMyRating} />
-          <textarea
-            value={myComment}
-            onChange={e => setMyComment(e.target.value)}
-            placeholder="Nhận xét của bạn về rạp..."
-            rows={3}
-            className="input-field w-full resize-none text-sm"
-          />
-          <button
-            type="submit"
-            disabled={myRating === 0}
-            className={`w-full py-2 rounded-xl text-sm font-semibold transition-all ${
-              myRating > 0
-                ? 'btn-primary'
-                : 'bg-cinema-surface text-cinema-muted cursor-not-allowed'
-            }`}
-          >
-            Gửi đánh giá
-          </button>
-          <AnimatePresence>
-            {submitted && (
-              <motion.p
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="text-green-400 text-xs text-center"
-              >
-                ✅ Cảm ơn bạn đã đánh giá!
-              </motion.p>
-            )}
-          </AnimatePresence>
-        </form>
+      {/* Review list */}
+      {loading ? (
+        <div className="text-center py-5 text-cinema-muted text-xs">Đang tải đánh giá...</div>
+      ) : reviews.length > 0 ? (
+        <div className="space-y-3 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
+          {reviews.map(r => (
+            <motion.div
+              key={r.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-cinema-surface rounded-xl p-3"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-white text-xs font-semibold">{r.author}</span>
+                <div className="flex gap-0.5">
+                  {[1,2,3,4,5].map(s => (
+                    <svg key={s} className={`w-3 h-3 ${r.rating >= s ? 'text-primary' : 'text-cinema-border'}`} fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                  ))}
+                </div>
+              </div>
+              {r.comment && <p className="text-cinema-muted text-xs leading-relaxed">{r.comment}</p>}
+              <p className="text-cinema-muted/50 text-[10px] mt-1">{r.date}</p>
+            </motion.div>
+          ))}
+        </div>
       ) : (
-        <div className="mb-5 pb-5 border-b border-cinema-border text-center">
-          <p className="text-cinema-muted text-xs mb-2">Đăng nhập để đánh giá rạp này</p>
-          <Link to="/login" className="btn-primary text-xs px-4 py-1.5 inline-block">Đăng Nhập</Link>
+        <div className="text-center py-5 text-cinema-muted text-xs bg-cinema-surface rounded-xl">
+          Chưa có đánh giá nào cho rạp này.
         </div>
       )}
-
-      {/* Review list */}
-      <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-        {reviews.map(r => (
-          <motion.div
-            key={r.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-cinema-surface rounded-xl p-3"
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-white text-xs font-semibold">{r.author}</span>
-              <div className="flex gap-0.5">
-                {[1,2,3,4,5].map(s => (
-                  <svg key={s} className={`w-3 h-3 ${r.rating >= s ? 'text-primary' : 'text-cinema-border'}`} fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                  </svg>
-                ))}
-              </div>
-            </div>
-            {r.comment && <p className="text-cinema-muted text-xs leading-relaxed">{r.comment}</p>}
-            <p className="text-cinema-muted/50 text-[10px] mt-1">{r.date}</p>
-          </motion.div>
-        ))}
-      </div>
     </motion.div>
   );
 }
