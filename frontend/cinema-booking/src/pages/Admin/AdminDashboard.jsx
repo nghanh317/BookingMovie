@@ -307,6 +307,8 @@ export default function AdminDashboard() {
           formattedPieData = [{ label: 'Chưa có dữ liệu', value: 100, color: '#50C878' }];
         }
 
+        setPieData(formattedPieData);
+
         const monthlyRevArr = yearMonths.map(m => Number((m.revenue / 1000000).toFixed(1)));
         setRevenueChart(monthlyRevArr);
         setChartLabels(mLabels);
