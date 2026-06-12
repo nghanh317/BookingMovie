@@ -25,7 +25,7 @@ public class AIController {
 		java.util.List<Map<String, String>> history = (java.util.List<Map<String, String>>) payload.get("history");
 		
 		if (prompt == null || prompt.isEmpty()) {
-			return Collections.singletonMap("response", "Vui lòng nhập câu hỏi.");
+			return Collections.<String, Object>singletonMap("response", "Vui lòng nhập câu hỏi.");
 		}
 		return aiService.askGemini(prompt, history);
 	}

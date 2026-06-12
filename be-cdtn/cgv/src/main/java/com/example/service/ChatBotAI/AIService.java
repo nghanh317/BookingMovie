@@ -122,13 +122,15 @@ public class AIService {
 					.parts(Collections.singletonList(Part.fromText(prompt)))
 					.build());
 
-			// Using gemini-1.5-flash for fast responses
-			GenerateContentResponse response = client.models.generateContent("gemini-1.5-flash", contents, config);
+			// Using gemini-robotics-er-1.6-preview for fast responses
+			GenerateContentResponse response = client.models.generateContent("gemini-robotics-er-1.6-preview", contents, config);
 			String responseText = response.text();
 			
 			com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
 			try {
-			    return mapper.readValue(responseText, Map.class);
+			    @SuppressWarnings("unchecked")
+			    Map<String, Object> result = (Map<String, Object>) mapper.readValue(responseText, Map.class);
+			    return result;
 			} catch (Exception parseEx) {
 			    Map<String, Object> fallback = new java.util.HashMap<>();
 			    fallback.put("response", responseText);
