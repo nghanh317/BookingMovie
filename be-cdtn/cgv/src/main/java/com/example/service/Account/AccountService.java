@@ -78,6 +78,12 @@ public class AccountService implements IAccountService {
 
 	@Override
 	public void createAccount(CreateAccountForm form) {
+		if (accountRepository.findByUserName(form.getUserName()) != null) {
+			throw new IllegalStateException("Tên đăng nhập đã tồn tại.");
+		}
+		if (accountRepository.findByEmail(form.getEmail()) != null) {
+			throw new IllegalStateException("Email đã tồn tại.");
+		}
 		Accounts accounts = new Accounts(form.getUserName(), form.getPasswordHash(), form.getEmail(), form.getPhone(),
 				form.getFullName());
 		accountRepository.save(accounts);

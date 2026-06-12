@@ -18,7 +18,7 @@ const chatbotService = {
   chat: async (prompt, history = []) => {
     const res = await api.post('/v1/ai/chat', { prompt, history });
     const data = res.data?.data || res.data;
-    return data.response || data;
+    return data;
   },
 };
 

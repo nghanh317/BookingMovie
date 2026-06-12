@@ -7,6 +7,9 @@ import seatLockService from '../../services/seatLockService';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
 
+// Base URL cho WebSocket
+const WEBSOCKET_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace('/api', '/ws');
+
 // ─── Seat type meta ───────────────────────────────────────────────────
 const SEAT_TYPE_META = {
   VIP: { icon: '👑', label: 'VIP', color: 'text-yellow-400', btnBase: 'bg-yellow-900/20 border-yellow-600/40 hover:bg-yellow-700/30 hover:border-yellow-400' },
@@ -88,12 +91,12 @@ export default function SeatSelection() {
   }, [showtimeId, accountId]);
 
   useEffect(() => {
-    if (!showtimeId || !accountId) return;
+    if (!showtimeId) return;
 
     fetchSeatStatus(true);
 
     const client = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+      webSocketFactory: () => new SockJS(WEBSOCKET_URL),
       reconnectDelay: 5000,
       onConnect: () => {
         setIsSocketConnected(true);
@@ -105,8 +108,9 @@ export default function SeatSelection() {
             const data = JSON.parse(message.body);
             setSeats(prevSeats => prevSeats.map(seat => {
               if (seat.seatId === data.seatId) {
+                const isMine = String(data.userId) === String(accountId);
                 if (data.action === 'LOCKED_SUCCESS') {
-                  return { ...seat, status: 'locked', lockedByMe: data.userId === accountId };
+                  return { ...seat, status: 'locked', lockedByMe: isMine };
                 } else if (data.action === 'UNLOCKED_SUCCESS') {
                   return { ...seat, status: 'available', lockedByMe: false };
                 } else if (data.action === 'BOOKED_SUCCESS') {
@@ -117,7 +121,7 @@ export default function SeatSelection() {
             }));
 
             // Nếu người khác khoanh trúng lúc mình đang định khoanh
-            if (data.action === 'LOCKED_FAILED' && data.userId === accountId) {
+            if (data.action === 'LOCKED_FAILED' && String(data.userId) === String(accountId)) {
               setError(data.message || 'Ghế này vừa bị người khác nhanh tay chọn mất!');
               setTimeout(() => setError(''), 4000);
               setSelected(prev => {

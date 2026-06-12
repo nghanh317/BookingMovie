@@ -118,12 +118,25 @@ export default function Booking() {
     }).filter(s => s.rawDate && s.rawDate > now);
   }, [slots]);
 
-  // Province names từ API provinceService + slots
+  // Province names từ API provinceService + slots (Hiển thị TẤT CẢ các tỉnh)
   const allProvinces = useMemo(() => {
     const fromApi = provinces.map(p => p.provinceName || p.name).filter(Boolean);
     const fromSlots = normalizedSlots.map(s => s.provinceName).filter(Boolean);
     return [...new Set([...fromApi, ...fromSlots])];
   }, [provinces, normalizedSlots]);
+
+  // Tự động chọn Tỉnh đầu tiên CÓ SUẤT CHIẾU (chỉ chạy 1 lần khi load xong data)
+  useEffect(() => {
+    if (!loading) {
+      const provincesWithShowtimes = [...new Set(normalizedSlots.map(s => s.provinceName).filter(Boolean))];
+      // Nếu tỉnh đang chọn không có suất chiếu, nhảy sang tỉnh có suất chiếu (nếu có)
+      if (provincesWithShowtimes.length > 0 && !provincesWithShowtimes.includes(province)) {
+        setLocalProvince(provincesWithShowtimes[0]);
+        setProvince(provincesWithShowtimes[0]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   // Lọc slots theo province đã chọn
   const slotsInProvince = useMemo(() => {
@@ -133,8 +146,16 @@ export default function Booking() {
 
   // Dates có suất chiếu
   const datesWithShowtimes = useMemo(() =>
-    [...new Set(slotsInProvince.map(s => s.date).filter(Boolean))],
+    [...new Set(slotsInProvince.map(s => s.date).filter(Boolean))].sort(),
   [slotsInProvince]);
+
+  // Tự động chọn ngày đầu tiên có suất chiếu nếu ngày đang chọn không có suất
+  useEffect(() => {
+    if (datesWithShowtimes.length > 0 && !datesWithShowtimes.includes(selectedDate)) {
+      setSelectedDate(datesWithShowtimes[0]);
+      setSelectedShowtime(null);
+    }
+  }, [datesWithShowtimes, selectedDate]);
 
   // Group theo cinemaName cho ngày đã chọn
   const groupedShowtimes = useMemo(() => {
@@ -249,13 +270,15 @@ export default function Booking() {
                   {DATES.map(d => {
                     const hasShowtime = datesWithShowtimes.includes(d.value);
                     return (
-                      <button key={d.value} onClick={() => { setSelectedDate(d.value); setSelectedShowtime(null); }}
+                      <button key={d.value} 
+                        onClick={() => { setSelectedDate(d.value); setSelectedShowtime(null); }}
+                        disabled={!hasShowtime}
                         className={`relative flex-shrink-0 flex flex-col items-center p-3 rounded-xl border min-w-[62px] transition-all duration-200 ${
                           selectedDate === d.value
                             ? 'border-primary bg-primary text-cinema-black'
                             : hasShowtime
                             ? 'border-primary/40 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10'
-                            : 'border-cinema-border bg-cinema-surface text-cinema-muted hover:border-cinema-muted opacity-60'
+                            : 'border-cinema-border bg-cinema-surface text-cinema-muted opacity-40 cursor-not-allowed'
                         }`}
                       >
                         {hasShowtime && selectedDate !== d.value && (
@@ -278,7 +301,13 @@ export default function Booking() {
                 Chọn Rạp & Suất Chiếu
               </h2>
 
-              {!province ? (
+              {normalizedSlots.length === 0 ? (
+                <div className="bg-cinema-surface border border-cinema-border rounded-xl p-6 text-center text-cinema-muted">
+                  <p className="text-4xl mb-3">🎬</p>
+                  <p className="font-semibold">Phim hiện chưa có lịch chiếu</p>
+                  <p className="text-sm mt-1">Vui lòng quay lại sau khi rạp cập nhật lịch chiếu mới nhé.</p>
+                </div>
+              ) : !province ? (
                 <div className="bg-cinema-surface border border-cinema-border rounded-xl p-6 text-center text-cinema-muted">
                   <p className="text-4xl mb-3">📍</p>
                   <p className="font-semibold">Chưa chọn khu vực</p>

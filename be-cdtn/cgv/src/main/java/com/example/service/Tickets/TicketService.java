@@ -80,10 +80,13 @@ public class TicketService implements ITicketService{
 		TicketDTO dto = new TicketDTO();
 		
 		dto.setId(ticket.getId());
-		dto.setAccountsId(ticket.getAccounts().getId());
-		dto.setAccountsFullName(ticket.getAccounts().getFullName());
-		dto.setSlotsId(ticket.getSlots().getId());
+		if (ticket.getAccounts() != null) {
+			dto.setAccountsId(ticket.getAccounts().getId());
+			dto.setAccountsFullName(ticket.getAccounts().getFullName());
+		}
+		
 		if (ticket.getSlots() != null) {
+			dto.setSlotsId(ticket.getSlots().getId());
 			dto.setSlotsShowTime(ticket.getSlots().getShowTime());
 			if (ticket.getSlots().getMovies() != null) {
 				dto.setMovieName(ticket.getSlots().getMovies().getTitle());
@@ -112,6 +115,7 @@ public class TicketService implements ITicketService{
 		
 		if (bookingSeats != null && !bookingSeats.isEmpty()) {
 			List<Integer> seatIds = bookingSeats.stream()
+				.filter(bs -> bs.getSeats() != null)
 				.map(bs -> bs.getSeats().getId())
 				.collect(Collectors.toList());
 			
@@ -161,7 +165,9 @@ public class TicketService implements ITicketService{
 				TicketDTO.TicketsDetailDTO detailDTO = new TicketDTO.TicketsDetailDTO();
 				
 				detailDTO.setId(detail.getId());
-				detailDTO.setProductsName(detail.getProducts().getProductName());
+				if (detail.getProducts() != null) {
+					detailDTO.setProductsName(detail.getProducts().getProductName());
+				}
 				detailDTO.setQuantity(detail.getQuantity());
 				detailDTO.setUnitPrice(detail.getUnitPrice());
 				detailDTO.setTotalPrice(detail.getTotalPrice());

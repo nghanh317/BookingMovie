@@ -64,12 +64,12 @@ function BotMessage({ text, movies, showtimes, options, onOption }) {
                         Xem chi tiết →
                       </Link>
                       {movie.status === 'now_showing' && (
-                        <Link
-                          to={`/booking/${movie.id}`}
-                          className="text-accent text-[10px] hover:underline font-medium"
+                        <button
+                          onClick={() => onOption(`Cho tôi xem lịch chiếu của phim ${movie.title}`)}
+                          className="text-accent text-[10px] hover:underline font-medium text-left"
                         >
-                          🎟 Đặt vé
-                        </Link>
+                          🎟 Xem lịch chiếu / Đặt vé
+                        </button>
                       )}
                     </div>
                   </div>
@@ -161,7 +161,21 @@ function UserMessage({ text }) {
 
 export default function MovieChatbot() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => {
+    const saved = sessionStorage.getItem('chatbot_messages');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('chatbot_messages', JSON.stringify(messages));
+  }, [messages]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   
@@ -404,6 +418,7 @@ export default function MovieChatbot() {
                     key={i}
                     text={msg.text}
                     movies={msg.movies}
+                    showtimes={msg.showtimes}
                     options={msg.options}
                     onOption={(opt) => handleUserInput(opt)}
                   />

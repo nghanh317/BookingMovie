@@ -62,8 +62,15 @@ export const registerApi = async (userName, passwordHash, email, phone, fullName
 
         // 4. Kiểm tra lỗi (ví dụ: trùng userName, email đã tồn tại...)
         if (!response.ok) {
-            const errorData = await response.text();
-            throw new Error(errorData || 'Đăng ký thất bại. Vui lòng thử lại!');
+            const errorText = await response.text();
+            let errorMsg = 'Đăng ký thất bại. Vui lòng thử lại!';
+            try {
+                const errObj = JSON.parse(errorText);
+                if (errObj.message) errorMsg = errObj.message;
+            } catch (e) {
+                if (errorText) errorMsg = errorText;
+            }
+            throw new Error(errorMsg);
         }
 
         // 5. Nếu thành công, backend trả về chuỗi "Đăng ký thành công"
