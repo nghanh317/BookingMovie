@@ -38,7 +38,19 @@ export default function Register() {
     if (!form.fullName.trim()) errs.fullName = 'Vui lòng nhập họ tên';
     if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email không hợp lệ';
     if (!form.phone || !/^(0|\+84)[0-9]{9}$/.test(form.phone)) errs.phone = 'Số điện thoại không hợp lệ';
-    if (!form.password || form.password.length < 8) errs.password = 'Mật khẩu tối thiểu 8 ký tự';
+    if (!form.password) {
+      errs.password = 'Vui lòng nhập mật khẩu';
+    } else if (form.password.length < 8) {
+      errs.password = 'Mật khẩu tối thiểu 8 ký tự';
+    } else if (!/[A-Z]/.test(form.password)) {
+      errs.password = 'Mật khẩu phải chứa ít nhất 1 chữ in hoa';
+    } else if (!/[a-z]/.test(form.password)) {
+      errs.password = 'Mật khẩu phải chứa ít nhất 1 chữ thường';
+    } else if (!/[0-9]/.test(form.password)) {
+      errs.password = 'Mật khẩu phải chứa ít nhất 1 số';
+    } else if (!/[^A-Za-z0-9]/.test(form.password)) {
+      errs.password = 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt';
+    }
     if (form.password !== form.confirm) errs.confirm = 'Mật khẩu không khớp';
     if (!agreed) errs.agreed = 'Bạn cần đồng ý với điều khoản';
     return errs;
@@ -54,7 +66,10 @@ export default function Register() {
     try {
       await registerApi(form.userName, form.password, form.email, form.phone, form.fullName);
       setLoading(false);
-      navigate('/login');
+      setErrors({ success: 'Đăng ký thành công! Đang chuyển hướng đến trang đăng nhập...' });
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
     } catch (error) {
       setLoading(false);
       setErrors({ apiError: error.message });
@@ -101,6 +116,20 @@ export default function Register() {
           <h1 className="font-heading font-bold text-3xl text-white">Tạo tài khoản mới</h1>
           <p className="text-cinema-muted mt-2">Đăng ký để nhận ưu đãi đặt vé</p>
         </div>
+
+        {errors.success && (
+          <motion.div 
+            initial={{ opacity: 0, x: 50, scale: 0.9 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            className="fixed top-20 right-6 z-[9999] min-w-[300px] px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border backdrop-blur-md bg-green-500/20 border-green-500/30 text-green-400"
+          >
+            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-green-500 text-white">✓</div>
+            <div className="flex-1 text-left">
+              <p className="text-sm font-bold text-white mb-0.5">Thành công</p>
+              <p className="text-xs opacity-90">{errors.success}</p>
+            </div>
+          </motion.div>
+        )}
 
         <div className="card p-8">
           <form onSubmit={handleSubmit} className="space-y-4">

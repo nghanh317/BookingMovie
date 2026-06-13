@@ -9,12 +9,15 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import com.example.form.Tickets.BookingConfirmEmailForm;
 
+import org.springframework.scheduling.annotation.Async;
+
 @Service
 public class EmailService {
 
     @Autowired
     private JavaMailSender mailSender;
 
+    @Async
     public void sendResetPasswordEmail(String toEmail, String resetLink) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -47,6 +50,7 @@ public class EmailService {
         }
     }
 
+    @Async
     public void sendBookingConfirmEmail(BookingConfirmEmailForm data) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -84,6 +88,7 @@ public class EmailService {
         }
     }
 
+    @Async
     public void sendWelcomeEmail(String toEmail, String toName) {
         try {
             MimeMessage message = mailSender.createMimeMessage();

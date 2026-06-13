@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,15 +14,13 @@ function StepIndicator({ current }) {
     <div className="flex items-center justify-center gap-0 mb-8 flex-wrap gap-y-2">
       {steps.map((step, i) => (
         <div key={step} className="flex items-center">
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-            i + 1 === current ? 'bg-primary text-cinema-black' :
-            i + 1 < current ? 'text-primary' : 'text-cinema-muted'
-          }`}>
-            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${
-              i + 1 < current ? 'bg-primary border-primary text-cinema-black' :
-              i + 1 === current ? 'bg-primary border-primary text-cinema-black' :
-              'border-cinema-border'
-            }`}>{i + 1 < current ? '✓' : i + 1}</span>
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${i + 1 === current ? 'bg-primary text-cinema-black' :
+              i + 1 < current ? 'text-primary' : 'text-cinema-muted'
+            }`}>
+            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${i + 1 < current ? 'bg-primary border-primary text-cinema-black' :
+                i + 1 === current ? 'bg-primary border-primary text-cinema-black' :
+                  'border-cinema-border'
+              }`}>{i + 1 < current ? '✓' : i + 1}</span>
             {step}
           </div>
           {i < steps.length - 1 && <div className={`w-6 h-0.5 ${i + 1 < current ? 'bg-primary' : 'bg-cinema-border'}`} />}
@@ -108,9 +106,9 @@ export default function Checkout() {
   const { movieId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { 
+  const {
     movie, showtime, cinema, seats, totalPrice, snacks = [], selectedVoucher,
-    lockExpiresAt, showtimeId, slotId 
+    lockExpiresAt, showtimeId, slotId
   } = location.state || {};
 
   const { user } = useAuthStore();
@@ -127,6 +125,39 @@ export default function Checkout() {
   const [success, setSuccess] = useState(false);
   const [booking, setBooking] = useState(null);
   const [payosData, setPayosData] = useState(null);
+
+  const isSuccessRef = useRef(false);
+  const payosTicketIdRef = useRef(null);
+
+  useEffect(() => {
+    isSuccessRef.current = success;
+  }, [success]);
+
+  useEffect(() => {
+    payosTicketIdRef.current = payosData?.ticketId || null;
+  }, [payosData]);
+
+  // ── Huỷ giữ ghế & huỷ vé khi thoát ngang (không tính F5) ──
+  useEffect(() => {
+    const uid = user?.id || user?.userId;
+    const sid = showtimeId || slotId;
+    
+    return () => {
+      setTimeout(() => {
+        if (!isSuccessRef.current) {
+          const path = window.location.pathname;
+          
+          // Chỉ nhả ghế nếu thoát hẳn khỏi luồng booking (không phải checkout, không phải snacks)
+          // VÀ người dùng CHƯA bấm thanh toán (nếu đã tạo mã QR thì giữ nguyên như cũ)
+          if (!path.includes('/checkout') && !path.includes('/snacks') && !payosTicketIdRef.current) {
+            if (uid && sid) {
+              seatLockService.releaseSeats(uid, sid).catch(() => {});
+            }
+          }
+        }
+      }, 100);
+    };
+  }, [user, showtimeId, slotId]);
 
   // ── Đồng hồ giữ ghế (tiếp nối từ SeatSelection / SnackSelection) ──
   const seatExpiresAt = lockExpiresAt ? new Date(lockExpiresAt) : null;
@@ -147,11 +178,11 @@ export default function Checkout() {
         const uid = user?.id || user?.userId;
         const sid = showtimeId || slotId;
         if (uid && sid) {
-          seatLockService.releaseSeats(uid, sid).catch(() => {});
+          seatLockService.releaseSeats(uid, sid).catch(() => { });
         }
         setPayosData(prev => {
           if (prev?.ticketId) {
-            ticketService.update(prev.ticketId, { status: 'CANCELLED', paymentStatus: 'UNPAID' }).catch(() => {});
+            ticketService.update(prev.ticketId, { status: 'CANCELLED', paymentStatus: 'UNPAID' }).catch(() => { });
           }
           return null;
         });
@@ -162,7 +193,7 @@ export default function Checkout() {
 
   const snackTotal = (snacks || []).reduce((sum, s) => sum + (s.subtotal || 0), 0);
   const subTotalAmount = (totalPrice || 0) + snackTotal;
-  
+
   let discountAmount = 0;
   if (selectedVoucher) {
     if (subTotalAmount >= (selectedVoucher.minOrderAmount || 0)) {
@@ -189,11 +220,11 @@ export default function Checkout() {
           // Bỏ cache bằng cách thêm query string time thông qua tham số của getById
           const ticket = await ticketService.getById(payosData.ticketId, { _t: Date.now() });
           console.log('[Polling] Trạng thái vé hiện tại:', ticket?.paymentStatus);
-          
+
           if (ticket && (ticket.paymentStatus === 'PAID' || ticket.status === 'CONFIRMED')) {
             clearInterval(pollInterval);
             setPayosData(null);
-            
+
             // Đặt thành công
             const newBooking = {
               code: ticket.ticketsCode,
@@ -208,16 +239,16 @@ export default function Checkout() {
             // Gửi email xác nhận đặt vé (sau khi PayOS xác nhận)
             try {
               await api.post('/v1/tickets/send-confirm-email', {
-                to_name:      form.name,
-                to_email:     form.email,
+                to_name: form.name,
+                to_email: form.email,
                 booking_code: ticket.ticketsCode,
-                movie_title:  movie?.title || 'Phim',
-                cinema_name:  cinema?.name || 'Chưa xác định',
-                showtime:     showtime
+                movie_title: movie?.title || 'Phim',
+                cinema_name: cinema?.name || 'Chưa xác định',
+                showtime: showtime
                   ? `${new Date(showtime.date).toLocaleDateString('vi-VN')} – ${showtime.time}`
                   : 'Chưa xác định',
-                seats:  (seats || []).map(s => s.label).join(', '),
-                total:  grandTotal.toLocaleString('vi-VN') + 'đ',
+                seats: (seats || []).map(s => s.label).join(', '),
+                total: grandTotal.toLocaleString('vi-VN') + 'đ',
               });
             } catch (err) {
               console.warn('Không thể gửi email xác nhận:', err);
@@ -260,7 +291,7 @@ export default function Checkout() {
       setErrors(errs);
       return;
     }
-    
+
     setProcessing(true);
 
     try {
@@ -286,7 +317,7 @@ export default function Checkout() {
         // Tạo link thanh toán PayOS (Lấy dữ liệu QR)
         console.log('[Checkout] Đang tạo thông tin QR PayOS cho vé ID:', createdTicket.id);
         const payosResponse = await payosService.createPaymentLink(createdTicket.id);
-        
+
         if (payosResponse && payosResponse.qrCode) {
           // Hiện màn hình QR — đồng hồ đếm ngược là seatRemain tiếp tục chạy, KHÔNG reset
           setPayosData({ ...payosResponse, ticketId: createdTicket.id });
@@ -310,16 +341,16 @@ export default function Checkout() {
         // Gửi email xác nhận đặt vé
         try {
           await api.post('/v1/tickets/send-confirm-email', {
-            to_name:      form.name,
-            to_email:     form.email,
+            to_name: form.name,
+            to_email: form.email,
             booking_code: bookingCode,
-            movie_title:  movie.title,
-            cinema_name:  cinema?.name || 'Chưa xác định',
-            showtime:     showtime
+            movie_title: movie.title,
+            cinema_name: cinema?.name || 'Chưa xác định',
+            showtime: showtime
               ? `${new Date(showtime.date).toLocaleDateString('vi-VN')} – ${showtime.time}`
               : 'Chưa xác định',
-            seats:  seats.map(s => s.label).join(', '),
-            total:  grandTotal.toLocaleString('vi-VN') + 'đ',
+            seats: seats.map(s => s.label).join(', '),
+            total: grandTotal.toLocaleString('vi-VN') + 'đ',
           });
         } catch (err) {
           console.warn('Không thể gửi email xác nhận:', err);
@@ -340,23 +371,23 @@ export default function Checkout() {
     return (
       <div className="min-h-screen py-12 flex items-center justify-center relative">
         <div className="absolute inset-0 bg-cinema-black/80 backdrop-blur-sm z-0"></div>
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="card p-8 max-w-md w-full text-center relative z-10 border-primary/50 shadow-glow-gold"
         >
           <div className="flex justify-center mb-4">
-             <svg viewBox="0 0 140 40" className="h-10 w-auto" xmlns="http://www.w3.org/2000/svg">
-               <rect width="140" height="40" rx="8" fill="#0052FF"/>
-               <rect x="10" y="8" width="24" height="24" rx="6" fill="white" />
-               <rect x="15" y="13" width="14" height="14" rx="2" fill="#0052FF" />
-               <rect x="18" y="16" width="8" height="8" fill="white" />
-               <text x="44" y="25" fill="white" fontSize="13" fontWeight="bold" fontFamily="Arial, sans-serif">VietQR PayOS</text>
-             </svg>
+            <svg viewBox="0 0 140 40" className="h-10 w-auto" xmlns="http://www.w3.org/2000/svg">
+              <rect width="140" height="40" rx="8" fill="#0052FF" />
+              <rect x="10" y="8" width="24" height="24" rx="6" fill="white" />
+              <rect x="15" y="13" width="14" height="14" rx="2" fill="#0052FF" />
+              <rect x="18" y="16" width="8" height="8" fill="white" />
+              <text x="44" y="25" fill="white" fontSize="13" fontWeight="bold" fontFamily="Arial, sans-serif">VietQR PayOS</text>
+            </svg>
           </div>
           <h2 className="font-heading font-bold text-2xl text-white mb-2">Thanh Toán Quét Mã QR</h2>
           <p className="text-cinema-muted text-sm mb-6">Mở ứng dụng ngân hàng và quét mã dưới đây</p>
-          
+
           <div className="bg-white p-3 rounded-2xl inline-block mb-6 shadow-xl">
             <QRCodeCanvas value={payosData.qrCode} size={224} />
           </div>
@@ -388,8 +419,8 @@ export default function Checkout() {
               </div>
             )}
           </div>
-          
-          <button 
+
+          <button
             onClick={async () => {
               if (payosData?.ticketId) {
                 try {
@@ -401,10 +432,10 @@ export default function Checkout() {
               const uid = user?.id || user?.userId;
               const sid = showtimeId || slotId;
               if (uid && sid) {
-                seatLockService.releaseSeats(uid, sid).catch(() => {});
+                seatLockService.releaseSeats(uid, sid).catch(() => { });
               }
-              setPayosData(null); 
-              navigate('/'); 
+              setPayosData(null);
+              navigate('/');
             }}
             className="text-cinema-muted hover:text-red-400 transition-colors underline text-sm"
           >
@@ -422,9 +453,8 @@ export default function Checkout() {
 
         {/* ── Banner đếm ngược giữ ghế ── */}
         {seatExpiresAt && (
-          <div className={`flex items-center justify-between gap-4 mb-6 px-5 py-3 rounded-xl border ${
-            seatExpired ? 'bg-red-500/10 border-red-500/40' : seatRemain <= 60 ? 'bg-red-500/10 border-red-500/40' : seatRemain <= 120 ? 'bg-yellow-500/10 border-yellow-500/40' : 'bg-green-500/10 border-green-500/40'
-          }`}>
+          <div className={`flex items-center justify-between gap-4 mb-6 px-5 py-3 rounded-xl border ${seatExpired ? 'bg-red-500/10 border-red-500/40' : seatRemain <= 60 ? 'bg-red-500/10 border-red-500/40' : seatRemain <= 120 ? 'bg-yellow-500/10 border-yellow-500/40' : 'bg-green-500/10 border-green-500/40'
+            }`}>
             <div className="flex items-center gap-3">
               <span className="text-xl">⏳</span>
               <div>
@@ -437,9 +467,8 @@ export default function Checkout() {
               </div>
             </div>
             {!seatExpired ? (
-              <span className={`font-mono font-extrabold text-2xl ${
-                seatRemain <= 60 ? 'text-red-400 animate-pulse' : seatRemain <= 120 ? 'text-yellow-400' : 'text-green-400'
-              }`}>
+              <span className={`font-mono font-extrabold text-2xl ${seatRemain <= 60 ? 'text-red-400 animate-pulse' : seatRemain <= 120 ? 'text-yellow-400' : 'text-green-400'
+                }`}>
                 {String(Math.floor(seatRemain / 60)).padStart(2, '0')}:{String(seatRemain % 60).padStart(2, '0')}
               </span>
             ) : (
@@ -509,7 +538,7 @@ export default function Checkout() {
                   const logos = {
                     payos: (
                       <svg viewBox="0 0 140 40" className="h-8 w-auto" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="140" height="40" rx="8" fill="#0052FF"/>
+                        <rect width="140" height="40" rx="8" fill="#0052FF" />
                         <rect x="10" y="8" width="24" height="24" rx="6" fill="white" />
                         <rect x="15" y="13" width="14" height="14" rx="2" fill="#0052FF" />
                         <rect x="18" y="16" width="8" height="8" fill="white" />
@@ -521,11 +550,10 @@ export default function Checkout() {
                     <button
                       key={method.id}
                       onClick={() => setPaymentMethod(method.id)}
-                      className={`p-4 rounded-xl border text-left transition-all duration-200 ${
-                        isSelected
+                      className={`p-4 rounded-xl border text-left transition-all duration-200 ${isSelected
                           ? 'border-primary bg-primary/10'
                           : 'border-cinema-border bg-cinema-surface hover:border-cinema-muted'
-                      }`}
+                        }`}
                     >
                       <div className="mb-2">{logos[method.id]}</div>
                       <p className={`font-semibold text-sm ${isSelected ? 'text-primary' : 'text-white'}`}>
@@ -541,15 +569,14 @@ export default function Checkout() {
             <button
               onClick={handleSubmit}
               disabled={processing}
-              className={`w-full py-4 rounded-xl font-heading font-bold text-base transition-all duration-200 ${
-                processing ? 'bg-cinema-surface text-cinema-muted cursor-not-allowed' : 'btn-accent'
-              }`}
+              className={`w-full py-4 rounded-xl font-heading font-bold text-base transition-all duration-200 ${processing ? 'bg-cinema-surface text-cinema-muted cursor-not-allowed' : 'btn-accent'
+                }`}
             >
               {processing ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                   Đang xử lý...
                 </span>

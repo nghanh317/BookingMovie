@@ -10,10 +10,10 @@ import useAuthStore from '../../store/authStore';
 const STEPS = ['Chọn tỉnh/thành phố', 'Chọn ngày', 'Chọn rạp & suất chiếu', 'Chọn ghế & bỏng nước', 'Thanh toán'];
 
 const CATEGORY_META = {
-  FOOD:    { icon: '🍿', label: 'Bỏng Rang',       color: 'from-yellow-500/10 to-orange-500/10 border-yellow-700/30' },
-  DRINK:   { icon: '🥤', label: 'Nước Uống',        color: 'from-blue-500/10 to-cyan-500/10 border-blue-700/30' },
-  COMBO:   { icon: '🎉', label: 'Combo Tiết Kiệm',  color: 'from-primary/10 to-accent/10 border-primary/30' },
-  VOUCHER: { icon: '🎫', label: 'Khác',             color: 'from-cinema-surface/10 to-cinema-card/10 border-cinema-border' },
+  FOOD: { icon: '🍿', label: 'Bỏng Rang', color: 'from-yellow-500/10 to-orange-500/10 border-yellow-700/30' },
+  DRINK: { icon: '🥤', label: 'Nước Uống', color: 'from-blue-500/10 to-cyan-500/10 border-blue-700/30' },
+  COMBO: { icon: '🎉', label: 'Combo Tiết Kiệm', color: 'from-primary/10 to-accent/10 border-primary/30' },
+  VOUCHER: { icon: '🎫', label: 'Khác', color: 'from-cinema-surface/10 to-cinema-card/10 border-cinema-border' },
 };
 
 function parseCategory(cat) {
@@ -28,13 +28,11 @@ function StepIndicator({ current }) {
     <div className="flex items-center justify-center gap-0 mb-8 flex-wrap gap-y-2">
       {STEPS.map((step, i) => (
         <div key={step} className="flex items-center">
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-            i + 1 === current ? 'bg-primary text-cinema-black' :
-            i + 1 < current ? 'text-primary' : 'text-cinema-muted'
-          }`}>
-            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${
-              i + 1 <= current ? 'bg-primary border-primary text-cinema-black' : 'border-cinema-border'
-            }`}>{i + 1 < current ? '✓' : i + 1}</span>
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${i + 1 === current ? 'bg-primary text-cinema-black' :
+              i + 1 < current ? 'text-primary' : 'text-cinema-muted'
+            }`}>
+            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${i + 1 <= current ? 'bg-primary border-primary text-cinema-black' : 'border-cinema-border'
+              }`}>{i + 1 < current ? '✓' : i + 1}</span>
             {step}
           </div>
           {i < STEPS.length - 1 && <div className={`w-6 h-0.5 ${i + 1 < current ? 'bg-primary' : 'bg-cinema-border'}`} />}
@@ -69,9 +67,9 @@ function formatCountdown(secs) {
 }
 
 export default function SnackSelection() {
-  const { movieId }  = useParams();
-  const location     = useLocation();
-  const navigate     = useNavigate();
+  const { movieId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const {
     movie, showtime, cinema, seats, totalPrice,
     showtimeId, slotId, lockExpiresAt,
@@ -84,8 +82,8 @@ export default function SnackSelection() {
   const calcRemaining = () =>
     lockExpiresAt ? Math.max(0, Math.round((new Date(lockExpiresAt) - Date.now()) / 1000)) : 0;
 
-  const [remainSecs, setRemainSecs]       = useState(calcRemaining);
-  const [holdExpired, setHoldExpired]     = useState(false); // hết hạn → hiện popup
+  const [remainSecs, setRemainSecs] = useState(calcRemaining);
+  const [holdExpired, setHoldExpired] = useState(false); // hết hạn → hiện popup
 
   // Bộ đếm ngược mỗi giây
   useEffect(() => {
@@ -96,7 +94,7 @@ export default function SnackSelection() {
       if (rem === 0 && !holdExpired) {
         setHoldExpired(true);
         if (accountId && (showtimeId || slotId)) {
-           seatLockService.releaseSeats(accountId, showtimeId || slotId).catch(() => {});
+          seatLockService.releaseSeats(accountId, showtimeId || slotId).catch(() => { });
         }
       }
     }, 1000);
@@ -104,12 +102,26 @@ export default function SnackSelection() {
   }, [holdExpired, lockExpiresAt, accountId, showtimeId, slotId]);
 
   // ── State chính ──
-  const [products, setProducts]           = useState([]);
-  const [loading, setLoading]             = useState(true);
-  const [quantities, setQuantities]       = useState({});
-  const [vouchers, setVouchers]           = useState([]);
-  const [selectedVoucher, setSelectedVoucher]     = useState(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [quantities, setQuantities] = useState({});
+  const [vouchers, setVouchers] = useState([]);
+  const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [showVoucherDropdown, setShowVoucherDropdown] = useState(false);
+
+  // ── Huỷ giữ ghế khi thoát ngang (không tính F5) ──
+  useEffect(() => {
+    return () => {
+      setTimeout(() => {
+        const path = window.location.pathname;
+        if (!path.includes('/checkout') && !path.includes('/snacks')) {
+          if (accountId && (showtimeId || slotId)) {
+            seatLockService.releaseSeats(accountId, showtimeId || slotId).catch(() => {});
+          }
+        }
+      }, 100);
+    };
+  }, [accountId, showtimeId, slotId]);
 
   // ── Fetch products & vouchers ──
   useEffect(() => {
@@ -121,7 +133,7 @@ export default function SnackSelection() {
         ]);
 
         let items = [];
-        if (resProducts?.content)            items = resProducts.content;
+        if (resProducts?.content) items = resProducts.content;
         else if (resProducts?.data?.content) items = resProducts.data.content;
         else if (Array.isArray(resProducts?.data)) items = resProducts.data;
         else if (Array.isArray(resProducts)) items = resProducts;
@@ -132,7 +144,7 @@ export default function SnackSelection() {
         setQuantities(initial);
 
         let promoItems = [];
-        if (resPromotions?.content)            promoItems = resPromotions.content;
+        if (resPromotions?.content) promoItems = resPromotions.content;
         else if (resPromotions?.data?.content) promoItems = resPromotions.data.content;
         else if (Array.isArray(resPromotions?.data)) promoItems = resPromotions.data;
         else if (Array.isArray(resPromotions)) promoItems = resPromotions;
@@ -146,7 +158,7 @@ export default function SnackSelection() {
             const parsed = JSON.parse(saved);
             userOwned = parsed.map(item => item.original).filter(Boolean);
           }
-        } catch (e) {}
+        } catch (e) { }
 
         const now = new Date();
         const validVouchers = [...generalVouchers, ...userOwned].filter(v => {
@@ -199,8 +211,8 @@ export default function SnackSelection() {
       name: p.productName,
     }));
 
-  const snackTotal      = selectedSnacks.reduce((sum, s) => sum + s.subtotal, 0);
-  const subTotalAmount  = totalPrice + snackTotal;
+  const snackTotal = selectedSnacks.reduce((sum, s) => sum + s.subtotal, 0);
+  const subTotalAmount = totalPrice + snackTotal;
 
   let discountAmount = 0;
   if (selectedVoucher && subTotalAmount >= (selectedVoucher.minOrderAmount || 0)) {
@@ -451,9 +463,8 @@ export default function SnackSelection() {
                                 key={v.id}
                                 disabled={!isEligible}
                                 onClick={() => { setSelectedVoucher(v); setShowVoucherDropdown(false); }}
-                                className={`w-full text-left p-3 border-b border-cinema-border last:border-0 transition-colors ${
-                                  !isEligible ? 'opacity-50 cursor-not-allowed bg-cinema-surface/30' : 'hover:bg-cinema-surface'
-                                }`}
+                                className={`w-full text-left p-3 border-b border-cinema-border last:border-0 transition-colors ${!isEligible ? 'opacity-50 cursor-not-allowed bg-cinema-surface/30' : 'hover:bg-cinema-surface'
+                                  }`}
                               >
                                 <div className="flex justify-between items-start mb-1">
                                   <span className={`font-semibold text-sm ${!isEligible ? 'text-cinema-muted' : 'text-white'}`}>
