@@ -16,21 +16,42 @@ const FORMAT_COLORS = {
 };
 
 function getToday() {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().split('T')[0];
 }
 
 function getMoviesAtCinema(cinemaId, allMovies, allShowtimes) {
-  const today = getToday();
-  const todayShowtimes = allShowtimes.filter(s => s.cinemaId === cinemaId && s.date === today);
+  let today = getToday();
+  let todayShowtimes = allShowtimes.filter(s => s.cinemaId === cinemaId && s.date === today);
+  
+  // Nếu hôm nay không có lịch chiếu, tìm ngày gần nhất trong tương lai có lịch
+  if (todayShowtimes.length === 0) {
+    const futureShowtimes = allShowtimes
+      .filter(s => s.cinemaId === cinemaId && s.date >= today)
+      .sort((a, b) => a.date.localeCompare(b.date));
+      
+    if (futureShowtimes.length > 0) {
+       today = futureShowtimes[0].date;
+       todayShowtimes = allShowtimes.filter(s => s.cinemaId === cinemaId && s.date === today);
+    }
+  }
+
   const movieIds = [...new Set(todayShowtimes.map(s => s.movieId))];
-  return movieIds
-    .map(id => ({ movie: allMovies.find(m => m.id === id), showtimes: todayShowtimes.filter(s => s.movieId === id) }))
-    .filter(x => x.movie);
+  return {
+    date: today,
+    movies: movieIds
+      .map(id => ({ movie: allMovies.find(m => m.id === id), showtimes: todayShowtimes.filter(s => s.movieId === id) }))
+      .filter(x => x.movie)
+  };
 }
 
 function CinemaCard({ cinema, index, allMovies, allShowtimes }) {
   const [expanded, setExpanded] = useState(false);
-  const moviesNow = useMemo(() => getMoviesAtCinema(cinema.id, allMovies, allShowtimes), [cinema.id, allMovies, allShowtimes]);
+  const dataNow = useMemo(() => getMoviesAtCinema(cinema.id, allMovies, allShowtimes), [cinema.id, allMovies, allShowtimes]);
+  const moviesNow = dataNow.movies;
+  const showDate = dataNow.date;
+  const isToday = showDate === getToday();
 
   return (
     <motion.div
@@ -51,7 +72,7 @@ function CinemaCard({ cinema, index, allMovies, allShowtimes }) {
         <div className="absolute bottom-0 left-0 p-4">
           <div className="flex items-center gap-2 mb-1">
             <span className="badge bg-primary/20 border border-primary/40 text-primary text-xs font-semibold">
-              🎬 {cinema.screens} phòng chiếu
+              🎬 {cinema.screens || (cinema.rooms && cinema.rooms.length) || 0} phòng chiếu
             </span>
             <span className="badge bg-cinema-black/60 border border-cinema-border text-cinema-muted text-xs">
               {cinema.province}
@@ -84,7 +105,7 @@ function CinemaCard({ cinema, index, allMovies, allShowtimes }) {
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
           <p className="text-white font-semibold text-sm">
-            Hôm nay chiếu{' '}
+            {isToday ? 'Hôm nay chiếu ' : `Ngày ${showDate.split('-').reverse().join('/')} chiếu `}
             <span className="text-primary font-bold">{moviesNow.length}</span> phim
           </p>
           <button
@@ -112,7 +133,9 @@ function CinemaCard({ cinema, index, allMovies, allShowtimes }) {
               </Link>
             ))}
             {moviesNow.length === 0 && (
-              <p className="text-cinema-muted text-xs py-2">Chưa có lịch chiếu hôm nay</p>
+              <p className="text-cinema-muted text-xs py-2">
+                {isToday ? 'Chưa có lịch chiếu hôm nay' : `Chưa có lịch chiếu trong tương lai`}
+              </p>
             )}
           </div>
         )}
@@ -172,7 +195,7 @@ function CinemaCard({ cinema, index, allMovies, allShowtimes }) {
               ) : (
                 <div className="py-4 text-center text-cinema-muted text-sm">
                   <p className="text-3xl mb-2">🎬</p>
-                  Chưa có lịch chiếu hôm nay
+                  {isToday ? 'Chưa có lịch chiếu hôm nay' : 'Chưa có lịch chiếu trong tương lai'}
                 </div>
               )}
             </motion.div>
@@ -232,17 +255,32 @@ export default function Cinemas() {
       const slotsRaw = Array.isArray(slotsData) ? slotsData : (slotsData?.content || slotsData?.data || []);
       
       const slots = slotsRaw.map(s => {
-        const [date, timeWithSec] = (s.showTime || '2024-01-01 00:00:00').split(' ');
+        let dateStr = s.showTime || '2024-01-01 00:00:00';
+        // Xử lý trường hợp format dd-MM-yyyy HH:mm:ss
+        if (dateStr.includes('-') && dateStr.split(' ')[0].split('-')[2].length === 4) {
+           const parts = dateStr.split(' ')[0].split('-');
+           dateStr = `${parts[2]}-${parts[1]}-${parts[0]} ${dateStr.split(' ')[1]}`;
+        }
+        const [date, timeWithSec] = dateStr.split(' ');
         const time = timeWithSec ? timeWithSec.substring(0, 5) : '';
         const room = fetchedRooms.find(r => r.id === s.roomId);
+        
+        // Tìm cinemaId từ s.cinemaName hoặc room.cinemasName
+        let cId = s.cinemaId;
+        if (!cId) {
+          const cName = s.cinemaName || room?.cinemasName;
+          const match = Array.isArray(cinemasData) ? cinemasData.find(c => c.name === cName || c.cinemaName === cName) : null;
+          cId = match?.id;
+        }
+
         return {
           id: s.id,
           movieId: s.movieId,
           roomId: s.roomId,
-          cinemaId: room?.cinemaId,
+          cinemaId: cId,
           date,
           time,
-          hall: s.roomName || room?.name,
+          hall: s.roomName || room?.roomName || room?.name,
           type: '2D', // Default fallback
           price: s.price,
           vipPrice: s.vipPrice,

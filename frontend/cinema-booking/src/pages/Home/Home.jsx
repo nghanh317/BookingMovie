@@ -133,25 +133,6 @@ function StatsBar({ stats }) {
   );
 }
 
-// --- Promo Banner ---
-function PromoBanner() {
-  return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-accent/20 via-cinema-surface to-primary/20 border border-cinema-border p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-6">
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute -top-10 -left-10 w-60 h-60 rounded-full bg-accent blur-3xl" />
-        <div className="absolute -bottom-10 -right-10 w-60 h-60 rounded-full bg-primary blur-3xl" />
-      </div>
-      <div className="relative text-center md:text-left">
-        <span className="badge bg-accent text-white text-xs mb-3 inline-block">🔥 ƯU ĐÃI ĐẶC BIỆT</span>
-        <h3 className="font-heading font-bold text-2xl md:text-3xl text-white mb-2">Giảm 30% cho lần đặt vé đầu tiên</h3>
-        <p className="text-cinema-muted">Đăng ký thành viên ngay hôm nay và nhận ngay ưu đãi hấp dẫn!</p>
-      </div>
-      <div className="relative flex-shrink-0">
-        <Link to="/register" className="btn-primary px-8 py-3 text-base shadow-glow-gold">Đăng Ký Ngay</Link>
-      </div>
-    </div>
-  );
-}
 
 // --- Main Home Page ---
 export default function Home() {
@@ -237,7 +218,6 @@ export default function Home() {
           </div>
         </section>
 
-        <PromoBanner />
 
         {/* Coming Soon */}
         <section>

@@ -17,7 +17,7 @@ const normalize = (cinema) => ({
   longitude: cinema.longitude ? parseFloat(cinema.longitude) : null,
   phone: cinema.phone || '',
   email: cinema.email || '',
-  screens: parseInt(cinema.screens || cinema.numberOfScreens) || 0,
+  screens: parseInt(cinema.screens || cinema.numberOfScreens) || (cinema.rooms && Array.isArray(cinema.rooms) ? cinema.rooms.length : 0),
   rating: parseFloat(cinema.rating) || 0,
   rooms: cinema.rooms || [],
 });
