@@ -39,7 +39,7 @@ public class ExceptionConfiguration extends ResponseEntityExceptionHandler {
 				message, 
 				detailMessage, 
 				code, 
-				exception);
+				null);
 
 		return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
 	}
@@ -62,7 +62,19 @@ public class ExceptionConfiguration extends ResponseEntityExceptionHandler {
 				exception.getMessage(),
 				exception.getLocalizedMessage(),
 				9,
-				exception);
+				null);
+		return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+	}
+
+	// Database constraint violation (e.g. duplicate review)
+	@ExceptionHandler({ org.springframework.dao.DataIntegrityViolationException.class })
+	public ResponseEntity<Object> handleDataIntegrityViolation(org.springframework.dao.DataIntegrityViolationException exception) {
+		String message = "Dữ liệu không hợp lệ hoặc đã tồn tại.";
+		ErrorResponse response = new ErrorResponse(
+				message,
+				exception.getLocalizedMessage(),
+				10,
+				null);
 		return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
 	}
 
@@ -90,7 +102,7 @@ public class ExceptionConfiguration extends ResponseEntityExceptionHandler {
 				message, 
 				detailMessage, 
 				code, 
-				exception);
+				null);
 			
 		return new ResponseEntity<>(response, status);
 	}
@@ -108,7 +120,7 @@ public class ExceptionConfiguration extends ResponseEntityExceptionHandler {
 				message, 
 				detailMessage, 
 				code, 
-				exception);
+				null);
 		
 		return new ResponseEntity<>(response, status);
 	}
@@ -135,7 +147,7 @@ public class ExceptionConfiguration extends ResponseEntityExceptionHandler {
 				message, 
 				detailMessage, 
 				code, 
-				exception);
+				null);
 		
 		return new ResponseEntity<>(response, status);
 	}
@@ -162,7 +174,7 @@ public class ExceptionConfiguration extends ResponseEntityExceptionHandler {
 				message, 
 				detailMessage, 
 				code, 
-				exception);
+				null);
 		
 		return new ResponseEntity<>(response, status);
 	}
@@ -180,7 +192,7 @@ public class ExceptionConfiguration extends ResponseEntityExceptionHandler {
 				message, 
 				detailMessage, 
 				code, 
-				new Exception());
+				null);
 		
 		return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
 	}

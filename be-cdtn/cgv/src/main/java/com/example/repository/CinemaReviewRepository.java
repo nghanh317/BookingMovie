@@ -8,5 +8,6 @@ import com.example.entity.CinemaReviews;
 
 @Repository
 public interface CinemaReviewRepository extends JpaRepository<CinemaReviews, Integer>, JpaSpecificationExecutor<CinemaReviews>{
+	java.util.Optional<CinemaReviews> findByTicketId(Integer ticketId);
 
 }

@@ -47,6 +47,18 @@ public class CinemaReviewService implements ICinemaReviewService{
 		return dtoPage;
 	}
 
+	@Autowired
+	private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+	@jakarta.annotation.PostConstruct
+	public void dropUniqueIndex() {
+		try {
+			jdbcTemplate.execute("ALTER TABLE cinema_reviews DROP INDEX account_cinema_unique");
+		} catch (Exception e) {
+			// Ignore if index doesn't exist
+		}
+	}
+
 	@Override
 	public void createCinemaReview(CreateCinemaReview form) {
 		boolean hasVisited = ticketRepository.hasUserVisitedCinema(form.getAccountId(), form.getCinemaId());
@@ -54,18 +66,29 @@ public class CinemaReviewService implements ICinemaReviewService{
 			throw new IllegalStateException("Bạn cần đến rạp này ít nhất một lần trước khi đánh giá.");
 		}
 
-		CinemaReviews createReview = new CinemaReviews(form.getRating(), form.getComment());
-		createReview.setTicketId(form.getTicketId());
-		
-		Accounts account = new Accounts();
-		account.setId(form.getAccountId());
-		createReview.setAccount(account);
-		
-		Cinemas cinema = new Cinemas();
-		cinema.setId(form.getCinemaId());
-		createReview.setCinema(cinema);
-		
-		cinemaReviewRepository.save(createReview);
+		java.util.Optional<CinemaReviews> existingOpt = form.getTicketId() != null 
+				? cinemaReviewRepository.findByTicketId(form.getTicketId()) 
+				: java.util.Optional.empty();
+
+		if (existingOpt.isPresent()) {
+			CinemaReviews existingReview = existingOpt.get();
+			existingReview.setRating(form.getRating());
+			existingReview.setComment(form.getComment());
+			cinemaReviewRepository.save(existingReview);
+		} else {
+			CinemaReviews createReview = new CinemaReviews(form.getRating(), form.getComment());
+			createReview.setTicketId(form.getTicketId());
+			
+			Accounts account = new Accounts();
+			account.setId(form.getAccountId());
+			createReview.setAccount(account);
+			
+			Cinemas cinema = new Cinemas();
+			cinema.setId(form.getCinemaId());
+			createReview.setCinema(cinema);
+			
+			cinemaReviewRepository.save(createReview);
+		}
 	}
 
 	@Override

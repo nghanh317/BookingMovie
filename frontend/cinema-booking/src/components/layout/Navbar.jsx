@@ -97,27 +97,48 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const loadCinemasWithRating = async () => {
+    if (cinemas.length > 0) return;
+    setCinemasLoading(true);
+    try {
+      const { default: api } = await import('../../services/api');
+      const [cinemasData, reviewsRes] = await Promise.all([
+        cinemaService.getAll(),
+        api.get('/v1/cinema-reviews', { params: { size: 1000 } }).catch(() => ({ data: [] }))
+      ]);
+
+      let cReviewsData = [];
+      if (Array.isArray(reviewsRes.data)) cReviewsData = reviewsRes.data;
+      else if (Array.isArray(reviewsRes.data?.data)) cReviewsData = reviewsRes.data.data;
+      else if (Array.isArray(reviewsRes.data?.content)) cReviewsData = reviewsRes.data.content;
+      else if (Array.isArray(reviewsRes.data?.data?.content)) cReviewsData = reviewsRes.data.data.content;
+
+      const rawCinemas = Array.isArray(cinemasData) ? cinemasData : [];
+      const enrichedCinemas = rawCinemas.map(c => {
+        const cReviews = cReviewsData.filter(r => r.cinemaId === c.id);
+        let avg = 0;
+        if (cReviews.length > 0) {
+          avg = cReviews.reduce((sum, r) => sum + (r.rating || 5), 0) / cReviews.length;
+        }
+        return { ...c, rating: avg > 0 ? Number(avg.toFixed(1)) : 0, reviewCount: cReviews.length };
+      });
+      setCinemas(enrichedCinemas);
+    } catch (err) {
+      console.error('Error loading cinemas in navbar:', err);
+    } finally {
+      setCinemasLoading(false);
+    }
+  };
+
   // Load danh sách rạp khi hover vào "Rạp Phim"
   const handleCinemaHover = () => {
-    if (cinemas.length === 0) {
-      setCinemasLoading(true);
-      cinemaService.getAll().then((data) => {
-        setCinemas(data);
-        setCinemasLoading(false);
-      });
-    }
+    loadCinemasWithRating();
     setCinemaDropdownOpen(true);
   };
 
   // Load cinemas cho mobile menu
   const handleMobileCinemaToggle = () => {
-    if (cinemas.length === 0) {
-      setCinemasLoading(true);
-      cinemaService.getAll().then((data) => {
-        setCinemas(data);
-        setCinemasLoading(false);
-      });
-    }
+    loadCinemasWithRating();
     setMobileCinemaOpen(!mobileCinemaOpen);
   };
 

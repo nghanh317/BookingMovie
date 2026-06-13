@@ -237,17 +237,34 @@ export default function Cinemas() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      cinemaService.getAll(),
-      provinceService.getAll(),
-      movieService.getAll(),
-      roomService.getAll(),
-      slotService.getAll({ size: 1000 })
-    ]).then(([cinemasData, provincesData, moviesData, roomsData, slotsData]) => {
-      setCinemas(Array.isArray(cinemasData) ? cinemasData : []);
-      
-      const provs = Array.isArray(provincesData) ? provincesData : (provincesData?.content || provincesData?.data || []);
-      setProvinces(provs.map(p => p.provinceName || p.name || p));
+    import('../../services/api').then(({ default: api }) => {
+      Promise.all([
+        cinemaService.getAll(),
+        provinceService.getAll(),
+        movieService.getAll(),
+        roomService.getAll(),
+        slotService.getAll({ size: 1000 }),
+        api.get('/v1/cinema-reviews', { params: { size: 1000 } }).catch(() => ({ data: [] }))
+      ]).then(([cinemasData, provincesData, moviesData, roomsData, slotsData, reviewsRes]) => {
+        let cReviewsData = [];
+        if (Array.isArray(reviewsRes.data)) cReviewsData = reviewsRes.data;
+        else if (Array.isArray(reviewsRes.data?.data)) cReviewsData = reviewsRes.data.data;
+        else if (Array.isArray(reviewsRes.data?.content)) cReviewsData = reviewsRes.data.content;
+        else if (Array.isArray(reviewsRes.data?.data?.content)) cReviewsData = reviewsRes.data.data.content;
+        
+        const rawCinemas = Array.isArray(cinemasData) ? cinemasData : [];
+        const enrichedCinemas = rawCinemas.map(c => {
+          const cReviews = cReviewsData.filter(r => r.cinemaId === c.id);
+          let avg = 0;
+          if (cReviews.length > 0) {
+             avg = cReviews.reduce((sum, r) => sum + (r.rating || 5), 0) / cReviews.length;
+          }
+          return { ...c, rating: avg > 0 ? Number(avg.toFixed(1)) : 0, reviewCount: cReviews.length };
+        });
+        setCinemas(enrichedCinemas);
+        
+        const provs = Array.isArray(provincesData) ? provincesData : (provincesData?.content || provincesData?.data || []);
+        setProvinces(provs.map(p => p.provinceName || p.name || p));
       
       setMovies(Array.isArray(moviesData) ? moviesData : (moviesData?.content || moviesData?.data || []));
       
@@ -291,6 +308,7 @@ export default function Cinemas() {
     }).catch(err => {
       console.error("Error fetching data in Cinemas.jsx:", err);
     }).finally(() => setLoading(false));
+    });
   }, []);
 
   const availableProvinces = useMemo(() => {

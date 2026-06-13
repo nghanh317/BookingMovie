@@ -117,10 +117,6 @@ function CinemaRatingSection({ cinemaId, cinemaName }) {
     });
   }, [cinemaId]);
 
-  const avgRating = reviews.length
-    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
-    : 0;
-
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -128,15 +124,24 @@ function CinemaRatingSection({ cinemaId, cinemaName }) {
       transition={{ delay: 0.35 }}
       className="bg-cinema-card border border-cinema-border rounded-2xl p-5"
     >
-      {/* Header + avg */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-white font-heading font-bold flex items-center gap-2">
-          <span className="text-primary">⭐</span> Đánh Giá Rạp
+          <span className="text-primary">📝</span> Đánh Giá Rạp
         </h3>
-        <div className="text-right">
-          <p className="text-primary font-extrabold text-xl leading-none">{avgRating}</p>
-          <p className="text-cinema-muted text-[10px]">/ 5 · {reviews.length} đg</p>
-        </div>
+        {reviews.length > 0 && (
+          <div className="text-right flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded-lg border border-primary/20">
+              <svg className="w-3.5 h-3.5 text-primary" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+              <span className="text-primary font-bold text-sm">
+                {(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)}
+              </span>
+            </div>
+            <p className="text-cinema-muted text-[10px]">{reviews.length} đánh giá</p>
+          </div>
+        )}
       </div>
 
       {/* Review list */}
@@ -190,22 +195,40 @@ export default function CinemaDetail() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      cinemaService.getById(cinemaId),
-      movieService.getAll({ size: 100 }),
-      slotService.getAll({ size: 1000 })
-    ]).then(([cinemaData, movieRes, slotRes]) => {
-      setCinema(cinemaData);
-      
-      const mList = Array.isArray(movieRes) ? movieRes : (movieRes?.content || movieRes?.data || []);
-      setAllMovies(mList);
+    import('../../services/api').then(({ default: api }) => {
+      Promise.all([
+        cinemaService.getById(cinemaId),
+        movieService.getAll({ size: 100 }),
+        slotService.getAll({ size: 1000 }),
+        api.get('/v1/cinema-reviews', { params: { size: 1000 } }).catch(() => ({ data: [] }))
+      ]).then(([cinemaData, movieRes, slotRes, reviewsRes]) => {
+        let cReviewsData = [];
+        if (Array.isArray(reviewsRes.data)) cReviewsData = reviewsRes.data;
+        else if (Array.isArray(reviewsRes.data?.data)) cReviewsData = reviewsRes.data.data;
+        else if (Array.isArray(reviewsRes.data?.content)) cReviewsData = reviewsRes.data.content;
+        else if (Array.isArray(reviewsRes.data?.data?.content)) cReviewsData = reviewsRes.data.data.content;
 
-      const sList = Array.isArray(slotRes) ? slotRes : (slotRes?.content || slotRes?.data || []);
-      setAllShowtimes(sList);
-    }).catch(err => {
-      console.error(err);
-    }).finally(() => {
-      setLoading(false);
+        const cReviews = cReviewsData.filter(r => r.cinemaId === Number(cinemaId));
+        let avg = 0;
+        if (cReviews.length > 0) {
+          avg = cReviews.reduce((sum, r) => sum + (r.rating || 5), 0) / cReviews.length;
+        }
+        
+        if (cinemaData) {
+          cinemaData.rating = avg > 0 ? Number(avg.toFixed(1)) : 0;
+        }
+        setCinema(cinemaData);
+        
+        const mList = Array.isArray(movieRes) ? movieRes : (movieRes?.content || movieRes?.data || []);
+        setAllMovies(mList);
+
+        const sList = Array.isArray(slotRes) ? slotRes : (slotRes?.content || slotRes?.data || []);
+        setAllShowtimes(sList);
+      }).catch(err => {
+        console.error(err);
+      }).finally(() => {
+        setLoading(false);
+      });
     });
   }, [cinemaId]);
 
@@ -542,6 +565,7 @@ export default function CinemaDetail() {
                 </div>
               </motion.div>
             )}
+
 
             {/* Cinema Rating Section */}
             <CinemaRatingSection cinemaId={cinemaId} cinemaName={cinema.name} />

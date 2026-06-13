@@ -585,13 +585,8 @@ export default function Profile() {
         });
         localStorage.setItem('reviewed_movie_' + reviewModal.booking?.ticketId, 'true');
       } else {
-        const cinemasRes = await api.get('/v1/cinemas').catch(() => ({ data: [] }));
-        let cinemas = [];
-        if (cinemasRes.data) {
-          if (Array.isArray(cinemasRes.data)) cinemas = cinemasRes.data;
-          else if (Array.isArray(cinemasRes.data.content)) cinemas = cinemasRes.data.content;
-          else if (Array.isArray(cinemasRes.data.data)) cinemas = cinemasRes.data.data;
-        }
+        const { default: cinemaService } = await import('../../services/cinemaService');
+        const cinemas = await cinemaService.getAll();
         const matchedCinema = cinemas.find(c => c.name === reviewModal.booking?.cinema || reviewModal.booking?.cinema?.includes(c.name));
         const cinemaId = matchedCinema ? matchedCinema.id : 1;
 
