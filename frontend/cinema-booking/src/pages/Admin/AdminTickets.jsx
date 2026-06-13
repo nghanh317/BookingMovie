@@ -261,13 +261,13 @@ export default function AdminTickets() {
 
   // Pagination
   const [page, setPage]                 = useState(0);
-  const [totalPages, setTotalPages]     = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
   const PAGE_SIZE = 10;
+  const FETCH_SIZE = 1000;
 
   // Filters
   const [search, setSearch]             = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [payFilter, setPayFilter]       = useState('PAID');
   
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -283,40 +283,44 @@ export default function AdminTickets() {
     }, 400);
   };
 
-  // Fetch
+  // Fetch all tickets once
   const fetchTickets = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const params = {
-        page,
-        size: PAGE_SIZE,
+        page: 0,
+        size: FETCH_SIZE,
         sort: 'id,desc',
       };
-      // accountId search by keyword — backend supports accountId filter; for name search we pass keyword if backend supports
       const data = await ticketService.getAll(params);
       const content = data?.content ?? data?.data ?? data ?? [];
       setTickets(Array.isArray(content) ? content : []);
-      setTotalPages(data?.totalPages ?? 1);
-      setTotalElements(data?.totalElements ?? content.length);
     } catch (e) {
       setError('Không thể tải danh sách vé. Vui lòng thử lại!');
       setTickets([]);
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, []);
 
   useEffect(() => { fetchTickets(); }, [fetchTickets]);
 
-  // Client-side search filter on loaded tickets (for name search)
-  const displayedTickets = debouncedSearch
-    ? tickets.filter(t =>
-        (t.accountsFullName || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        (t.ticketsCode || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        String(t.id).includes(debouncedSearch)
-      )
-    : tickets;
+  // Client-side search
+  const filteredTickets = tickets
+    .filter(t => payFilter === 'ALL' || t.paymentStatus === payFilter)
+    .filter(t => debouncedSearch ? (
+      (t.accountsFullName || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      (t.ticketsCode || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      String(t.id).includes(debouncedSearch)
+    ) : true);
+
+  const totalElements = filteredTickets.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+
+  // Client-side pagination
+  const displayedTickets = filteredTickets.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   // Stats summary
   const paidCount      = tickets.filter(t => t.paymentStatus === 'PAID').length;
@@ -373,12 +377,23 @@ export default function AdminTickets() {
           className="input-field w-64"
         />
 
-        {search && (
+        {/* Filter Dropdown */}
+        <select
+          value={payFilter}
+          onChange={e => { setPayFilter(e.target.value); setPage(0); }}
+          className="input-field"
+        >
+          <option value="ALL">Tất cả trạng thái</option>
+          <option value="PAID">Chỉ vé Đã thanh toán</option>
+          <option value="UNPAID">Chỉ vé Chưa thanh toán</option>
+        </select>
+
+        {(search || payFilter !== 'PAID') && (
           <button
-            onClick={() => { setSearch(''); setDebouncedSearch(''); setPage(0); }}
+            onClick={() => { setSearch(''); setDebouncedSearch(''); setPayFilter('PAID'); setPage(0); }}
             className="text-xs text-cinema-muted hover:text-red-400 transition-colors"
           >
-            ✕ Xóa bộ lọc
+            ✕ Đặt lại bộ lọc
           </button>
         )}
       </div>
@@ -452,43 +467,43 @@ export default function AdminTickets() {
         {!loading && totalPages > 0 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-cinema-border">
             <p className="text-cinema-muted text-xs">
-              Trang {page + 1} / {totalPages} · {totalElements} vé
+              Trang {currentPage + 1} / {totalPages} · {totalElements} vé
             </p>
             <div className="flex gap-1">
               <button
                 onClick={() => setPage(0)}
-                disabled={page === 0}
+                disabled={currentPage === 0}
                 className="px-2 py-1 rounded text-xs text-cinema-muted hover:text-white disabled:opacity-30 transition-colors"
               >«</button>
               <button
-                onClick={() => setPage(p => Math.max(0, p - 1))}
-                disabled={page === 0}
+                onClick={() => setPage(Math.max(0, currentPage - 1))}
+                disabled={currentPage === 0}
                 className="px-3 py-1 rounded text-xs text-cinema-muted hover:text-white disabled:opacity-30 transition-colors"
               >‹ Trước</button>
 
               {/* Page numbers */}
               {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                const startPage = Math.max(0, Math.min(page - 2, totalPages - 5));
+                const startPage = Math.max(0, Math.min(currentPage - 2, totalPages - 5));
                 const p = startPage + i;
                 return (
                   <button
                     key={p}
                     onClick={() => setPage(p)}
                     className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                      p === page ? 'bg-primary text-cinema-black' : 'text-cinema-muted hover:text-white'
+                      p === currentPage ? 'bg-primary text-cinema-black' : 'text-cinema-muted hover:text-white'
                     }`}
                   >{p + 1}</button>
                 );
               })}
 
               <button
-                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                disabled={page >= totalPages - 1}
+                onClick={() => setPage(Math.min(totalPages - 1, currentPage + 1))}
+                disabled={currentPage >= totalPages - 1}
                 className="px-3 py-1 rounded text-xs text-cinema-muted hover:text-white disabled:opacity-30 transition-colors"
               >Sau ›</button>
               <button
                 onClick={() => setPage(totalPages - 1)}
-                disabled={page >= totalPages - 1}
+                disabled={currentPage >= totalPages - 1}
                 className="px-2 py-1 rounded text-xs text-cinema-muted hover:text-white disabled:opacity-30 transition-colors"
               >»</button>
             </div>
