@@ -13,6 +13,22 @@ function MovieFormModal({ movie, onClose, onSave }) {
     ageRating: 'T13', status: 'coming_soon', poster: '', backdrop: '', trailer: ''
   });
 
+  const [error, setError] = useState(null);
+
+  const handleSubmit = () => {
+    if (!form.title || form.title.trim() === '') {
+      setError('Tên phim không được bỏ trống');
+      return;
+    }
+    if (!form.duration || Number(form.duration) <= 0) {
+      setError('Thời lượng phim phải lớn hơn 0 phút');
+      return;
+    }
+    setError(null);
+    onSave(form);
+    onClose();
+  };
+
   const GENRE_OPTIONS = ['Hành động','Tình cảm','Hài','Kinh dị','Hoạt hình','Khoa học viễn tưởng','Drama','Gia đình','Phiêu lưu'];
 
   const toggleGenre = (g) => {
@@ -54,10 +70,15 @@ function MovieFormModal({ movie, onClose, onSave }) {
         </div>
 
         <div className="space-y-4">
+          {error && (
+            <div className="bg-red-500/20 border border-red-500/50 text-red-300 px-4 py-2 rounded-lg text-sm mb-4">
+              ⚠️ {error}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="block text-cinema-muted text-xs mb-1.5">Tên phim *</label>
-              <input value={form.title} onChange={e => setForm({...form, title: e.target.value})}
+              <input value={form.title} onChange={e => { setForm({...form, title: e.target.value}); setError(null); }}
                 placeholder="Avengers: Secret Wars" className="input-field" />
             </div>
             <div>
@@ -66,8 +87,8 @@ function MovieFormModal({ movie, onClose, onSave }) {
                 placeholder="VD: Christopher Nolan" className="input-field" />
             </div>
             <div>
-              <label className="block text-cinema-muted text-xs mb-1.5">Thời lượng (phút)</label>
-              <input type="number" value={form.duration} onChange={e => setForm({...form, duration: e.target.value})}
+              <label className="block text-cinema-muted text-xs mb-1.5">Thời lượng (phút) *</label>
+              <input type="number" value={form.duration} onChange={e => { setForm({...form, duration: e.target.value}); setError(null); }}
                 placeholder="120" className="input-field" />
             </div>
             <div>
@@ -142,7 +163,7 @@ function MovieFormModal({ movie, onClose, onSave }) {
           </div>
           <div className="flex gap-3 pt-2">
             <button onClick={onClose} className="flex-1 btn-outline py-2.5 text-sm">Huỷ</button>
-            <button onClick={() => { onSave(form); onClose(); }} className="flex-1 btn-primary py-2.5 text-sm">
+            <button onClick={handleSubmit} className="flex-1 btn-primary py-2.5 text-sm">
               {movie ? 'Lưu thay đổi' : 'Thêm phim'}
             </button>
           </div>

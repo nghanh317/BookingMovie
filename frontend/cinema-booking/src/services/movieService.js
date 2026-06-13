@@ -31,7 +31,9 @@ const normalize = (movie) => ({
   language: movie.language || 'Tiếng Anh',
   releaseDate: movie.releaseDate || movie.release_date || '',
   director: movie.director || '',
-  cast: Array.isArray(movie.cast) ? movie.cast : [],
+  cast: Array.isArray(movie.cast)
+    ? movie.cast
+    : (movie.cast || '').split(',').map((c) => c.trim()).filter(Boolean),
   description: movie.description || movie.content || '',
   trailer: normalizeTrailer(movie.trailer || movie.trailerUrl || ''),
   status: (movie.status || 'now_showing').toLowerCase(),
