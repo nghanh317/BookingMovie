@@ -105,7 +105,7 @@ public class RoomService implements IRoomService {
 	}
 	
 	public void recalculateTotalSeats(Integer roomId) {
-		Long totalSeats = seatRepository.countByRoomsIdAndStatus(roomId, "active");
+		Long totalSeats = seatRepository.countByRoomsIdAndStatus(roomId, com.example.entity.Seats.Status.ACTIVE);
 		
 		Rooms room = roomRepository.findById(roomId)
 			.orElseThrow(() -> new RuntimeException("Room not found with id: " + roomId));

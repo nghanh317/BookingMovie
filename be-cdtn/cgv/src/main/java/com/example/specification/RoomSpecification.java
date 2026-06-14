@@ -16,14 +16,16 @@ import lombok.RequiredArgsConstructor;
 public class RoomSpecification {
 @SuppressWarnings ({"deprecation", "removal"})
 public static Specification<Rooms> buildWhere (RoomFilterForm filterform){
-	Specification<Rooms> where = Specification.where(null);
+	Specification<Rooms> where = (root, query, cb) -> 
+		cb.or(cb.equal(root.get("isDeleted"), false), cb.isNull(root.get("isDeleted")));
+		
 	if (filterform == null)
 		return where;
 	
 	if (!StringUtils.isEmpty(filterform.getSearch())) {
 		String search = filterform.getSearch().trim();
 		CustomSpecification nameSpecification = new CustomSpecification ("roomName", search);
-		where = Specification.where(nameSpecification);
+		where = where.and(nameSpecification);
 	}
 	if (filterform.getRoomId() != null) {
 		CustomSpecification statusSpecification = new CustomSpecification ("Id", filterform.getRoomId());

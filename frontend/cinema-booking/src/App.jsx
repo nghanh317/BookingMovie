@@ -7,6 +7,7 @@ import useAuthStore from './store/authStore';
 
 import Layout from './components/layout/Layout';
 import ScrollToTop from './components/layout/ScrollToTop';
+import ToastContainer from './components/ui/ToastContainer';
 import { RequireAuth, RequireAdmin } from './components/auth/ProtectedRoute';
 
 import Home from './pages/Home/Home';
@@ -64,6 +65,7 @@ function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <ToastContainer />
       <Routes>
         {/* ── Public routes ───────────────────────────── */}
         <Route path="/" element={<Layout><Home /></Layout>} />

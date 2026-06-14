@@ -23,17 +23,35 @@ const useNotificationStore = create(
           read: true,
         }
       ],
+      toasts: [],
       
-      addNotification: (notification) => set((state) => ({
-        notifications: [
-          {
-            id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-            date: new Date().toISOString(),
-            read: false,
-            ...notification,
-          },
-          ...state.notifications,
-        ].slice(0, 50), // Giữ tối đa 50 thông báo gần nhất
+      addNotification: (notification) => {
+        const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
+        
+        // Tự động xoá toast sau 4 giây
+        setTimeout(() => {
+          get().removeToast(id);
+        }, 4000);
+
+        set((state) => ({
+          notifications: [
+            {
+              id,
+              date: new Date().toISOString(),
+              read: false,
+              ...notification,
+            },
+            ...state.notifications,
+          ].slice(0, 50), // Giữ tối đa 50 thông báo gần nhất
+          toasts: [
+            ...state.toasts,
+            { id, type: notification.type || 'info', message: notification.message }
+          ].slice(0, 5), // Giữ tối đa 5 toast trên màn hình
+        }));
+      },
+
+      removeToast: (id) => set((state) => ({
+        toasts: state.toasts.filter(t => t.id !== id)
       })),
 
       markAsRead: (id) => set((state) => ({

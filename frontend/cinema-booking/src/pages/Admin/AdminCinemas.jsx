@@ -9,42 +9,41 @@ import roomService from '../../services/roomService';
 import seatService from '../../services/seatService';
 import seatTypeService from '../../services/seatTypeService';
 
+const VIETNAM_PROVINCES = [
+  "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu", "Bắc Ninh", "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước", "Bình Thuận", "Cà Mau", "Cần Thơ", "Cao Bằng", "Đà Nẵng", "Đắk Lắk", "Đắk Nông", "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Giang", "Hà Nam", "Hà Nội", "Hà Tĩnh", "Hải Dương", "Hải Phòng", "Hậu Giang", "Hòa Bình", "Hưng Yên", "Khánh Hòa", "Kiên Giang", "Kon Tum", "Lai Châu", "Lâm Đồng", "Lạng Sơn", "Lào Cai", "Long An", "Nam Định", "Nghệ An", "Ninh Bình", "Ninh Thuận", "Phú Thọ", "Phú Yên", "Quảng Bình", "Quảng Nam", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị", "Sóc Trăng", "Sơn La", "Tây Ninh", "Thái Bình", "Thái Nguyên", "Thanh Hóa", "Thừa Thiên Huế", "Tiền Giang", "TP Hồ Chí Minh", "Trà Vinh", "Tuyên Quang", "Vĩnh Long", "Vĩnh Phúc", "Yên Bái"
+];
+
 // ── Cinema Modal (Add / Edit) ─────────────────────────────
 function CinemaModal({ initialData, onClose, onSave, provinces }) {
   const isEdit = !!initialData;
+  const initialProvinceName = useMemo(() => {
+    if (initialData && initialData.provinceId) {
+      const p = provinces.find(x => x.id === initialData.provinceId);
+      if (p) return p.provinceName || p.name;
+    }
+    return '';
+  }, [initialData, provinces]);
+
   const [form, setForm] = useState(
     initialData
-      ? { ...initialData, newProvinceName: '' }
-      : { name: '', address: '', phone: '', email: '', provinceId: '', newProvinceName: '', image: '', latitude: '', longitude: '' }
+      ? { ...initialData, provinceName: initialProvinceName }
+      : { name: '', address: '', phone: '', email: '', provinceName: '', image: '' }
   );
-  const [isGeocoding, setIsGeocoding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showProvinceDropdown, setShowProvinceDropdown] = useState(false);
+  const [provinceSearch, setProvinceSearch] = useState('');
 
-  // Auto-geocode khi địa chỉ thay đổi (debounce 1.5s)
-  useEffect(() => {
-    if (!form.address || (initialData && form.address === initialData.address)) return;
-    const timer = setTimeout(handleGeocode, 1500);
-    return () => clearTimeout(timer);
-  }, [form.address]);
-
-  const handleGeocode = async () => {
-    if (!form.address) return;
-    setIsGeocoding(true);
-    try {
-      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(form.address)}&limit=1`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data?.features?.length > 0) {
-        const [lng, lat] = data.features[0].geometry.coordinates;
-        setForm(prev => ({ ...prev, latitude: parseFloat(lat), longitude: parseFloat(lng) }));
-      }
-    } catch (_) {
-      // Geocoding thất bại — không ảnh hưởng đến luồng chính
-    } finally {
-      setIsGeocoding(false);
-    }
-  };
+  const filteredProvinces = useMemo(() => {
+    const allNames = new Set(VIETNAM_PROVINCES);
+    provinces.forEach(p => {
+       const n = p.provinceName || p.name;
+       if (n) allNames.add(n);
+    });
+    return Array.from(allNames)
+      .filter(p => p.toLowerCase().includes(provinceSearch.toLowerCase()))
+      .sort((a, b) => a.localeCompare(b));
+  }, [provinceSearch, provinces]);
 
   const handleSave = async () => {
     // Validate bắt buộc
@@ -53,23 +52,23 @@ function CinemaModal({ initialData, onClose, onSave, provinces }) {
       return;
     }
 
-    let finalProvinceId = form.provinceId;
+    if (!form.provinceName) {
+      setError('Vui lòng chọn Tỉnh / Thành Phố.');
+      return;
+    }
 
-    // Nếu chọn "Thêm tỉnh mới"
-    if (form.provinceId === 'new') {
-      if (!form.newProvinceName.trim()) {
-        setError('Vui lòng nhập tên tỉnh/thành phố mới.');
-        return;
-      }
+    let finalProvinceId = null;
+    const existing = provinces.find(p => (p.provinceName || p.name) === form.provinceName);
+
+    if (existing) {
+      finalProvinceId = existing.id;
+    } else {
       setSaving(true);
       try {
-        // Backend trả void → re-fetch để tìm ID tỉnh vừa tạo
-        await provinceService.create({ provinceName: form.newProvinceName.trim() });
+        await provinceService.create({ provinceName: form.provinceName });
         const freshProvinces = await provinceService.getAll();
-        const provList = Array.isArray(freshProvinces)
-          ? freshProvinces
-          : (freshProvinces?.content || freshProvinces?.data || []);
-        const created = provList.find(p => (p.provinceName || p.name) === form.newProvinceName.trim());
+        const provList = Array.isArray(freshProvinces) ? freshProvinces : (freshProvinces?.content || freshProvinces?.data || []);
+        const created = provList.find(p => (p.provinceName || p.name) === form.provinceName);
         if (!created) throw new Error('Không tìm thấy tỉnh vừa tạo.');
         finalProvinceId = created.id;
       } catch (err) {
@@ -77,12 +76,6 @@ function CinemaModal({ initialData, onClose, onSave, provinces }) {
         setSaving(false);
         return;
       }
-    }
-
-    if (!finalProvinceId) {
-      setError('Vui lòng chọn Tỉnh / Thành Phố.');
-      setSaving(false);
-      return;
     }
 
     setError('');
@@ -97,8 +90,6 @@ function CinemaModal({ initialData, onClose, onSave, provinces }) {
         email: form.email || '',
         provinceId: finalProvinceId,
         image: form.image || '',
-        latitude: form.latitude || null,
-        longitude: form.longitude || null,
       });
     } catch (_) {
       // Lỗi đã được xử lý bởi handleSaveCinema (parent)
@@ -128,53 +119,75 @@ function CinemaModal({ initialData, onClose, onSave, provinces }) {
             <label className="text-cinema-muted text-xs mb-1 block">Tên Rạp *</label>
             <input className="input-field" placeholder="VD: CGV Vincom Center" value={form.name} onChange={e => f('name', e.target.value)} />
           </div>
-          <div>
+          <div className="relative">
             <label className="text-cinema-muted text-xs mb-1 block">Tỉnh / Thành Phố *</label>
-            <div className="flex gap-2">
-              <select className="input-field cursor-pointer flex-1" value={form.provinceId || ''}
-                onChange={e => f('provinceId', e.target.value === 'new' ? 'new' : Number(e.target.value))}>
-                <option value="">Chọn tỉnh thành...</option>
-                {provinces.map(p => <option key={p.id} value={p.id}>{p.provinceName || p.name}</option>)}
-                <option value="new">➕ Thêm tỉnh thành khác...</option>
-              </select>
-              {form.provinceId === 'new' && (
-                <input className="input-field flex-1" placeholder="Nhập tên tỉnh mới..."
-                  value={form.newProvinceName} onChange={e => f('newProvinceName', e.target.value)} autoFocus />
-              )}
+            <div 
+              className="input-field cursor-pointer flex items-center justify-between"
+              onClick={() => setShowProvinceDropdown(!showProvinceDropdown)}
+            >
+              <span className={form.provinceName ? 'text-white' : 'text-cinema-muted'}>
+                {form.provinceName || 'Chọn tỉnh thành...'}
+              </span>
+              <span className="text-xs">▼</span>
             </div>
+            
+            <AnimatePresence>
+              {showProvinceDropdown && (
+                <>
+                  <div className="fixed inset-0 z-[5]" onClick={() => setShowProvinceDropdown(false)} />
+                  <motion.div 
+                    initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+                    className="absolute z-10 top-full left-0 right-0 mt-1 bg-cinema-surface border border-cinema-border rounded-lg shadow-xl overflow-hidden"
+                  >
+                    <div className="p-2 border-b border-cinema-border">
+                      <input 
+                        type="text" 
+                        placeholder="🔍 Tìm tỉnh thành..." 
+                        className="input-field py-1.5 w-full text-sm bg-cinema-card"
+                        value={provinceSearch}
+                        onChange={e => setProvinceSearch(e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      {filteredProvinces.length > 0 ? filteredProvinces.map(p => (
+                        <div 
+                          key={p} 
+                          className={`px-3 py-2 text-sm cursor-pointer hover:bg-primary/20 ${form.provinceName === p ? 'bg-primary/10 text-primary' : 'text-white'}`}
+                          onClick={() => {
+                            f('provinceName', p);
+                            setShowProvinceDropdown(false);
+                            setProvinceSearch('');
+                          }}
+                        >
+                          {p}
+                        </div>
+                      )) : (
+                        <div className="px-3 py-3 text-xs text-cinema-muted text-center">Không tìm thấy tỉnh nào.</div>
+                      )}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
           <div>
             <label className="text-cinema-muted text-xs mb-1 block">Địa chỉ *</label>
-            <div className="flex gap-2 items-center">
-              <input className="input-field flex-1" placeholder="VD: Tầng 3, TTTM Vincom..."
-                value={form.address} onChange={e => f('address', e.target.value)} />
-              <button type="button" onClick={handleGeocode} disabled={isGeocoding}
-                className="btn-outline px-3 text-xs">📍 Quét</button>
-            </div>
-            {isGeocoding && <span className="text-xs text-primary mt-1 inline-block animate-pulse">Đang dò toạ độ...</span>}
+            <input className="input-field w-full" placeholder="VD: Tầng 3, TTTM Vincom..."
+              value={form.address} onChange={e => f('address', e.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-cinema-muted text-xs mb-1 block">Số điện thoại</label>
-              <input className="input-field" placeholder="VD: 0924783748" value={form.phone} onChange={e => f('phone', e.target.value)} />
+              <input className="input-field" placeholder="VD: 0924783748" value={form.phone} onChange={e => f('phone', e.target.value)} maxLength={15} />
             </div>
             <div>
               <label className="text-cinema-muted text-xs mb-1 block">Email</label>
               <input className="input-field" placeholder="VD: email@cgv.vn" value={form.email} onChange={e => f('email', e.target.value)} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-cinema-muted text-xs mb-1 block">Vĩ độ (Latitude)</label>
-              <input type="number" className="input-field opacity-60 cursor-not-allowed" readOnly disabled
-                placeholder="Tự động từ địa chỉ..." value={form.latitude ?? ''} />
-            </div>
-            <div>
-              <label className="text-cinema-muted text-xs mb-1 block">Kinh độ (Longitude)</label>
-              <input type="number" className="input-field opacity-60 cursor-not-allowed" readOnly disabled
-                placeholder="Tự động từ địa chỉ..." value={form.longitude ?? ''} />
-            </div>
-          </div>
+
           <div>
             <label className="text-cinema-muted text-xs mb-1 block">Link ảnh (URL)</label>
             <input className="input-field" placeholder="https://..." value={form.image} onChange={e => f('image', e.target.value)} />
@@ -412,7 +425,12 @@ export default function AdminCinemas() {
         addNotification({ title: 'Không có quyền', message: 'Tài khoản không có quyền Admin.', type: 'error', isAdmin: true });
         return;
       }
-      const errMsg = error.response?.data?.detailMessage || error.response?.data?.message || error.message || 'Không thể lưu rạp chiếu phim';
+      let errMsg = error.response?.data?.detailMessage || error.response?.data?.message || error.message || 'Không thể lưu rạp chiếu phim';
+      
+      if (errMsg.includes('Data too long for column \'phone\'')) {
+        errMsg = 'Số điện thoại quá dài (tối đa 15 ký tự).';
+      }
+      
       addNotification({ title: 'Lỗi', message: errMsg, type: 'error', isAdmin: true });
     }
   };
@@ -538,7 +556,7 @@ export default function AdminCinemas() {
                               <div>
                                 <label className="block text-cinema-muted text-xs mb-1">Loại phòng</label>
                                 <select value={roomForm.roomType} onChange={e => setRoomForm({ ...roomForm, roomType: e.target.value })} className="input-field py-1.5 pr-8">
-                                  {['Standard', 'VIP', 'IMAX', '4DX'].map(f => <option key={f} value={f}>{f}</option>)}
+                                  {['Standard', 'VIP'].map(f => <option key={f} value={f}>{f}</option>)}
                                 </select>
                               </div>
                               <button onClick={() => handleAddRoom(cinema.id)} disabled={savingRoom} className="btn-primary px-4 py-1.5 text-sm h-[38px]">
@@ -564,7 +582,7 @@ export default function AdminCinemas() {
                                       <div>
                                         <label className="text-cinema-muted text-xs">Loại phòng</label>
                                         <select value={editRoomForm.roomType} onChange={e => setEditRoomForm({ ...editRoomForm, roomType: e.target.value })} className="input-field py-1 text-xs mt-1 w-full">
-                                          {['Standard', 'VIP', 'IMAX', '4DX'].map(f => <option key={f} value={f}>{f}</option>)}
+                                          {['Standard', 'VIP'].map(f => <option key={f} value={f}>{f}</option>)}
                                         </select>
                                       </div>
                                       <div className="flex gap-2">
