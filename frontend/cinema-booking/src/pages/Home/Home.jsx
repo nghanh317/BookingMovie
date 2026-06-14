@@ -113,7 +113,7 @@ function StatsBar({ stats }) {
   const items = [
     { icon: '🎬', value: stats.movies, label: 'Phim được chiếu' },
     { icon: '🏟️', value: stats.cinemas, label: 'Rạp chiếu phim' },
-    { icon: '🎟️', value: stats.tickets, label: 'Vé đã bán' },
+    { icon: '🎟️', value: stats.tickets > 100 ? '100+' : stats.tickets, label: 'Vé đã bán' },
     { icon: '⭐', value: stats.rating, label: 'Đánh giá phim TB' },
   ];
   return (

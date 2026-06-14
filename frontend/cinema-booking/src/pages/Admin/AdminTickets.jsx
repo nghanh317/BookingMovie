@@ -412,7 +412,7 @@ export default function AdminTickets() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-cinema-dark border-b border-cinema-border">
-                {['ID', 'Mã vé', 'Khách hàng', 'Ngày đặt', 'Thành tiền'].map(h => (
+                {['STT', 'Mã vé', 'Khách hàng', 'Ngày đặt', 'Thành tiền'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-cinema-muted text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                     {h}
                   </th>
@@ -438,7 +438,9 @@ export default function AdminTickets() {
                     transition={{ delay: idx * 0.03 }}
                     className="border-b border-cinema-border hover:bg-cinema-dark/50 transition-colors"
                   >
-                    <td className="px-4 py-3 text-cinema-muted text-xs">#{ticket.id}</td>
+                    <td className="px-4 py-3 text-cinema-muted text-xs">
+                      {currentPage * PAGE_SIZE + idx + 1}
+                    </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => { setSelectedTicket(ticket); setShowDetailModal(true); }}

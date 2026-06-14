@@ -463,7 +463,7 @@ export default function Cinemas() {
             { icon: '🏟️', value: cinemas.length, label: 'Tổng rạp' },
             { icon: '📍', value: availableProvinces.length, label: 'Tỉnh thành' },
             { icon: '🎬', value: cinemas.reduce((a, c) => a + c.screens, 0), label: 'Phòng chiếu' },
-            { icon: '⭐', value: cinemas.length > 0 ? (cinemas.reduce((a, c) => a + c.rating, 0) / cinemas.length).toFixed(1) : 0, label: 'Đánh giá TB' },
+            { icon: '⭐', value: (() => { const rated = cinemas.filter(c => c.rating > 0); return rated.length > 0 ? (rated.reduce((a, c) => a + c.rating, 0) / rated.length).toFixed(1) : 0; })(), label: 'Đánh giá TB' },
           ].map((s, i) => (
             <motion.div
               key={s.label}
