@@ -64,12 +64,12 @@ function BotMessage({ text, movies, showtimes, options, onOption }) {
                         Xem chi tiết →
                       </Link>
                       {movie.status === 'now_showing' && (
-                        <button
-                          onClick={() => onOption(`Cho tôi xem lịch chiếu của phim ${movie.title}`)}
+                        <Link
+                          to={`/booking/${movie.id}`}
                           className="text-accent text-[10px] hover:underline font-medium text-left"
                         >
                           🎟 Xem lịch chiếu / Đặt vé
-                        </button>
+                        </Link>
                       )}
                     </div>
                   </div>
