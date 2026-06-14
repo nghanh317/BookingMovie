@@ -215,9 +215,11 @@ public class SeatService implements ISeatService {
 		
 		if (diff != 0) {
 			List<Slots> slots = slotRepository.findByRoomsId(roomId);
+			java.util.Date tenMinsAgo = new java.util.Date(System.currentTimeMillis() - (10 * 60 * 1000));
 			for (Slots s : slots) {
-				int newEmpty = (s.getEmptySeats() != null ? s.getEmptySeats() : 0) + diff;
-				s.setEmptySeats(Math.max(0, newEmpty));
+				int bookedCount = bookingSeatRepository.findUnavailableBySlotId(s.getId(), tenMinsAgo).size();
+				int newEmpty = Math.max(0, totalSeats.intValue() - bookedCount);
+				s.setEmptySeats(newEmpty);
 				slotRepository.save(s);
 			}
 		}

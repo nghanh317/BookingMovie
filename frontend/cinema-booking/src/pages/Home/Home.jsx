@@ -163,8 +163,8 @@ export default function Home() {
       else if (Array.isArray(res?.data)) content = res.data;
       else if (Array.isArray(res)) content = res;
 
-      // Tính tổng số lượng ghế đã đặt từ tất cả vé PAID
-      const total = content.reduce((sum, ticket) => sum + (ticket.seats ? ticket.seats.length : 0), 0);
+      // Đếm theo số lượng phiếu đặt vé (đơn hàng) thay vì đếm từng ghế
+      const total = content.length;
       const display = total > 0 ? total.toLocaleString() : '0';
       setStats(prev => ({ ...prev, tickets: display }));
     }).catch(() => {});

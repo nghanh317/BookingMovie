@@ -36,7 +36,13 @@ public class SlotService implements ISlotService {
 	private RoomRepository roomRepository;
 	
 	@Autowired
+	private com.example.repository.BookingSeatRepository bookingSeatRepository;
+	
+	@Autowired
 	private PricingService pricingService;
+	
+	@Autowired
+	private com.example.repository.MovieRepository movieRepository;
 
 	@Override
 	public Page<SlotDTO> getAllSlot(Pageable pageable, SlotFilterForm filterForm) {
@@ -66,7 +72,13 @@ public class SlotService implements ISlotService {
 				dto.setPrice(slot.getPrice());
 				dto.setVipPrice(slot.getVipPrice());
 				dto.setCouplePrice(slot.getCouplePrice());
-				dto.setEmptySeats(slot.getEmptySeats());
+				
+				int totalSeats = slot.getRooms() != null && slot.getRooms().getTotalSeats() != null ? slot.getRooms().getTotalSeats() : 0;
+				java.util.Date tenMinsAgo = new java.util.Date(System.currentTimeMillis() - (10 * 60 * 1000));
+				int bookedCount = bookingSeatRepository.findUnavailableBySlotId(slot.getId(), tenMinsAgo).size();
+				int realEmpty = Math.max(0, totalSeats - bookedCount);
+				dto.setEmptySeats(realEmpty);
+				
 				dto.setCreateDate(slot.getCreateDate());
 				return dto;
 			}).collect(Collectors.toList());
@@ -98,7 +110,13 @@ public class SlotService implements ISlotService {
 		dto.setPrice(slot.getPrice());
 		dto.setVipPrice(slot.getVipPrice());
 		dto.setCouplePrice(slot.getCouplePrice());
-		dto.setEmptySeats(slot.getEmptySeats());
+		
+		int totalSeats = slot.getRooms() != null && slot.getRooms().getTotalSeats() != null ? slot.getRooms().getTotalSeats() : 0;
+		java.util.Date tenMinsAgo = new java.util.Date(System.currentTimeMillis() - (10 * 60 * 1000));
+		int bookedCount = bookingSeatRepository.findUnavailableBySlotId(slot.getId(), tenMinsAgo).size();
+		int realEmpty = Math.max(0, totalSeats - bookedCount);
+		dto.setEmptySeats(realEmpty);
+		
 		dto.setCreateDate(slot.getCreateDate());
 		return dto;
 	}
@@ -106,6 +124,23 @@ public class SlotService implements ISlotService {
 	@Override
 	@Transactional
 	public void createSlot(CreateSlotForm form) {
+		Movies movie = movieRepository.findById(form.getMovieId())
+			.orElseThrow(() -> new RuntimeException("Movie not found"));
+			
+		// So sánh ngày (chỉ lấy phần ngày của showTime và releaseDate)
+		SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyyMMdd");
+		dateFormatter.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+		if (movie.getReleaseDate() != null) {
+			String showDateStr = dateFormatter.format(form.getShowTime());
+			String releaseDateStr = dateFormatter.format(movie.getReleaseDate());
+			if (showDateStr.compareTo(releaseDateStr) < 0) {
+				SimpleDateFormat printFmt = new SimpleDateFormat("dd/MM/yyyy");
+				String msg = String.format("Không thể tạo suất chiếu! Phim '%s' dự kiến ra mắt vào ngày %s, bạn không thể tạo suất chiếu trước ngày này.", 
+					movie.getTitle(), printFmt.format(movie.getReleaseDate()));
+				throw new SlotOverlapException("Lỗi ngày chiếu", msg);
+			}
+		}
+
 		List<Slots> overlapping = slotRepository.findOverlappingSlots(form.getRoomId(), form.getShowTime(), form.getEndTime());
 		if (!overlapping.isEmpty()) {
 			Slots overlap = overlapping.get(0);
@@ -134,8 +169,6 @@ public class SlotService implements ISlotService {
 		createSlot.setVipPrice(vPrice);
 		createSlot.setCouplePrice(cPrice);
 		
-		Movies movie = new Movies();
-		movie.setId(form.getMovieId());
 		createSlot.setMovies(movie);
 		
 		createSlot.setRooms(room);
@@ -146,6 +179,23 @@ public class SlotService implements ISlotService {
 	@Override
 	@Transactional
 	public void updateSlot(Integer id, UpdateSlotForm form) {
+		Movies movieObj = movieRepository.findById(form.getMovieId())
+			.orElseThrow(() -> new RuntimeException("Movie not found"));
+			
+		// So sánh ngày (chỉ lấy phần ngày của showTime và releaseDate)
+		SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyyMMdd");
+		dateFormatter.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+		if (movieObj.getReleaseDate() != null) {
+			String showDateStr = dateFormatter.format(form.getShowTime());
+			String releaseDateStr = dateFormatter.format(movieObj.getReleaseDate());
+			if (showDateStr.compareTo(releaseDateStr) < 0) {
+				SimpleDateFormat printFmt = new SimpleDateFormat("dd/MM/yyyy");
+				String msg = String.format("Không thể cập nhật suất chiếu! Phim '%s' dự kiến ra mắt vào ngày %s.", 
+					movieObj.getTitle(), printFmt.format(movieObj.getReleaseDate()));
+				throw new SlotOverlapException("Lỗi ngày chiếu", msg);
+			}
+		}
+
 		List<Slots> overlapping = slotRepository.findOverlappingSlots(form.getRoomId(), form.getShowTime(), form.getEndTime());
 		Slots overlap = overlapping.stream().filter(s -> !s.getId().equals(id)).findFirst().orElse(null);
 		if (overlap != null) {
@@ -168,9 +218,7 @@ public class SlotService implements ISlotService {
 		BigDecimal vPrice = form.getVipPrice() != null ? form.getVipPrice() : autoPrice.multiply(new BigDecimal("1.3"));
 		BigDecimal cPrice = form.getCouplePrice() != null ? form.getCouplePrice() : autoPrice.multiply(new BigDecimal("1.8"));
 		
-		Movies movie = new Movies();
-		movie.setId(form.getMovieId());
-		updateSlot.setMovies(movie);
+		updateSlot.setMovies(movieObj);
 		
 		Rooms room = roomRepository.findById(form.getRoomId())
 			.orElseThrow(() -> new RuntimeException("Room not found with id: " + form.getRoomId()));

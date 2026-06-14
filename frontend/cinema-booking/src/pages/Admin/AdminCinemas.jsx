@@ -17,9 +17,12 @@ const VIETNAM_PROVINCES = [
 function CinemaModal({ initialData, onClose, onSave, provinces }) {
   const isEdit = !!initialData;
   const initialProvinceName = useMemo(() => {
-    if (initialData && initialData.provinceId) {
-      const p = provinces.find(x => x.id === initialData.provinceId);
-      if (p) return p.provinceName || p.name;
+    if (initialData) {
+      if (initialData.provinceId) {
+        const p = provinces.find(x => x.id === initialData.provinceId);
+        if (p) return p.provinceName || p.name;
+      }
+      if (initialData.province) return initialData.province;
     }
     return '';
   }, [initialData, provinces]);
@@ -122,13 +125,13 @@ function CinemaModal({ initialData, onClose, onSave, provinces }) {
           <div className="relative">
             <label className="text-cinema-muted text-xs mb-1 block">Tỉnh / Thành Phố *</label>
             <div 
-              className="input-field cursor-pointer flex items-center justify-between"
-              onClick={() => setShowProvinceDropdown(!showProvinceDropdown)}
+              className={`input-field flex items-center justify-between ${isEdit ? 'bg-cinema-surface/50 opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+              onClick={() => { if (!isEdit) setShowProvinceDropdown(!showProvinceDropdown); }}
             >
               <span className={form.provinceName ? 'text-white' : 'text-cinema-muted'}>
                 {form.provinceName || 'Chọn tỉnh thành...'}
               </span>
-              <span className="text-xs">▼</span>
+              {!isEdit && <span className="text-xs">▼</span>}
             </div>
             
             <AnimatePresence>
@@ -174,8 +177,13 @@ function CinemaModal({ initialData, onClose, onSave, provinces }) {
           </div>
           <div>
             <label className="text-cinema-muted text-xs mb-1 block">Địa chỉ *</label>
-            <input className="input-field w-full" placeholder="VD: Tầng 3, TTTM Vincom..."
-              value={form.address} onChange={e => f('address', e.target.value)} />
+            <input 
+              className={`input-field w-full ${isEdit ? 'bg-cinema-surface/50 opacity-70 cursor-not-allowed' : ''}`} 
+              placeholder="VD: Tầng 3, TTTM Vincom..."
+              value={form.address} 
+              onChange={e => f('address', e.target.value)} 
+              disabled={isEdit}
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

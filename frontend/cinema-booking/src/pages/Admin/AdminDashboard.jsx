@@ -189,6 +189,7 @@ export default function AdminDashboard() {
         const todayStr = new Date().toISOString().split('T')[0];
         let todayTicketsCount = 0;
         let todayRevenueAmount = 0;
+        let allTimeTicketsCount = 0;
         
         // Xử lý các năm khả dụng
         const years = new Set([new Date().getFullYear()]);
@@ -212,6 +213,7 @@ export default function AdminDashboard() {
             const amount = (ticket.finalAmount || ticket.totalAmount || 0);
 
             allTimeRevenueAmount += amount;
+            allTimeTicketsCount += 1;
 
             if (ticketDateStr === todayStr) {
               todayTicketsCount += 1;
@@ -247,7 +249,7 @@ export default function AdminDashboard() {
                 };
               }
               // Tính số vé cho mỗi lượt đặt
-              movieCounts[movieId].ticketCount += (ticket.seats?.length || 1);
+              movieCounts[movieId].ticketCount += 1;
               // Cộng dồn doanh thu
               movieCounts[movieId].totalRevenue += amount;
             }
@@ -278,7 +280,7 @@ export default function AdminDashboard() {
         setStatsData([
           { label: 'Tổng phim', value: allMovies.length, icon: '🎬', change: 'Đang chiếu & Sắp chiếu', color: 'border-blue-500/30 bg-blue-500/5' },
           { label: 'Rạp chiếu phim', value: cinemasCount, icon: '🏟️', change: 'Đang hoạt động', color: 'border-green-500/30 bg-green-500/5' },
-          { label: 'Lượt đặt vé hôm nay', value: todayTicketsCount, icon: '🎟️', change: 'Realtime', color: 'border-primary/30 bg-primary/5' },
+          { label: 'Tổng số vé bán ra', value: allTimeTicketsCount, icon: '🎟️', change: 'Toàn thời gian', color: 'border-primary/30 bg-primary/5' },
           { label: 'Doanh thu hôm nay', value: formattedRevenue, icon: '💰', change: 'Realtime', color: 'border-accent/30 bg-accent/5' },
         ]);
 

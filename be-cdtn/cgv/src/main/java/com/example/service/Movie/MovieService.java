@@ -42,6 +42,9 @@ public class MovieService implements IMovieService {
 	@Autowired
 	private SlotRepository slotRepository;
 
+	@Autowired
+	private com.example.repository.BookingSeatRepository bookingSeatRepository;
+
 	@Override
 	public Page<MovieDTO> getAllMovie(Pageable pageable, MovieFilterForm filterform) {
 		Specification<Movies> where = MovieSpecification.buildWhere(filterform);
@@ -169,12 +172,48 @@ public class MovieService implements IMovieService {
 	}
 
 	@Override
+	@org.springframework.transaction.annotation.Transactional
 	public void deleteMovie(Integer id) {
-		Movies delete = movieRepository.findById(id).get();
+		Movies delete = movieRepository.findById(id)
+			.orElseThrow(() -> new RuntimeException("Movie not found"));
+			
+		List<Slots> slots = slotRepository.findByMoviesIdOrderByShowTime(id);
+		java.util.Date now = new java.util.Date();
+		java.util.Date tenMinsAgo = new java.util.Date(now.getTime() - (10 * 60 * 1000));
+		
+		boolean hasFutureBookedSlots = false;
+		
+		for (Slots slot : slots) {
+			if (slot.getIsDeleted() != null && slot.getIsDeleted()) continue;
+			
+			// Kiểm tra các suất chiếu chưa kết thúc
+			if (slot.getEndTime() != null && slot.getEndTime().after(now)) {
+				// Kiểm tra xem có người đặt vé chưa
+				int bookedCount = bookingSeatRepository.findUnavailableBySlotId(slot.getId(), tenMinsAgo).size();
+				if (bookedCount > 0) {
+					hasFutureBookedSlots = true;
+					break;
+				}
+			}
+		}
+		
+		if (hasFutureBookedSlots) {
+			throw new IllegalStateException("Phim đang có suất chiếu (đã có người đặt vé) nên không thể xóa.");
+		}
+		
+		// Xoá mềm phim
 		delete.setIsDeleted(true);
 		movieRepository.save(delete);
+		
+		// Xoá mềm tất cả các suất chiếu chưa bị xoá của phim này
+		for (Slots slot : slots) {
+			if (slot.getIsDeleted() == null || !slot.getIsDeleted()) {
+				slot.setIsDeleted(true);
+				slotRepository.save(slot);
+			}
+		}
 
-	// XÓA CACHE
+	    // XÓA CACHE
     	redisTemplate.delete("movie:detail:" + id);
 	}
 

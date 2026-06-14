@@ -114,6 +114,27 @@ export default function AdminShowtimes() {
       const showTime = toDateTimeStr(form.date, form.time);
       const movie = movies.find(m => m.id === +form.movieId);
       const durationMs = (movie?.duration || 120) * 60 * 1000;
+      
+      // Bắt lỗi trực tiếp ở Frontend: Không cho tạo suất chiếu trước ngày phim ra mắt
+      if (movie?.releaseDate) {
+        const releaseDate = new Date(movie.releaseDate);
+        releaseDate.setHours(0, 0, 0, 0); // Chỉ so sánh ngày
+        const showDateObj = new Date(form.date);
+        showDateObj.setHours(0, 0, 0, 0);
+        
+        if (showDateObj < releaseDate) {
+          const formattedReleaseDate = releaseDate.toLocaleDateString('vi-VN');
+          addNotification({ 
+            title: 'Lỗi ngày chiếu', 
+            message: `Không thể tạo suất chiếu! Phim "${movie.title}" dự kiến ra mắt vào ngày ${formattedReleaseDate}.`, 
+            type: 'error', 
+            isAdmin: true 
+          });
+          setSaving(false);
+          return;
+        }
+      }
+
       const endTimeDate = new Date(new Date(`${form.date}T${form.time}:00`).getTime() + durationMs);
       const endTime = `${endTimeDate.toISOString().split('T')[0]} ${endTimeDate.toTimeString().substring(0, 5)}:00`;
 
@@ -507,11 +528,7 @@ export default function AdminShowtimes() {
                                             <p className="text-cinema-muted text-xs mb-2">
                                               Ghế còn: <span className="text-white font-medium">{st.availableSeats}</span> / {room.totalSeats || '?'}
                                             </p>
-                                            {st.price && (
-                                              <p className="text-[11px] text-cinema-muted mb-2">
-                                                Giá: <span className="text-primary font-semibold">{fmtPrice(Number(st.price))}</span>
-                                              </p>
-                                            )}
+
                                             <div className="flex gap-2">
                                               <button
                                                 disabled={!canEdit}

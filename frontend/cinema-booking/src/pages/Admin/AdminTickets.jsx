@@ -351,10 +351,10 @@ export default function AdminTickets() {
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { icon: '🎟️', label: 'Lượt đặt (trang này)', value: tickets.length, sub: `/${totalElements} tổng lượt` },
-          { icon: '✅', label: 'Đã thanh toán', value: paidCount, sub: 'trang này' },
-          { icon: '🎬', label: 'Đã xác nhận', value: confirmedCount, sub: 'trang này' },
-          { icon: '💰', label: 'Doanh thu (trang)', value: fmtMoney(totalRevenue), sub: 'vé đã thanh toán' },
+          { icon: '🎟️', label: 'Tổng số vé bán ra', value: paidCount, sub: `Toàn thời gian` },
+          { icon: '✅', label: 'Tổng số lượt đặt', value: totalElements, sub: 'kể cả chưa thanh toán' },
+          { icon: '🎬', label: 'Đã xác nhận', value: confirmedCount, sub: 'chờ xem phim' },
+          { icon: '💰', label: 'Doanh thu', value: fmtMoney(totalRevenue), sub: 'vé đã thanh toán' },
         ].map(({ icon, label, value, sub }) => (
           <div key={label} className="bg-cinema-surface border border-cinema-border rounded-xl p-3">
             <div className="flex items-center gap-2 mb-1">
