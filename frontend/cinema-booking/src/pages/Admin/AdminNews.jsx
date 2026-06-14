@@ -6,12 +6,8 @@ import newsService from '../../services/newsService';
 import movieService from '../../services/movieService';
 import promotionService from '../../services/promotionService';
 
-// ── Tabs giống phía user ─────────────────────────────────────
 const TABS = [
-  { key: 'review',  label: 'Review Phim',   icon: '🎬', category: 'Review phim' },
-  { key: 'preview', label: 'Dự Báo Phim',   icon: '🔮', category: 'Dự báo phim' },
-  { key: 'promo',   label: 'Khuyến Mãi',    icon: '🎉', category: 'Khuyến mãi' },
-  { key: 'news',    label: 'Tin Tức',       icon: '📰', category: 'Tin tức' },
+  { key: 'news', label: 'Tin Tức', icon: '📰', category: 'Tin tức' }
 ];
 
 const CATEGORY_COLOR = {
@@ -61,9 +57,7 @@ function fmtDate(dateStr) {
 
 // ── Modal tạo/sửa bài viết ───────────────────────────────────
 function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [], dbPromotions = [] }) {
-  const tabMeta   = TABS.find(t => t.key === tab);
-  const isPromo   = tab === 'promo';
-  const isPreview = tab === 'preview';
+  const isPreview = false;
 
   const today = new Date().toISOString().split('T')[0];
   const [form, setForm] = useState({
@@ -77,29 +71,7 @@ function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [], dbPr
     readTime:         article?.readTime      || '5 phút đọc',
     genre:            article?.genre?.join(', ') || '',
     tags:             article?.tags?.join(', ')  || '',
-    rating:           article?.rating        || '',
-    linkedMovieId:    article?.linkedMovieId || '',
-    // ── Review sections (accordion) ──
-    synopsis:         article?.sections?.synopsis         || '',
-    screenplay:       article?.sections?.screenplay       || '',
-    acting:           article?.sections?.acting           || '',
-    cinematography:   article?.sections?.cinematography   || '',
-    conclusion:       article?.sections?.conclusion       || '',
-    ratingScreenplay: article?.sections?.ratingScreenplay || '',
-    ratingActing:     article?.sections?.ratingActing     || '',
-    ratingCine:       article?.sections?.ratingCine       || '',
-    // ── Preview (Dự báo) fields ──
-    previewContent:   article?.previewContent  || '',
-    releaseDate:      formatDateForInput(article?.releaseDate) || '',
-    trailerUrl:       article?.trailerUrl      || '',
-    expectedRating:   article?.expectedRating  || '',
-    linkedMovieIds:   article?.linkedMovieIds?.join(', ') || (article?.linkedMovieId ? String(article.linkedMovieId) : ''),
-    // ── Khuyến mãi fields ──
-    voucherIds:       article?.voucherIds?.join(', ') || '',
-    promotionContent: article?.promotionContent || '',
-    discountPercent:  article?.discountPercent || '',
-    validFrom:        formatDateForInput(article?.validFrom) || today,
-    validTo:          formatDateForInput(article?.validTo)   || '',
+    content:          article?.content       || '',
   });
 
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -113,42 +85,15 @@ function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [], dbPr
       excerpt:     form.excerpt.trim(),
       coverImage:  form.coverImage || 'https://placehold.co/640x360/1a1a2e/e5b85c?text=CinemaBook',
       bannerImage: form.bannerImage || '',
-      category:    tabMeta.category,
+      category:    'Tin tức',
       genre:       form.genre.split(',').map(s => s.trim()).filter(Boolean),
-      rating:      form.rating ? +form.rating : null,
       author:      form.author,
       authorAvatar: form.authorAvatar,
       publishedAt: form.publishedAt,
       readTime:    form.readTime,
       tags:        form.tags.split(',').map(s => s.trim()).filter(Boolean),
       linkedMovieId: form.linkedMovieId ? +form.linkedMovieId : null,
-      // ── nội dung review accordion ──
-      sections: tab === 'review' ? {
-        synopsis:       form.synopsis,
-        screenplay:     form.screenplay,
-        acting:         form.acting,
-        cinematography: form.cinematography,
-        conclusion:     form.conclusion,
-        ratingScreenplay: form.ratingScreenplay,
-        ratingActing:   form.ratingActing,
-        ratingCine:     form.ratingCine,
-      } : undefined,
-      // ── preview đặc thú ──
-      ...(isPreview && {
-        previewContent:  form.previewContent,
-        releaseDate:     form.releaseDate,
-        trailerUrl:      form.trailerUrl,
-        expectedRating:  form.expectedRating ? +form.expectedRating : null,
-        linkedMovieIds:  form.linkedMovieIds.split(',').map(s => +s.trim()).filter(Boolean),
-      }),
-      // ── promo đặc thú ──
-      ...(isPromo && {
-        voucherIds:       (Array.isArray(form.voucherIds) ? form.voucherIds : form.voucherIds.split(',')).map(s=>typeof s === 'string' ? s.trim() : s).filter(Boolean),
-        promotionContent: form.promotionContent,
-        discountPercent:  form.discountPercent ? +form.discountPercent : null,
-        validFrom:        form.validFrom,
-        validTo:          form.validTo,
-      }),
+      content:     form.content,
     });
     onClose();
   };
@@ -323,108 +268,16 @@ function ArticleModal({ mode, article, tab, onClose, onSave, dbMovies = [], dbPr
             )}
           </div>
 
-          {/* Review-specific: 5 accordion sections */}
-          {tab === 'review' && (
-            <div className="bg-cinema-surface rounded-xl p-4 space-y-3 border border-cinema-border">
-              <p className="text-white text-xs font-semibold uppercase tracking-wide">⭐ Nội dung Review</p>
-              <div className="grid grid-cols-2 gap-3">
-                {renderField("Điểm Kịch bản (0-10)", "ratingScreenplay", "number", false, "VD: 9.0")}
-                {renderField("Điểm Diễn xuất (0-10)", "ratingActing", "number", false, "VD: 9.5")}
-                {renderField("Điểm Kỹ thuật (0-10)", "ratingCine", "number", false, "VD: 10")}
-                {renderField("Điểm Tổng thể (0-10)", "rating", "number", false, "VD: 9.1")}
-              </div>
-              <div>
-                <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor="synopsis">📖 Tóm tắt phim</label>
-                <textarea id="synopsis" className="input-field resize-none w-full" rows={3}
-                  placeholder="Nội dung tóm tắt cốt truyện bộ phim..."
-                  value={form.synopsis} onChange={e => f('synopsis', e.target.value)} />
-              </div>
-              <div>
-                <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor="screenplay">✍️ Review kịch bản</label>
-                <textarea id="screenplay" className="input-field resize-none w-full" rows={3}
-                  placeholder="Nhận xét về kịch bản, cốt truyện, tình tiết..."
-                  value={form.screenplay} onChange={e => f('screenplay', e.target.value)} />
-              </div>
-              <div>
-                <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor="acting">🎭 Diễn xuất</label>
-                <textarea id="acting" className="input-field resize-none w-full" rows={3}
-                  placeholder="Đánh giá diễn xuất của các diễn viên chính..."
-                  value={form.acting} onChange={e => f('acting', e.target.value)} />
-              </div>
-              <div>
-                <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor="cinematography">🎬 Quay dựng &amp; Kỹ xảo</label>
-                <textarea id="cinematography" className="input-field resize-none w-full" rows={3}
-                  placeholder="Chất lượng hình ảnh, âm thanh, kỹ xảo, nhạc phim..."
-                  value={form.cinematography} onChange={e => f('cinematography', e.target.value)} />
-              </div>
-              <div>
-                <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor="conclusion">🏆 Nhận xét tổng kết</label>
-                <textarea id="conclusion" className="input-field resize-none w-full" rows={3}
-                  placeholder="Kết luận tổng hợp..."
-                  value={form.conclusion} onChange={e => f('conclusion', e.target.value)} />
-              </div>
+          {/* Nội dung bài viết chung */}
+          <div className="bg-cinema-surface rounded-xl p-4 space-y-3 border border-cinema-border">
+            <p className="text-white text-xs font-semibold uppercase tracking-wide">📰 Nội dung bài viết</p>
+            <div>
+              <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor="content">Nội dung chi tiết <span className="text-red-400">*</span></label>
+              <textarea id="content" className="input-field resize-none w-full" rows={15}
+                placeholder="Nhập nội dung bài viết tin tức tại đây..."
+                value={form.content} onChange={e => f('content', e.target.value)} />
             </div>
-          )}
-
-          {/* Preview-specific */}
-          {isPreview && (
-            <div className="bg-cinema-surface rounded-xl p-4 space-y-3 border border-cinema-border">
-              <p className="text-white text-xs font-semibold uppercase tracking-wide">🔮 Dự Báo Phim</p>
-              <div>
-                <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor="previewContent">📰 Nội dung bài viết <span className="text-red-400">*</span></label>
-                <textarea id="previewContent" className="input-field resize-none w-full" rows={8}
-                  placeholder="Viết nội dung chi tiết bài dự báo: những phim sẽ ra mắt, đợt lễ này có gì hay, phân tích tình hình phim...\nHỗ trợ xuống dòng để sắp xếp nội dung."
-                  value={form.previewContent} onChange={e => f('previewContent', e.target.value)} />
-              </div>
-            </div>
-          )}
-
-          {/* Promo-specific */}
-          {isPromo && (
-            <div className="bg-cinema-surface rounded-xl p-4 space-y-3 border border-cinema-border">
-              <p className="text-white text-xs font-semibold uppercase tracking-wide">🎉 Khuyến Mãi</p>
-              <div>
-                <label className="text-cinema-muted text-xs mb-1 block cursor-pointer">Chọn Voucher áp dụng</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
-                  {dbPromotions.map(v => {
-                    const ids = Array.isArray(form.voucherIds) 
-                      ? form.voucherIds 
-                      : (typeof form.voucherIds === 'string' ? form.voucherIds.split(',').map(s => s.trim()).filter(Boolean) : []);
-                    const checked = ids.includes(String(v.id)) || ids.includes(Number(v.id));
-                    return (
-                      <label key={v.id} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition-colors ${
-                        checked ? 'bg-primary/15 border border-primary/30 text-primary' : 'bg-cinema-card border border-cinema-border text-cinema-muted hover:border-primary/30'
-                      }`}>
-                        <input type="checkbox" className="accent-yellow-400" checked={checked}
-                          onChange={() => {
-                            const cur = Array.isArray(form.voucherIds) 
-                              ? form.voucherIds.map(String) 
-                              : (typeof form.voucherIds === 'string' ? form.voucherIds.split(',').map(s => s.trim()).filter(Boolean) : []);
-                            const next = checked ? cur.filter(x => x !== String(v.id)) : [...cur, String(v.id)];
-                            f('voucherIds', next);
-                          }} />
-                        <div>
-                          <p className="font-bold">{v.promotionCode}</p>
-                          <p className="text-[10px] truncate max-w-[120px]" title={v.description}>{v.description}</p>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-              {renderField("Phần trăm giảm giá (%)", "discountPercent", "number", false, "VD: 20")}
-              <div className="grid grid-cols-2 gap-3">
-                {renderField("Hiệu lực từ", "validFrom", "date")}
-                {renderField("Hết hạn", "validTo", "date")}
-              </div>
-              <div>
-                <label className="text-cinema-muted text-xs mb-1 block cursor-pointer" htmlFor="promotionContent">Nội dung chi tiết chương trình</label>
-                <textarea id="promotionContent" className="input-field resize-none w-full" rows={6}
-                  placeholder="Mô tả chi tiết các ưu đãi, điều khoản, cách thức nhận..."
-                  value={form.promotionContent} onChange={e => f('promotionContent', e.target.value)} />
-              </div>
-            </div>
-          )}
+          </div>
         </div>
 
         <div className="sticky bottom-0 bg-cinema-dark border-t border-cinema-border px-6 py-4 flex gap-3">
@@ -457,19 +310,12 @@ function ArticleRow({ article, onEdit, onDelete, onTogglePublish }) {
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span className="text-cinema-muted text-[11px]">✍️ {article.author}</span>
           <span className="text-cinema-muted text-[11px]">📅 {fmtDate(article.publishedAt)}</span>
-          {article.rating && <span className="text-primary text-[11px] font-bold">⭐ {article.rating}/10</span>}
-          {article.expectedRating && <span className="text-accent text-[11px]">🔮 Kỳ vọng {article.expectedRating}/10</span>}
-          {article.discountPercent && <span className="text-green-400 text-[11px]">🎉 Giảm {article.discountPercent}%</span>}
         </div>
       </div>
       <div className="flex gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={() => onEdit(article)}
           className="px-2 py-1 text-[11px] border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 rounded transition-colors">
           ✏️ Sửa
-        </button>
-        <button onClick={() => onTogglePublish(article.id)}
-          className="px-2 py-1 text-[11px] border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 rounded transition-colors">
-          {article.published === false ? '▶ Xuất bản' : '⏸ Ẩn'}
         </button>
         <button onClick={() => onDelete(article.id)}
           className="px-2 py-1 text-[11px] border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded transition-colors">
@@ -509,8 +355,11 @@ export default function AdminNews() {
         }
       }
 
+      // Lọc bỏ các bài viết đã bị xóa mềm từ backend
+      const activeContent = rawContent.filter(n => !n.isDeleted);
+
       // Map sang format dùng trong Admin (thêm field published)
-      setArticles(rawContent.map(n => ({
+      setArticles(activeContent.map(n => ({
         ...n,
         title: (n.title || '')
                  .replace(/&lt;span.*?&gt;\[.*?\]&lt;\/span&gt;/gi, '')
@@ -606,15 +455,14 @@ export default function AdminNews() {
   // Filtered list
   const filtered = useMemo(() => {
     return articles.filter(a => {
-      const matchTab = a.category === tabMeta.category;
       const matchSearch = !search.trim() ||
         a.title.toLowerCase().includes(search.toLowerCase()) ||
         (a.author || '').toLowerCase().includes(search.toLowerCase()) ||
         (a.tags || []).some(t => t.toLowerCase().includes(search.toLowerCase())) ||
         (a.excerpt || '').toLowerCase().includes(search.toLowerCase());
-      return matchTab && matchSearch;
+      return matchSearch;
     });
-  }, [articles, search, activeTab]);
+  }, [articles, search]);
 
   // Actions — kết nối API
   const handleSave = async (data) => {
@@ -669,22 +517,17 @@ export default function AdminNews() {
     }
   };
 
-  const handleTogglePublish = (id) => {
-    // Backend chỉ có isDeleted, toggle published là UI-only
-    setArticles(prev => prev.map(a => a.id === id ? { ...a, published: !a.published } : a));
-  };
+  // Không sử dụng Toggle Publish nữa
 
   const stats = useMemo(() => {
-    const tab = articles.filter(a => a.category === tabMeta.category || (tabMeta.category === 'Review phim' && !['Dự báo phim','Khuyến mãi'].includes(a.category)));
-    return { total: tab.length, published: tab.filter(a => a.published !== false).length };
-  }, [articles, activeTab]);
+    return { total: articles.length, published: articles.filter(a => a.published !== false).length };
+  }, [articles]);
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-heading font-extrabold text-2xl text-white">Quản lý Tin Tức</h2>
-          <p className="text-cinema-muted text-sm mt-0.5">Tạo và quản lý bài viết cho cả 3 mục tin tức</p>
         </div>
         <button
           onClick={() => setModal({ mode: 'create', article: null })}
@@ -694,36 +537,14 @@ export default function AdminNews() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-cinema-surface rounded-xl p-1 border border-cinema-border overflow-x-auto">
-        {TABS.map(tab => (
-          <button key={tab.key} onClick={() => { setActiveTab(tab.key); setSearch(''); setSuggestions([]); }}
-            className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-              activeTab === tab.key ? 'bg-cinema-card border border-cinema-border text-white shadow' : 'text-cinema-muted hover:text-white'
-            }`}>
-            <span>{tab.icon}</span>
-            <span>{tab.label}</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? 'bg-primary text-cinema-black' : 'bg-cinema-border text-cinema-muted'}`}>
-              {articles.filter(a => a.category === tab.category).length}
-            </span>
-          </button>
-        ))}
-      </div>
+      {/* Đã gộp thành 1 phần quản lý chung */}
 
       {/* Stats + Search */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex gap-3">
           <div className="rounded-xl border border-cinema-border bg-cinema-surface px-4 py-2">
             <p className="font-bold text-white">{stats.total}</p>
-            <p className="text-cinema-muted text-xs">Tổng bài</p>
-          </div>
-          <div className="rounded-xl border border-green-500/30 bg-green-500/5 px-4 py-2">
-            <p className="font-bold text-green-400">{stats.published}</p>
-            <p className="text-cinema-muted text-xs">Đã xuất bản</p>
-          </div>
-          <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 px-4 py-2">
-            <p className="font-bold text-orange-400">{stats.total - stats.published}</p>
-            <p className="text-cinema-muted text-xs">Đang ẩn</p>
+            <p className="text-cinema-muted text-xs">Tổng bài viết</p>
           </div>
         </div>
 
@@ -772,12 +593,11 @@ export default function AdminNews() {
       ) : (
         <div className="space-y-2">
           {filtered.map(a => (
-            <div key={a.id} className={a.published === false ? 'opacity-60' : ''}>
+            <div key={a.id}>
               <ArticleRow
                 article={a}
                 onEdit={(art) => setModal({ mode: 'edit', article: art })}
                 onDelete={handleDelete}
-                onTogglePublish={handleTogglePublish}
               />
             </div>
           ))}
